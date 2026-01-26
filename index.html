@@ -74,6 +74,15 @@
           </div>
 
           <div class="field">
+            <label for="sumberDana">Sumber Dana</label>
+            <select id="sumberDana">
+              <option value="">All</option>
+              <option value="eksploitasi">Eksploitasi</option>
+              <option value="investasi">Investasi</option>
+            </select>
+          </div>
+
+          <div class="field">
             <label>Timeframe</label>
             <div class="segmented timeframe-seg" data-control="timeframe" role="group">
               <button type="button" data-value="1D">D</button>
@@ -102,9 +111,7 @@
           </div>
         </div>
 
-        <div class="panel-note">
-          Data diambil dari database olahproc via API.
-        </div>
+        <div class="panel-note" hidden></div>
       </section>
 
       <section class="chart-panel animate-in" aria-label="Grafik time series">
@@ -120,41 +127,37 @@
           </div>
         </div>
         <div class="chart-tools" role="toolbar" aria-label="Chart tools">
-          <div class="tool-group">
-            <span class="tool-label">View</span>
-            <button type="button" class="tool-btn" id="toolFit">Fit</button>
-            <button type="button" class="tool-btn is-active" id="toolAutoScale">Auto</button>
-            <button type="button" class="tool-btn" id="toolLogScale">Log</button>
-            <button type="button" class="tool-btn" id="toolZoomIn">Zoom +</button>
-            <button type="button" class="tool-btn" id="toolZoomOut">Zoom -</button>
-            <button type="button" class="tool-btn" id="toolExport">Export</button>
-          </div>
-          <div class="tool-group">
-            <span class="tool-label">Indicators</span>
-            <button type="button" class="tool-btn" id="toolSMA">SMA</button>
-            <button type="button" class="tool-btn" id="toolEMA">EMA</button>
-            <button type="button" class="tool-btn" id="toolRSI">RSI</button>
-          </div>
-          <div class="tool-group">
-            <span class="tool-label">Draw</span>
-            <button type="button" class="tool-btn" id="toolHLine">H-Line</button>
-            <button type="button" class="tool-btn" id="toolVLine">V-Line</button>
-            <button type="button" class="tool-btn" id="toolTrend">Trend</button>
-            <button type="button" class="tool-btn" id="toolClearDraw">Clear</button>
-          </div>
-          <div class="tool-group">
-            <span class="tool-label">Templates</span>
-            <select id="templateSelect" class="tool-select" aria-label="Template">
-              <option value="">-- pilih template --</option>
+          <div class="tool-row">
+            <button type="button" class="tool-btn icon-btn" id="toolFit" title="Fit" data-tip="Fit">F</button>
+            <button type="button" class="tool-btn icon-btn is-active" id="toolAutoScale" title="Auto scale" data-tip="Auto">A</button>
+            <button type="button" class="tool-btn icon-btn" id="toolLogScale" title="Log scale" data-tip="Log">L</button>
+            <button type="button" class="tool-btn icon-btn" id="toolNormalize" title="Normalize (Index 100)" data-tip="Normalize">N</button>
+            <button type="button" class="tool-btn icon-btn" id="toolZoomIn" title="Zoom in" data-tip="Zoom +">+</button>
+            <button type="button" class="tool-btn icon-btn" id="toolZoomOut" title="Zoom out" data-tip="Zoom -">-</button>
+            <button type="button" class="tool-btn icon-btn" id="toolExport" title="Export image" data-tip="Export PNG">PNG</button>
+            <button type="button" class="tool-btn icon-btn" id="toolExportCsv" title="Export CSV" data-tip="Export CSV">CSV</button>
+            <span class="tool-sep" aria-hidden="true"></span>
+            <button type="button" class="tool-btn icon-btn" id="toolSMA" title="SMA" data-tip="SMA">S</button>
+            <button type="button" class="tool-btn icon-btn" id="toolEMA" title="EMA" data-tip="EMA">E</button>
+            <button type="button" class="tool-btn icon-btn" id="toolRSI" title="RSI" data-tip="RSI">R</button>
+            <span class="tool-sep" aria-hidden="true"></span>
+            <button type="button" class="tool-btn icon-btn" id="toolHLine" title="Horizontal line" data-tip="H-Line">H</button>
+            <button type="button" class="tool-btn icon-btn" id="toolVLine" title="Vertical line" data-tip="V-Line">V</button>
+            <button type="button" class="tool-btn icon-btn" id="toolTrend" title="Trend line" data-tip="Trend">T</button>
+            <button type="button" class="tool-btn icon-btn" id="toolClearDraw" title="Clear drawings" data-tip="Clear">C</button>
+            <span class="tool-sep" aria-hidden="true"></span>
+            <select id="templateSelect" class="tool-select" aria-label="Template" title="Templates" data-tip="Template">
+              <option value="">-- template --</option>
             </select>
-            <button type="button" class="tool-btn" id="toolTemplateSave">Save</button>
-            <button type="button" class="tool-btn" id="toolTemplateLoad">Load</button>
-            <button type="button" class="tool-btn" id="toolTemplateDelete">Delete</button>
+            <button type="button" class="tool-btn icon-btn" id="toolTemplateSave" title="Save template" data-tip="Save">SV</button>
+            <button type="button" class="tool-btn icon-btn" id="toolTemplateLoad" title="Load template" data-tip="Load">LD</button>
+            <button type="button" class="tool-btn icon-btn" id="toolTemplateDelete" title="Delete template" data-tip="Delete">DL</button>
           </div>
         </div>
 
         <!-- TradingView Lightweight Charts Container -->
         <div class="chart-area" id="chartContainer"></div>
+        <div class="data-window" id="dataWindow">Hover chart untuk lihat data.</div>
         <div class="indicator-panel" id="rsiPanel" hidden>
           <div class="indicator-header">RSI (14)</div>
           <div class="indicator-area" id="rsiContainer"></div>
@@ -184,9 +187,7 @@
           </div>
         </div>
 
-        <div class="footnote">
-          Charts powered by TradingView Lightweight Charts. Data dari database olahproc.
-        </div>
+        <div class="footnote" hidden></div>
       </section>
     </main>
   </div>

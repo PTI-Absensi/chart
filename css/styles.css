@@ -5,6 +5,7 @@
   --surface-alt: #f8f5ef;
   --ink: #142019;
   --muted: #5b6b63;
+  --page-gutter: clamp(18px, 8%, 140px);
   --accent: #0f766e;
   --accent-2: #e76f51;
   --accent-3: #2a9d8f;
@@ -40,7 +41,7 @@ body {
   gap: 16px;
   padding: 12px 18px;
   margin: 18px auto 0;
-  width: min(1100px, 100% - 32px);
+  width: min(1400px, 100%);
   background: rgba(255, 255, 255, 0.86);
   border: 1px solid var(--stroke);
   border-radius: 999px;
@@ -87,6 +88,7 @@ body {
   min-height: 100vh;
   position: relative;
   overflow: hidden;
+  padding: 0 var(--page-gutter);
 }
 
 .page::before,
@@ -118,7 +120,7 @@ body {
 .hero {
   position: relative;
   z-index: 1;
-  padding: 64px 8vw 28px;
+  padding: 64px 0 28px;
 }
 
 .hero-inner {
@@ -168,7 +170,7 @@ h1 {
   display: grid;
   grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
   gap: 24px;
-  padding: 24px 8vw 64px;
+  padding: 24px 0 64px;
   align-items: start;
 }
 
@@ -268,7 +270,7 @@ select:focus {
 
 .chart-panel {
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .chart-panel::before {
@@ -310,23 +312,14 @@ select:focus {
 .chart-tools {
   margin-top: 10px;
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
-.tool-group {
+.tool-row {
   display: flex;
+  align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  align-items: center;
-}
-
-.tool-label {
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted);
-  margin-right: 6px;
 }
 
 .tool-btn {
@@ -340,6 +333,16 @@ select:focus {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
+.icon-btn {
+  min-width: 38px;
+  height: 32px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: 0.04em;
+}
+
 .tool-btn:hover {
   transform: translateY(-1px);
   box-shadow: 0 6px 12px rgba(20, 32, 25, 0.12);
@@ -351,6 +354,11 @@ select:focus {
   border-color: transparent;
 }
 
+.tool-btn.is-muted {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .tool-select {
   padding: 6px 10px;
   border-radius: 999px;
@@ -359,7 +367,41 @@ select:focus {
   color: var(--muted);
   font-weight: 600;
   font-size: 0.8rem;
-  min-width: 160px;
+  min-width: 120px;
+  height: 32px;
+}
+
+.tool-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--stroke);
+  display: inline-block;
+}
+
+.icon-btn[data-tip] {
+  position: relative;
+}
+
+.icon-btn[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: -32px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: #fff;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  border-radius: 8px;
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.icon-btn:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(4px);
 }
 
 .indicator-panel {
@@ -379,6 +421,18 @@ select:focus {
 
 .indicator-area {
   height: 120px;
+  position: relative;
+}
+
+.indicator-area::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(20, 32, 25, 0.12);
+  pointer-events: none;
 }
 
 .badge {
@@ -395,6 +449,51 @@ select:focus {
   margin-top: 20px;
   height: 360px;
   position: relative;
+}
+
+.chart-area::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(20, 32, 25, 0.12);
+  pointer-events: none;
+}
+
+.data-window {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--stroke);
+  background: #ffffff;
+  font-size: 0.85rem;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: center;
+}
+
+.data-window .data-date {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.data-window .data-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.data-window .data-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--accent);
 }
 
 .drawing-layer {
@@ -542,11 +641,11 @@ select:focus {
 
 @media (max-width: 640px) {
   .hero {
-    padding: 50px 6vw 24px;
+    padding: 50px 0 24px;
   }
 
   .layout {
-    padding: 18px 6vw 48px;
+    padding: 18px 0 48px;
   }
 
   .summary-grid {

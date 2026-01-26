@@ -25,9 +25,11 @@
     periodType: 'calendar',
     chartType: 'line',
     year: 2025,
+    sumberDana: '',
     seriesData: new Map(),
     autoScale: true,
     logScale: false,
+    normalize: false,
     indicators: {
       sma: false,
       ema: false,
@@ -59,6 +61,7 @@
     selectedSymbolName: document.getElementById('selectedSymbolName'),
     selectedSymbolDesc: document.getElementById('selectedSymbolDesc'),
     yearSelect: document.getElementById('year'),
+    sumberDanaSelect: document.getElementById('sumberDana'),
     summaryTotal: document.querySelector('[data-summary="total"]'),
     summaryPeak: document.querySelector('[data-summary="peak"]'),
     summaryPeakLabel: document.querySelector('[data-summary="peak-label"]'),
@@ -71,7 +74,9 @@
     toolFit: document.getElementById('toolFit'),
     toolAutoScale: document.getElementById('toolAutoScale'),
     toolLogScale: document.getElementById('toolLogScale'),
+    toolNormalize: document.getElementById('toolNormalize'),
     toolExport: document.getElementById('toolExport'),
+    toolExportCsv: document.getElementById('toolExportCsv'),
     toolZoomIn: document.getElementById('toolZoomIn'),
     toolZoomOut: document.getElementById('toolZoomOut'),
     toolSMA: document.getElementById('toolSMA'),
@@ -86,7 +91,8 @@
     toolTemplateLoad: document.getElementById('toolTemplateLoad'),
     toolTemplateDelete: document.getElementById('toolTemplateDelete'),
     rsiPanel: document.getElementById('rsiPanel'),
-    rsiContainer: document.getElementById('rsiContainer')
+    rsiContainer: document.getElementById('rsiContainer'),
+    dataWindow: document.getElementById('dataWindow')
   };
 
   // ==================== Chart Functions ====================
@@ -129,7 +135,7 @@
       },
       leftPriceScale: {
         borderColor: 'rgba(20, 32, 25, 0.12)',
-        visible: false  // Will be enabled when comparing symbols with different scales
+        visible: true
       },
       timeScale: {
         borderColor: 'rgba(20, 32, 25, 0.12)',
@@ -163,6 +169,10 @@
         rsiChart.timeScale().setVisibleLogicalRange(range);
       }
       renderDrawings();
+    });
+
+    chart.subscribeCrosshairMove((param) => {
+      updateDataWindow(param);
     });
   }
 
@@ -237,6 +247,23 @@
     return series;
   }
 
+  function normalizeSeries(data) {
+    if (!data || data.length === 0) return [];
+    let base = null;
+    for (let i = 0; i < data.length; i++) {
+      const val = data[i].close;
+      if (val !== 0 && val !== null && val !== undefined) {
+        base = val;
+        break;
+      }
+    }
+    if (!base) base = data[0].close || 1;
+    return data.map((d) => ({
+      time: d.time,
+      value: (d.close / base) * 100
+    }));
+  }
+
   function ensureRsiChart() {
     if (!els.rsiContainer) return;
     if (rsiChart) return;
@@ -303,7 +330,10 @@
 
   async function loadSymbolData(symbol, series, isPrimary = false) {
     try {
-      const url = `${API_BASE}/api/procurement/data/${symbol.symbol}?timeframe=${state.timeframe}&limit=200&period_type=${state.periodType}&year=${state.year}`;
+      const sumberDanaParam = state.sumberDana ? `&sumber_dana=${encodeURIComponent(state.sumberDana)}` : '';
+      const hasDanaSuffix = symbol.symbol.endsWith('_INV') || symbol.symbol.endsWith('_EKS') || symbol.symbol.startsWith('DANA_');
+      const finalDanaParam = hasDanaSuffix ? '' : sumberDanaParam;
+      const url = `${API_BASE}/api/procurement/data/${symbol.symbol}?timeframe=${state.timeframe}&limit=200&period_type=${state.periodType}&year=${state.year}${finalDanaParam}`;
       const response = await fetch(url);
       const result = await response.json();
 
@@ -311,18 +341,28 @@
         let chartData;
 
         if (state.chartType === 'candlestick' && isPrimary) {
-          chartData = result.data.map(d => ({
-            time: d.time,
-            open: d.open,
-            high: d.high,
-            low: d.low,
-            close: d.close
-          }));
+          let prevClose = null;
+          chartData = result.data.map((d, idx) => {
+            const close = d.close;
+            const open = idx === 0 || prevClose === null ? d.open : prevClose;
+            const high = Math.max(d.high, open, close);
+            const low = Math.min(d.low, open, close);
+            prevClose = close;
+            return {
+              time: d.time,
+              open,
+              high,
+              low,
+              close
+            };
+          });
         } else {
-          chartData = result.data.map(d => ({
-            time: d.time,
-            value: d.close
-          }));
+          chartData = state.normalize
+            ? normalizeSeries(result.data)
+            : result.data.map(d => ({
+                time: d.time,
+                value: d.close
+              }));
         }
 
         series.setData(chartData);
@@ -350,8 +390,12 @@
     // Load data for each symbol
     let primaryData = null;
 
-    for (let i = 0; i < state.symbols.length; i++) {
-      const symbol = state.symbols[i];
+    const symbolsToRender = state.chartType === 'candlestick'
+      ? state.symbols.slice(0, 1)
+      : state.symbols;
+
+    for (let i = 0; i < symbolsToRender.length; i++) {
+      const symbol = symbolsToRender[i];
       if (i === 0) {
         state.currentSymbol = symbol;
       }
@@ -376,6 +420,7 @@
 
     updateIndicators();
     renderDrawings();
+    updateDataWindow(null);
 
     // Update total list (per-series + combined)
     updateTotalsSummary();
@@ -435,6 +480,9 @@
 
     const unitText = state.currentSymbol?.unit || '';
     let subtitle = `${unitText} - ${getTimeframeLabel(state.timeframe)}`;
+    if (state.normalize && state.chartType !== 'candlestick') {
+      subtitle += ' • Index 100';
+    }
     if (state.chartType === 'candlestick' && state.symbols.length > 1) {
       subtitle += ' • Candle hanya untuk 1 series';
     }
@@ -679,6 +727,99 @@
     link.download = 'procurement-chart.png';
     link.href = canvas.toDataURL('image/png');
     link.click();
+  }
+
+  function exportSeriesCsv() {
+    if (!state.seriesData || state.seriesData.size === 0) return;
+
+    const symbols = state.symbols || [];
+    const rowsByTime = new Map();
+
+    symbols.forEach((symbol) => {
+      const data = state.seriesData.get(symbol.symbol) || [];
+      data.forEach((d) => {
+        const timeKey = d.time;
+        if (!rowsByTime.has(timeKey)) {
+          rowsByTime.set(timeKey, {});
+        }
+        rowsByTime.get(timeKey)[symbol.symbol] = d.close;
+      });
+    });
+
+    const times = Array.from(rowsByTime.keys()).sort((a, b) => a - b);
+    const header = ['date'].concat(symbols.map((s) => s.name));
+    const lines = [header.join(',')];
+
+    times.forEach((t) => {
+      const row = rowsByTime.get(t) || {};
+      const date = new Date(t * 1000).toISOString().split('T')[0];
+      const values = symbols.map((s) => {
+        const val = row[s.symbol];
+        if (val === undefined || val === null) return '';
+        return Number(val).toFixed(2);
+      });
+      lines.push([date].concat(values).join(','));
+    });
+
+    const csv = lines.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'chart-series.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function updateDataWindow(param) {
+    if (!els.dataWindow) return;
+    if (!param || !param.time) {
+      els.dataWindow.textContent = 'Hover chart untuk lihat data.';
+      return;
+    }
+
+    let dateText = '';
+    if (typeof param.time === 'object' && param.time.year) {
+      const { year, month, day } = param.time;
+      dateText = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    } else {
+      dateText = new Date(param.time * 1000).toISOString().split('T')[0];
+    }
+
+    const items = [];
+    state.symbols.forEach((symbol, index) => {
+      const series = seriesMap.get(symbol.symbol);
+      if (!series) return;
+      const point = param.seriesData.get(series);
+      if (!point) return;
+      const rawValue = point.value ?? point.close;
+      const isRupiah = symbol.unit === 'Rp' && !state.normalize;
+      const displayValue = state.normalize
+        ? rawValue.toFixed(2)
+        : formatValue(rawValue, isRupiah);
+      items.push({
+        name: symbol.name,
+        value: displayValue,
+        color: SERIES_COLORS[index % SERIES_COLORS.length].line
+      });
+    });
+
+    if (items.length === 0) {
+      els.dataWindow.textContent = 'Hover chart untuk lihat data.';
+      return;
+    }
+
+    const listHtml = items.map((item) => `
+      <span class="data-item">
+        <span class="data-dot" style="background:${item.color}"></span>
+        ${item.name}: ${item.value}
+      </span>
+    `).join('');
+
+    els.dataWindow.innerHTML = `
+      <span class="data-date">${dateText}</span>
+      ${listHtml}
+    `;
   }
 
   function getTemplateStore() {
@@ -1223,6 +1364,13 @@
       });
     }
 
+    if (els.sumberDanaSelect) {
+      els.sumberDanaSelect.addEventListener('change', (e) => {
+        state.sumberDana = e.target.value;
+        loadAllChartData();
+      });
+    }
+
     // Period type (Kalender / Anggaran)
     initSegmentedControl('periodType', (value) => {
       state.periodType = value;
@@ -1240,6 +1388,15 @@
     // Chart type
     initSegmentedControl('chartType', (value) => {
       state.chartType = value;
+      if (state.chartType === 'candlestick' && state.normalize) {
+        state.normalize = false;
+        if (els.toolNormalize) {
+          els.toolNormalize.classList.remove('is-active');
+        }
+      }
+      if (els.toolNormalize) {
+        els.toolNormalize.classList.toggle('is-muted', state.chartType === 'candlestick');
+      }
       loadAllChartData();
     });
 
@@ -1266,8 +1423,23 @@
       });
     }
 
+    if (els.toolNormalize) {
+      els.toolNormalize.addEventListener('click', () => {
+        if (state.chartType === 'candlestick') {
+          return;
+        }
+        state.normalize = !state.normalize;
+        els.toolNormalize.classList.toggle('is-active', state.normalize);
+        loadAllChartData();
+      });
+    }
+
     if (els.toolExport) {
       els.toolExport.addEventListener('click', exportChartImage);
+    }
+
+    if (els.toolExportCsv) {
+      els.toolExportCsv.addEventListener('click', exportSeriesCsv);
     }
 
     if (els.toolZoomIn) {
@@ -1354,6 +1526,10 @@
     if (els.badgeTimeframe) els.badgeTimeframe.textContent = 'Weekly';
     if (els.toolAutoScale) els.toolAutoScale.classList.toggle('is-active', state.autoScale);
     if (els.toolLogScale) els.toolLogScale.classList.toggle('is-active', state.logScale);
+    if (els.toolNormalize) {
+      els.toolNormalize.classList.toggle('is-active', state.normalize);
+      els.toolNormalize.classList.toggle('is-muted', state.chartType === 'candlestick');
+    }
     if (els.toolSMA) els.toolSMA.classList.toggle('is-active', state.indicators.sma);
     if (els.toolEMA) els.toolEMA.classList.toggle('is-active', state.indicators.ema);
     if (els.toolRSI) els.toolRSI.classList.toggle('is-active', state.indicators.rsi);
