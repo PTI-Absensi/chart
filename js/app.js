@@ -88,31 +88,52 @@
   let drawingLayer = null;
   const palette = ['#0f766e', '#e76f51', '#2a9d8f', '#f4a261', '#264653', '#8ecae6', '#ffb703'];
 
+  function getCssVar(name, fallback = '') {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+  }
+
+  function setTheme(theme, persist = true) {
+    document.body.dataset.theme = theme;
+    if (persist) localStorage.setItem('theme', theme);
+    const toggle = document.getElementById('themeToggle');
+    if (toggle) {
+      toggle.setAttribute('aria-pressed', theme === 'dark' ? 'true' : 'false');
+      const label = toggle.querySelector('span');
+      if (label) label.textContent = theme === 'dark' ? 'Dark' : 'Light';
+    }
+    applyChartAppearance();
+  }
+
   function initChart() {
     if (!els.chartContainer) return;
     if (chart) chart.remove();
+
+    const textColor = getCssVar('--chart-text', '#5b6b63');
+    const gridColor = getCssVar('--chart-grid', 'rgba(20, 32, 25, 0.06)');
+    const borderColor = getCssVar('--chart-grid-strong', 'rgba(20, 32, 25, 0.12)');
+    const crosshairColor = getCssVar('--chart-crosshair', '#0f766e');
 
     chart = LightweightCharts.createChart(els.chartContainer, {
       width: els.chartContainer.clientWidth || 960,
       height: 360,
       layout: {
         background: { type: 'solid', color: 'transparent' },
-        textColor: '#5b6b63',
+        textColor,
         fontFamily: "'Source Sans 3', sans-serif"
       },
       grid: {
-        vertLines: { color: 'rgba(20, 32, 25, 0.06)' },
-        horzLines: { color: 'rgba(20, 32, 25, 0.06)' }
+        vertLines: { color: gridColor },
+        horzLines: { color: gridColor }
       },
       crosshair: {
         mode: LightweightCharts.CrosshairMode.Normal,
-        vertLine: { color: '#0f766e', labelBackgroundColor: '#0f766e' },
-        horzLine: { color: '#0f766e', labelBackgroundColor: '#0f766e' }
+        vertLine: { color: crosshairColor, labelBackgroundColor: crosshairColor },
+        horzLine: { color: crosshairColor, labelBackgroundColor: crosshairColor }
       },
-      rightPriceScale: { borderColor: 'rgba(20, 32, 25, 0.12)' },
-      leftPriceScale: { borderColor: 'rgba(20, 32, 25, 0.12)', visible: false },
+      rightPriceScale: { borderColor },
+      leftPriceScale: { borderColor, visible: false },
       timeScale: {
-        borderColor: 'rgba(20, 32, 25, 0.12)',
+        borderColor,
         timeVisible: true,
         secondsVisible: false
       }
@@ -519,8 +540,17 @@
 
   function applyChartAppearance() {
     if (!chart) return;
-    const gridColor = state.appearance.showGrid ? 'rgba(20, 32, 25, 0.06)' : 'transparent';
+    const gridBase = getCssVar('--chart-grid', 'rgba(20, 32, 25, 0.06)');
+    const crosshairColor = getCssVar('--chart-crosshair', '#0f766e');
+    const borderColor = getCssVar('--chart-grid-strong', 'rgba(20, 32, 25, 0.12)');
+    const textColor = getCssVar('--chart-text', '#5b6b63');
+    const gridColor = state.appearance.showGrid ? gridBase : 'transparent';
     chart.applyOptions({
+      layout: {
+        background: { type: 'solid', color: 'transparent' },
+        textColor,
+        fontFamily: "'Source Sans 3', sans-serif"
+      },
       grid: {
         vertLines: { color: gridColor },
         horzLines: { color: gridColor }
@@ -528,16 +558,19 @@
       crosshair: {
         mode: LightweightCharts.CrosshairMode.Normal,
         vertLine: {
-          color: '#0f766e',
-          labelBackgroundColor: '#0f766e',
+          color: crosshairColor,
+          labelBackgroundColor: crosshairColor,
           visible: state.appearance.showCrosshair
         },
         horzLine: {
-          color: '#0f766e',
-          labelBackgroundColor: '#0f766e',
+          color: crosshairColor,
+          labelBackgroundColor: crosshairColor,
           visible: state.appearance.showCrosshair
         }
-      }
+      },
+      rightPriceScale: { borderColor },
+      leftPriceScale: { borderColor },
+      timeScale: { borderColor }
     });
     applyScaleOptions();
   }
@@ -872,6 +905,10 @@
   }
 
   async function init() {
+    const savedTheme = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    setTheme(savedTheme || (prefersDark ? 'dark' : 'light'), false);
+
     initChart();
     bindControls();
     initBadges();
@@ -892,6 +929,14 @@
     if (sideNavToggle && sideNav) {
       sideNavToggle.addEventListener('click', () => {
         sideNav.classList.toggle('is-collapsed');
+      });
+    }
+
+    const themeToggle = document.getElementById('themeToggle');
+    if (themeToggle) {
+      themeToggle.addEventListener('click', () => {
+        const next = document.body.dataset.theme === 'dark' ? 'light' : 'dark';
+        setTheme(next);
       });
     }
   }
