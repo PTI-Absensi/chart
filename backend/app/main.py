@@ -52,26 +52,36 @@ app.include_router(procurement_router)
 # Chart root directory (clean chart folder)
 CHART_DIR = Path(__file__).parent.parent.parent
 
-# Get procurement dashboard directory path (clean chart folder)
+# Legacy dashboard pages (inside chart folder)
 DASHBOARD_DIR = CHART_DIR
-
-# Other dashboard pages (inside chart folder)
 DFG_DASHBOARD = CHART_DIR / "dfg" / "index.html"
 PROCESS_TIME_DASHBOARD = CHART_DIR / "process-time" / "index.html"
+
+# Vite build output
+FRONTEND_DIST = CHART_DIR / "frontend" / "dist"
+FRONTEND_INDEX = FRONTEND_DIST / "index.html"
 
 # Mount static files (CSS, JS) for chart frontend
 if CHART_DIR.exists():
     app.mount("/css", StaticFiles(directory=CHART_DIR / "css"), name="css")
     app.mount("/js", StaticFiles(directory=CHART_DIR / "js"), name="js")
 
-# Mount static files for procurement dashboard
+# Mount static files for procurement dashboard (legacy)
 if DASHBOARD_DIR.exists():
     app.mount("/dashboard/static", StaticFiles(directory=DASHBOARD_DIR), name="dashboard_static")
+
+# Mount Vite assets when available
+if FRONTEND_DIST.exists():
+    assets_dir = FRONTEND_DIST / "assets"
+    if assets_dir.exists():
+        app.mount("/dashboard/assets", StaticFiles(directory=assets_dir), name="frontend_assets")
 
 
 @app.get("/")
 async def serve_frontend():
     """Serve the main frontend HTML"""
+    if FRONTEND_INDEX.exists():
+        return FileResponse(FRONTEND_INDEX)
     index_path = DASHBOARD_DIR / "index.html"
     if index_path.exists():
         return FileResponse(index_path)
@@ -81,6 +91,8 @@ async def serve_frontend():
 @app.get("/dashboard")
 async def serve_dashboard():
     """Serve the procurement dashboard (existing dashboard with TradingView charts)"""
+    if FRONTEND_INDEX.exists():
+        return FileResponse(FRONTEND_INDEX)
     index_path = DASHBOARD_DIR / "index.html"
     if index_path.exists():
         return FileResponse(index_path)
@@ -90,6 +102,8 @@ async def serve_dashboard():
 @app.get("/dashboard/dfg")
 async def serve_dfg_dashboard():
     """Serve the DFG dashboard page"""
+    if FRONTEND_INDEX.exists():
+        return FileResponse(FRONTEND_INDEX)
     if DFG_DASHBOARD.exists():
         return FileResponse(DFG_DASHBOARD)
     return {"message": "DFG dashboard not found. Please check dfg_module directory."}
@@ -98,6 +112,8 @@ async def serve_dfg_dashboard():
 @app.get("/dashboard/process-time")
 async def serve_process_time_dashboard():
     """Serve the process time dashboard page"""
+    if FRONTEND_INDEX.exists():
+        return FileResponse(FRONTEND_INDEX)
     if PROCESS_TIME_DASHBOARD.exists():
         return FileResponse(PROCESS_TIME_DASHBOARD)
     return {"message": "Process time dashboard not found. Please check process_time_module directory."}
