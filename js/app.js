@@ -17,12 +17,22 @@
     autoScale: true,
     logScale: false,
     dockToolbar: true,
+    appearance: {
+      showGrid: true,
+      showCrosshair: true,
+      showLeftScale: false,
+      lineWidth: 2,
+      areaOpacity: 0.2
+    },
     settings: {
       showHeader: true,
       showToolbar: true,
       showSummary: true,
       showDataWindow: true,
       showSeries: true,
+      showIndicators: true,
+      showDrawing: true,
+      showRsiPanel: false,
       enableCandle: true,
       enableBar: true
     }
@@ -47,6 +57,12 @@
     chartHeader: document.querySelector('.chart-header'),
     chartToolbar: document.querySelector('.chart-toolbar'),
     summaryGrid: document.querySelector('.summary-grid'),
+    chartTools: document.querySelector('.chart-tools'),
+    chartDock: document.querySelector('.chart-dock'),
+    indicatorDockPanel: document.getElementById('indicatorDockPanel'),
+    drawingDockPanel: document.getElementById('drawingDockPanel'),
+    drawingToolbar: document.getElementById('drawingToolbar'),
+    rsiPanel: document.getElementById('rsiPanel'),
     settingsPanel: document.getElementById('settingsPanel'),
     settingsToggles: document.querySelectorAll('[data-setting]'),
     toolFit: document.getElementById('toolFit'),
@@ -62,7 +78,9 @@
     searchModal: document.getElementById('searchModal'),
     searchDropdown: document.getElementById('searchDropdown'),
     symbolSearch: document.getElementById('symbolSearch'),
-    searchTrigger: document.getElementById('symbolSearchTrigger')
+    searchTrigger: document.getElementById('symbolSearchTrigger'),
+    lineWidthInput: document.getElementById('lineWidth'),
+    areaOpacityInput: document.getElementById('areaOpacity')
   };
 
   let chart = null;
@@ -154,15 +172,15 @@
     } else if (state.chartType === 'area') {
       series = chart.addAreaSeries({
         lineColor: color,
-        topColor: `${color}33`,
+        topColor: hexToRgba(color, state.appearance.areaOpacity),
         bottomColor: 'rgba(15, 118, 110, 0.05)',
-        lineWidth: 2,
+        lineWidth: state.appearance.lineWidth,
         priceScaleId: index === 0 ? 'right' : 'left'
       });
     } else {
       series = chart.addLineSeries({
         color,
-        lineWidth: 2,
+        lineWidth: state.appearance.lineWidth,
         crosshairMarkerVisible: true,
         crosshairMarkerRadius: 4,
         priceScaleId: index === 0 ? 'right' : 'left'
@@ -215,12 +233,23 @@
     if (state.chartType === 'area') {
       series.applyOptions({
         lineColor: color,
-        topColor: `${color}33`,
-        bottomColor: 'rgba(15, 118, 110, 0.05)'
+        topColor: hexToRgba(color, state.appearance.areaOpacity),
+        bottomColor: 'rgba(15, 118, 110, 0.05)',
+        lineWidth: state.appearance.lineWidth
       });
       return;
     }
-    series.applyOptions({ color });
+    series.applyOptions({ color, lineWidth: state.appearance.lineWidth });
+  }
+
+  function hexToRgba(hex, alpha) {
+    if (!hex || typeof hex !== 'string') return hex;
+    const clean = hex.replace('#', '');
+    if (clean.length !== 6) return hex;
+    const r = parseInt(clean.slice(0, 2), 16);
+    const g = parseInt(clean.slice(2, 4), 16);
+    const b = parseInt(clean.slice(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
 
   function setChartLoading(isLoading) {
@@ -481,9 +510,43 @@
       : undefined;
     const scaleOptions = { autoScale: state.autoScale };
     if (scaleMode !== undefined) scaleOptions.mode = scaleMode;
+    const leftVisible = state.appearance.showLeftScale || state.selectedSymbols.length > 1;
     chart.applyOptions({
       rightPriceScale: scaleOptions,
-      leftPriceScale: scaleOptions
+      leftPriceScale: { ...scaleOptions, visible: leftVisible }
+    });
+  }
+
+  function applyChartAppearance() {
+    if (!chart) return;
+    const gridColor = state.appearance.showGrid ? 'rgba(20, 32, 25, 0.06)' : 'transparent';
+    chart.applyOptions({
+      grid: {
+        vertLines: { color: gridColor },
+        horzLines: { color: gridColor }
+      },
+      crosshair: {
+        mode: LightweightCharts.CrosshairMode.Normal,
+        vertLine: {
+          color: '#0f766e',
+          labelBackgroundColor: '#0f766e',
+          visible: state.appearance.showCrosshair
+        },
+        horzLine: {
+          color: '#0f766e',
+          labelBackgroundColor: '#0f766e',
+          visible: state.appearance.showCrosshair
+        }
+      }
+    });
+    applyScaleOptions();
+  }
+
+  function applySeriesStyles() {
+    state.selectedSymbols.forEach((symbol, index) => {
+      const config = getSeriesConfig(symbol, index);
+      const series = seriesMap.get(symbol.symbol);
+      applySeriesColor(series, config.color, index);
     });
   }
 
@@ -544,6 +607,15 @@
     if (els.summaryGrid) els.summaryGrid.classList.toggle('is-hidden', !state.settings.showSummary);
     if (els.dataWindow) els.dataWindow.classList.toggle('is-hidden', !state.settings.showDataWindow);
     if (els.selectedSeriesRow) els.selectedSeriesRow.classList.toggle('is-hidden', !state.settings.showSeries);
+    if (els.chartTools) els.chartTools.classList.toggle('is-hidden', !state.settings.showIndicators);
+    if (els.drawingToolbar) els.drawingToolbar.classList.toggle('is-hidden', !state.settings.showDrawing);
+    if (els.chartDock) {
+      const showDock = state.settings.showIndicators || state.settings.showDrawing;
+      els.chartDock.classList.toggle('is-hidden', !showDock);
+    }
+    if (els.indicatorDockPanel) els.indicatorDockPanel.classList.toggle('is-hidden', !state.settings.showIndicators);
+    if (els.drawingDockPanel) els.drawingDockPanel.classList.toggle('is-hidden', !state.settings.showDrawing);
+    if (els.rsiPanel) els.rsiPanel.hidden = !state.settings.showRsiPanel;
     if (els.chartToolbar) {
       els.chartToolbar.classList.toggle('is-undocked', !state.dockToolbar);
     }
@@ -730,6 +802,9 @@
           if (!key) return;
           if (key === 'dockToolbar') {
             state.dockToolbar = input.checked;
+          } else if (Object.prototype.hasOwnProperty.call(state.appearance, key)) {
+            state.appearance[key] = input.checked;
+            applyChartAppearance();
           } else if (Object.prototype.hasOwnProperty.call(state.settings, key)) {
             state.settings[key] = input.checked;
           }
@@ -743,6 +818,19 @@
             document.querySelector('[data-control="chartType"] button[data-value="line"]')?.click();
           }
         });
+      });
+    }
+
+    if (els.lineWidthInput) {
+      els.lineWidthInput.addEventListener('input', (e) => {
+        state.appearance.lineWidth = parseInt(e.target.value, 10) || 2;
+        applySeriesStyles();
+      });
+    }
+    if (els.areaOpacityInput) {
+      els.areaOpacityInput.addEventListener('input', (e) => {
+        state.appearance.areaOpacity = parseFloat(e.target.value) || 0.2;
+        applySeriesStyles();
       });
     }
 
@@ -787,10 +875,13 @@
     initChart();
     bindControls();
     initBadges();
+    applyChartAppearance();
     applyIntroAnimations();
     await fetchSymbols();
     renderSelectedSeries();
     applySettings();
+    if (els.lineWidthInput) els.lineWidthInput.value = state.appearance.lineWidth;
+    if (els.areaOpacityInput) els.areaOpacityInput.value = state.appearance.areaOpacity;
     if (els.toolAutoScale) els.toolAutoScale.classList.toggle('is-active', state.autoScale);
     if (els.toolLogScale) els.toolLogScale.classList.toggle('is-active', state.logScale);
     if (els.toolNormalize) els.toolNormalize.classList.toggle('is-active', state.normalize);

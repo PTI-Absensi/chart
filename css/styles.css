@@ -1079,6 +1079,11 @@ select:focus {
   width: 80px;
 }
 
+.settings-grid input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent);
+}
+
 .summary-card {
   padding: 14px 16px;
   border-radius: var(--radius-sm);

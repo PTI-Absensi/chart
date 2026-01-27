@@ -14,15 +14,31 @@
 </head>
 
 <body>
-  <div class="page">
-    <nav class="top-nav">
-      <div class="nav-brand">Procurement Apps</div>
-      <div class="nav-links">
-        <a class="nav-link is-active" href="/dashboard">Chart</a>
-        <a class="nav-link" href="/dashboard/dfg">DFG</a>
-        <a class="nav-link" href="/dashboard/process-time">Process Time</a>
+  <div class="app-shell">
+    <aside class="side-nav is-expanded" id="sideNav">
+      <div class="side-nav-header">
+        <button class="side-nav-toggle" id="sideNavToggle" title="Toggle">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M5 12h14M5 18h14" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+        </button>
+        <div class="side-nav-title">Project Management</div>
       </div>
-    </nav>
+      <div class="side-nav-section">
+        <div class="side-nav-label">Apps</div>
+        <a class="side-nav-item is-active" href="/dashboard">
+          <span class="side-nav-icon">🌐</span>
+          <span class="side-nav-text">Procurement Charting</span>
+        </a>
+        <a class="side-nav-item" href="/dashboard/dfg">
+          <span class="side-nav-icon">📊</span>
+          <span class="side-nav-text">DFG</span>
+        </a>
+        <a class="side-nav-item" href="/dashboard/process-time">
+          <span class="side-nav-icon">⏱️</span>
+          <span class="side-nav-text">Process Time</span>
+        </a>
+      </div>
+    </aside>
+    <div class="page">
     <header class="hero animate-in">
       <div class="hero-inner">
         <div class="eyebrow">Procurement Analytics</div>
@@ -146,6 +162,12 @@
         <div class="chart-main">
           <div class="chart-canvas">
             <div class="chart-area" id="chartContainer"></div>
+            <div class="chart-loading" id="chartLoading" aria-hidden="true">
+              <div class="loading-bar"></div>
+              <div class="loading-bar"></div>
+              <div class="loading-bar"></div>
+              <div class="loading-bar"></div>
+            </div>
             <div class="chart-sidebar" id="drawingToolbar" aria-label="Drawing tools">
               <button class="sidebar-btn" data-tool="crosshair" title="Crosshair">
                 <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4" fill="none" stroke="currentColor" stroke-width="2"/></svg>
@@ -236,6 +258,11 @@
             <label><input type="checkbox" data-setting="showSummary" checked> Tampilkan summary</label>
             <label><input type="checkbox" data-setting="showDataWindow" checked> Tampilkan data window</label>
             <label><input type="checkbox" data-setting="showRsiPanel"> Tampilkan panel RSI</label>
+            <label><input type="checkbox" data-setting="showGrid" checked> Tampilkan grid</label>
+            <label><input type="checkbox" data-setting="showCrosshair" checked> Tampilkan crosshair</label>
+            <label><input type="checkbox" data-setting="showLeftScale"> Tampilkan sumbu kiri</label>
+            <label>Ketebalan garis <input type="range" id="lineWidth" min="1" max="4" step="1" value="2"></label>
+            <label>Opacity area <input type="range" id="areaOpacity" min="0.05" max="0.4" step="0.05" value="0.2"></label>
             <label><input type="checkbox" data-setting="enableCandle" checked> Aktifkan candlestick</label>
             <label><input type="checkbox" data-setting="enableBar" checked> Aktifkan bar chart</label>
             <label><input type="checkbox" data-setting="dockToolbar" checked> Dock toolbar</label>
@@ -261,6 +288,7 @@
         </div>
       </div>
       <div id="searchDropdown" class="search-dropdown search-results"></div>
+    </div>
     </div>
   </div>
 
