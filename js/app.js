@@ -12,6 +12,7 @@
     year: 2025,
     chartType: 'line',
     seriesData: new Map(),
+    seriesConfig: new Map(),
     normalize: false,
     autoScale: true,
     logScale: false,
@@ -67,6 +68,7 @@
   let chart = null;
   let seriesMap = new Map();
   let drawingLayer = null;
+  const palette = ['#0f766e', '#e76f51', '#2a9d8f', '#f4a261', '#264653', '#8ecae6', '#ffb703'];
 
   function initChart() {
     if (!els.chartContainer) return;
@@ -130,8 +132,8 @@
   }
 
   function createSeries(symbol, index) {
-    const palette = ['#0f766e', '#e76f51', '#2a9d8f', '#f4a261', '#264653'];
-    const color = palette[index % palette.length];
+    const config = getSeriesConfig(symbol, index);
+    const color = config.color;
     let series;
 
     if (state.chartType === 'candlestick' && index === 0) {
@@ -171,12 +173,54 @@
       chart.applyOptions({ leftPriceScale: { visible: true } });
     }
 
+    if (config.visible === false) {
+      series.applyOptions({ visible: false });
+    }
+
     return series;
   }
 
   function resetSeries() {
     seriesMap.forEach(series => chart.removeSeries(series));
     seriesMap.clear();
+  }
+
+  function getSeriesConfig(symbol, index) {
+    const key = symbol.symbol;
+    let config = state.seriesConfig.get(key);
+    if (!config) {
+      config = {
+        color: palette[index % palette.length],
+        visible: true
+      };
+      state.seriesConfig.set(key, config);
+    }
+    return config;
+  }
+
+  function applySeriesColor(series, color, index) {
+    if (!series) return;
+    if (state.chartType === 'candlestick' && index === 0) {
+      series.applyOptions({
+        upColor: color,
+        borderUpColor: color,
+        wickUpColor: color
+      });
+      return;
+    }
+    if (state.chartType === 'bar') {
+      series.applyOptions({ upColor: color });
+      return;
+    }
+    if (state.chartType === 'area') {
+      series.applyOptions({
+        lineColor: color,
+        topColor: `${color}33`,
+        bottomColor: 'rgba(15, 118, 110, 0.05)'
+      });
+      return;
+    }
+    series.applyOptions({ color });
   }
 
   function setChartLoading(isLoading) {
@@ -361,18 +405,53 @@
       return;
     }
 
-    const chips = state.selectedSymbols.map(s => `
-      <div class="series-chip">
-        <span class="series-name">${s.name || s.symbol}</span>
-        <span class="series-code">${s.symbol}</span>
-        <button type="button" class="remove-series" data-symbol="${s.symbol}" title="Hapus">x</button>
-      </div>
-    `).join('');
+    const chips = state.selectedSymbols.map((s, index) => {
+      const config = getSeriesConfig(s, index);
+      const chipClass = config.visible ? 'series-chip' : 'series-chip is-muted';
+      const toggleTitle = config.visible ? 'Sembunyikan series' : 'Tampilkan series';
+      return `
+        <div class="${chipClass}" data-symbol="${s.symbol}" style="--chip-color:${config.color}">
+          <span class="series-swatch" aria-hidden="true"></span>
+          <span class="series-name">${s.name || s.symbol}</span>
+          <span class="series-code">${s.symbol}</span>
+          <input type="color" class="series-color-input" value="${config.color}" aria-label="Warna series ${s.symbol}">
+          <button type="button" class="toggle-series" data-symbol="${s.symbol}" title="${toggleTitle}" aria-pressed="${config.visible ? 'true' : 'false'}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-6 10-6 10 6 10 6-4 6-10 6S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>
+          </button>
+          <button type="button" class="remove-series" data-symbol="${s.symbol}" title="Hapus">x</button>
+        </div>
+      `;
+    }).join('');
 
     els.selectedSeriesRow.innerHTML = `${chips}`;
 
     els.selectedSeriesRow.querySelectorAll('.remove-series').forEach(btn => {
       btn.addEventListener('click', () => removeSymbol(btn.dataset.symbol));
+    });
+    els.selectedSeriesRow.querySelectorAll('.toggle-series').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const symbol = btn.dataset.symbol;
+        const config = state.seriesConfig.get(symbol);
+        if (!config) return;
+        config.visible = !config.visible;
+        const series = seriesMap.get(symbol);
+        if (series) series.applyOptions({ visible: config.visible });
+        renderSelectedSeries();
+      });
+    });
+    els.selectedSeriesRow.querySelectorAll('.series-color-input').forEach((input) => {
+      input.addEventListener('input', (e) => {
+        const chip = e.target.closest('.series-chip');
+        if (!chip) return;
+        const symbol = chip.dataset.symbol;
+        const config = state.seriesConfig.get(symbol);
+        if (!config) return;
+        config.color = e.target.value;
+        chip.style.setProperty('--chip-color', config.color);
+        const series = seriesMap.get(symbol);
+        const index = state.selectedSymbols.findIndex(s => s.symbol === symbol);
+        applySeriesColor(series, config.color, index);
+      });
     });
     if (els.searchTrigger) {
       const primary = state.selectedSymbols[0];
@@ -523,6 +602,7 @@
 
   function removeSymbol(symbolCode) {
     state.selectedSymbols = state.selectedSymbols.filter(s => s.symbol !== symbolCode);
+    state.seriesConfig.delete(symbolCode);
     renderSelectedSeries();
     updateTitles();
     loadAllChartData();

@@ -419,6 +419,52 @@ select:focus {
   color: var(--ink);
 }
 
+.series-chip.is-muted {
+  opacity: 0.6;
+}
+
+.series-chip .series-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--chip-color, var(--accent));
+  border: 1px solid rgba(15, 46, 35, 0.2);
+  display: inline-block;
+}
+
+.series-chip .series-color-input {
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.series-chip .toggle-series {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  border: 1px solid var(--stroke);
+  background: var(--surface-alt);
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.series-chip .toggle-series svg {
+  width: 14px;
+  height: 14px;
+}
+
+.series-chip .toggle-series:hover {
+  color: var(--accent);
+  border-color: rgba(15, 118, 110, 0.35);
+}
+
 .series-chip .series-code {
   font-size: 0.82rem;
   color: var(--muted);
