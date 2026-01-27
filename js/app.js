@@ -1,113 +1,78 @@
 /**
- * Procurement Dashboard - TradingView Style
- * Using Lightweight Charts + Procurement API
- * With Multi-Series Support (Compare Symbols)
+ * Procurement Chart (kode_data) - multi-series
+ * UI: popup search + add series (+), filters period_type + year
  */
 (() => {
-  // API Base URL (chartsoftware backend)
-  const API_BASE = 'http://localhost:8000';
+  const API_BASE = window.location.origin;
 
-  // Color palette for multiple series
-  const SERIES_COLORS = [
-    { line: '#0f766e', area: 'rgba(15, 118, 110, 0.3)' },  // Teal (primary)
-    { line: '#e76f51', area: 'rgba(231, 111, 81, 0.3)' },  // Coral
-    { line: '#2a9d8f', area: 'rgba(42, 157, 143, 0.3)' },  // Sea green
-    { line: '#f4a261', area: 'rgba(244, 162, 97, 0.3)' },  // Sandy
-    { line: '#264653', area: 'rgba(38, 70, 83, 0.3)' },    // Charcoal
-    { line: '#9b59b6', area: 'rgba(155, 89, 182, 0.3)' },  // Purple
-  ];
-
-  // State
   const state = {
-    symbols: [],           // Array of symbols (for multi-series)
-    currentSymbol: null,   // Currently selected (main) symbol
-    timeframe: '1W',
+    symbols: [],
+    selectedSymbols: [],
     periodType: 'calendar',
-    chartType: 'line',
     year: 2025,
-    sumberDana: '',
+    chartType: 'line',
     seriesData: new Map(),
+    normalize: false,
     autoScale: true,
     logScale: false,
-    normalize: false,
-    indicators: {
-      sma: false,
-      ema: false,
-      rsi: false
-    },
-    drawingTool: 'none',
-    drawings: [],
-    pendingPoint: null
+    dockToolbar: true,
+    settings: {
+      showHeader: true,
+      showToolbar: true,
+      showSummary: true,
+      showDataWindow: true,
+      showSeries: true,
+      enableCandle: true,
+      enableBar: true
+    }
   };
 
-  // Chart instance
-  let chart = null;
-  let seriesMap = new Map();  // Map of symbol -> series instance
-  let smaSeries = null;
-  let emaSeries = null;
-  let rsiChart = null;
-  let rsiSeries = null;
-  let drawingCanvas = null;
-  let drawingCtx = null;
-  let symbolIndex = null;
-
-  // DOM Elements
   const els = {
-    symbolSearch: document.getElementById('symbolSearch'),
-    searchDropdown: document.getElementById('searchDropdown'),
     chartContainer: document.getElementById('chartContainer'),
     chartTitle: document.getElementById('chartTitle'),
     chartSubtitle: document.getElementById('chartSubtitle'),
-    selectedSymbolName: document.getElementById('selectedSymbolName'),
-    selectedSymbolDesc: document.getElementById('selectedSymbolDesc'),
-    yearSelect: document.getElementById('year'),
-    sumberDanaSelect: document.getElementById('sumberDana'),
+    badgePeriod: document.querySelector('[data-badge="period"]'),
+    badgeYear: document.querySelector('[data-badge="year"]'),
+    badgeTimeframe: document.querySelector('[data-badge="timeframe"]'),
+    dataWindow: document.getElementById('dataWindow'),
     summaryTotal: document.querySelector('[data-summary="total"]'),
     summaryPeak: document.querySelector('[data-summary="peak"]'),
     summaryPeakLabel: document.querySelector('[data-summary="peak-label"]'),
     summaryLatest: document.querySelector('[data-summary="latest"]'),
     summaryTrend: document.querySelector('[data-summary="trend"]'),
-    summarySeriesList: document.getElementById('summarySeriesList'),
-    badgePeriod: document.querySelector('[data-badge="period"]'),
-    badgeYear: document.querySelector('[data-badge="year"]'),
-    badgeTimeframe: document.querySelector('[data-badge="timeframe"]'),
+    selectedSeriesRow: document.getElementById('selectedSeriesRow'),
+    addSeriesBtn: document.getElementById('addSeriesBtn'),
+    chartHeader: document.querySelector('.chart-header'),
+    chartToolbar: document.querySelector('.chart-toolbar'),
+    summaryGrid: document.querySelector('.summary-grid'),
+    settingsPanel: document.getElementById('settingsPanel'),
+    settingsToggles: document.querySelectorAll('[data-setting]'),
     toolFit: document.getElementById('toolFit'),
     toolAutoScale: document.getElementById('toolAutoScale'),
     toolLogScale: document.getElementById('toolLogScale'),
     toolNormalize: document.getElementById('toolNormalize'),
-    toolExport: document.getElementById('toolExport'),
-    toolExportCsv: document.getElementById('toolExportCsv'),
     toolZoomIn: document.getElementById('toolZoomIn'),
     toolZoomOut: document.getElementById('toolZoomOut'),
-    toolSMA: document.getElementById('toolSMA'),
-    toolEMA: document.getElementById('toolEMA'),
-    toolRSI: document.getElementById('toolRSI'),
-    toolHLine: document.getElementById('toolHLine'),
-    toolVLine: document.getElementById('toolVLine'),
-    toolTrend: document.getElementById('toolTrend'),
-    toolClearDraw: document.getElementById('toolClearDraw'),
-    templateSelect: document.getElementById('templateSelect'),
-    toolTemplateSave: document.getElementById('toolTemplateSave'),
-    toolTemplateLoad: document.getElementById('toolTemplateLoad'),
-    toolTemplateDelete: document.getElementById('toolTemplateDelete'),
-    rsiPanel: document.getElementById('rsiPanel'),
-    rsiContainer: document.getElementById('rsiContainer'),
-    dataWindow: document.getElementById('dataWindow')
+    toolExport: document.getElementById('toolExport'),
+    toolExportCsv: document.getElementById('toolExportCsv'),
+    toolDock: document.getElementById('toolDock'),
+    toolSettings: document.getElementById('toolSettings'),
+    searchModal: document.getElementById('searchModal'),
+    searchDropdown: document.getElementById('searchDropdown'),
+    symbolSearch: document.getElementById('symbolSearch'),
+    searchTrigger: document.getElementById('symbolSearchTrigger')
   };
 
-  // ==================== Chart Functions ====================
+  let chart = null;
+  let seriesMap = new Map();
+  let drawingLayer = null;
 
   function initChart() {
-    if (chart) {
-      chart.remove();
-    }
-
-    seriesMap.clear();
-    smaSeries = null;
-    emaSeries = null;
+    if (!els.chartContainer) return;
+    if (chart) chart.remove();
 
     chart = LightweightCharts.createChart(els.chartContainer, {
-      width: els.chartContainer.clientWidth,
+      width: els.chartContainer.clientWidth || 960,
       height: 360,
       layout: {
         background: { type: 'solid', color: 'transparent' },
@@ -120,23 +85,11 @@
       },
       crosshair: {
         mode: LightweightCharts.CrosshairMode.Normal,
-        vertLine: {
-          color: '#0f766e',
-          labelBackgroundColor: '#0f766e'
-        },
-        horzLine: {
-          color: '#0f766e',
-          labelBackgroundColor: '#0f766e'
-        }
+        vertLine: { color: '#0f766e', labelBackgroundColor: '#0f766e' },
+        horzLine: { color: '#0f766e', labelBackgroundColor: '#0f766e' }
       },
-      rightPriceScale: {
-        borderColor: 'rgba(20, 32, 25, 0.12)',
-        visible: true
-      },
-      leftPriceScale: {
-        borderColor: 'rgba(20, 32, 25, 0.12)',
-        visible: true
-      },
+      rightPriceScale: { borderColor: 'rgba(20, 32, 25, 0.12)' },
+      leftPriceScale: { borderColor: 'rgba(20, 32, 25, 0.12)', visible: false },
       timeScale: {
         borderColor: 'rgba(20, 32, 25, 0.12)',
         timeVisible: true,
@@ -144,107 +97,96 @@
       }
     });
 
-    applyScaleOptions();
-
-    initDrawingLayer();
     bindChartEvents();
+    applyScaleOptions();
+    initDrawingLayer();
 
-    // Responsive resize
     const resizeObserver = new ResizeObserver(entries => {
-      if (entries.length > 0) {
-        const { width } = entries[0].contentRect;
-        chart.applyOptions({ width });
-        resizeDrawingLayer();
-        if (rsiChart && els.rsiContainer) {
-          rsiChart.applyOptions({ width: els.rsiContainer.clientWidth });
-        }
-      }
+      if (!entries.length) return;
+      const { width } = entries[0].contentRect;
+      chart.applyOptions({ width });
     });
     resizeObserver.observe(els.chartContainer);
   }
 
   function bindChartEvents() {
-    chart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
-      if (rsiChart && range) {
-        rsiChart.timeScale().setVisibleLogicalRange(range);
-      }
-      renderDrawings();
-    });
-
+    if (!chart) return;
     chart.subscribeCrosshairMove((param) => {
-      updateDataWindow(param);
+      if (!els.dataWindow) return;
+      if (!param.time || !param.seriesData) {
+        updateDataWindow(null);
+        return;
+      }
+      const primarySymbol = state.selectedSymbols[0];
+      if (!primarySymbol) {
+        updateDataWindow(null);
+        return;
+      }
+      const series = seriesMap.get(primarySymbol.symbol);
+      const point = series ? param.seriesData.get(series) : null;
+      updateDataWindow(point, param.time);
     });
   }
 
-  function getPrimarySeries() {
-    if (!state.currentSymbol) return null;
-    return seriesMap.get(state.currentSymbol.symbol);
-  }
-
-  function createSeriesForSymbol(symbol, colorIndex = 0) {
-    const colors = SERIES_COLORS[colorIndex % SERIES_COLORS.length];
+  function createSeries(symbol, index) {
+    const palette = ['#0f766e', '#e76f51', '#2a9d8f', '#f4a261', '#264653'];
+    const color = palette[index % palette.length];
     let series;
 
-    if (state.chartType === 'candlestick') {
-      if (colorIndex === 0) {
-        // Candlestick only for primary series
-        series = chart.addCandlestickSeries({
-          upColor: colors.line,
-          downColor: '#e76f51',
-          borderUpColor: colors.line,
-          borderDownColor: '#e76f51',
-          wickUpColor: colors.line,
-          wickDownColor: '#e76f51',
-          priceScaleId: 'right'
-        });
-      } else {
-        const scaleId = colorIndex === 1 ? 'left' : 'right';
-        series = chart.addLineSeries({
-          color: colors.line,
-          lineWidth: 1,
-          crosshairMarkerVisible: true,
-          crosshairMarkerRadius: 3,
-          priceScaleId: scaleId,
-          title: symbol.name.substring(0, 20)
-        });
-      }
+    if (state.chartType === 'candlestick' && index === 0) {
+      series = chart.addCandlestickSeries({
+        upColor: color,
+        downColor: '#e76f51',
+        borderUpColor: color,
+        borderDownColor: '#e76f51',
+        wickUpColor: color,
+        wickDownColor: '#e76f51'
+      });
+    } else if (state.chartType === 'bar') {
+      series = chart.addBarSeries({
+        upColor: color,
+        downColor: '#e76f51',
+        priceScaleId: index === 0 ? 'right' : 'left'
+      });
     } else if (state.chartType === 'area') {
-      const scaleId = colorIndex === 0 ? 'right' : (colorIndex === 1 ? 'left' : 'right');
       series = chart.addAreaSeries({
-        lineColor: colors.line,
-        topColor: colors.area,
+        lineColor: color,
+        topColor: `${color}33`,
         bottomColor: 'rgba(15, 118, 110, 0.05)',
         lineWidth: 2,
-        priceScaleId: scaleId
+        priceScaleId: index === 0 ? 'right' : 'left'
       });
-
-      if (colorIndex === 1) {
-        chart.applyOptions({
-          leftPriceScale: { visible: true }
-        });
-      }
     } else {
-      // Line series (default, and for all compare series)
-      const scaleId = colorIndex === 0 ? 'right' : (colorIndex === 1 ? 'left' : 'right');
-
       series = chart.addLineSeries({
-        color: colors.line,
+        color,
         lineWidth: 2,
         crosshairMarkerVisible: true,
         crosshairMarkerRadius: 4,
-        priceScaleId: scaleId,
-        title: symbol.name.substring(0, 20)  // Short name for legend
+        priceScaleId: index === 0 ? 'right' : 'left'
       });
+    }
 
-      // Enable left scale if we have compare series
-      if (colorIndex === 1) {
-        chart.applyOptions({
-          leftPriceScale: { visible: true }
-        });
-      }
+    if (index === 1) {
+      chart.applyOptions({ leftPriceScale: { visible: true } });
     }
 
     return series;
+  }
+
+  function resetSeries() {
+    seriesMap.forEach(series => chart.removeSeries(series));
+    seriesMap.clear();
+  }
+
+  function applyChartType() {
+    if (!chart) return;
+    if ((state.chartType === 'candlestick' || state.chartType === 'bar') && state.normalize) {
+      state.normalize = false;
+      if (els.toolNormalize) els.toolNormalize.classList.remove('is-active');
+    }
+    resetSeries();
+    state.seriesData.clear();
+    loadAllChartData();
   }
 
   function normalizeSeries(data) {
@@ -258,175 +200,192 @@
       }
     }
     if (!base) base = data[0].close || 1;
-    return data.map((d) => ({
+    return data.map(d => ({
       time: d.time,
       value: (d.close / base) * 100
     }));
   }
 
-  function ensureRsiChart() {
-    if (!els.rsiContainer) return;
-    if (rsiChart) return;
+  function setSeriesData(symbol, data, index) {
+    const series = seriesMap.get(symbol.symbol);
+    if (!series) return;
 
-    els.rsiPanel.hidden = false;
-
-    rsiChart = LightweightCharts.createChart(els.rsiContainer, {
-      width: els.rsiContainer.clientWidth,
-      height: 120,
-      layout: {
-        background: { type: 'solid', color: 'transparent' },
-        textColor: '#5b6b63',
-        fontFamily: "'Source Sans 3', sans-serif"
-      },
-      grid: {
-        vertLines: { color: 'rgba(20, 32, 25, 0.06)' },
-        horzLines: { color: 'rgba(20, 32, 25, 0.06)' }
-      },
-      rightPriceScale: {
-        borderColor: 'rgba(20, 32, 25, 0.12)',
-        visible: true
-      },
-      timeScale: {
-        borderColor: 'rgba(20, 32, 25, 0.12)',
-        timeVisible: true,
-        secondsVisible: false
-      }
-    });
-
-    rsiSeries = rsiChart.addLineSeries({
-      color: '#264653',
-      lineWidth: 2
-    });
-
-    rsiSeries.createPriceLine({
-      price: 70,
-      color: 'rgba(231, 111, 81, 0.6)',
-      lineWidth: 1,
-      lineStyle: 2,
-      axisLabelVisible: true,
-      title: '70'
-    });
-
-    rsiSeries.createPriceLine({
-      price: 30,
-      color: 'rgba(42, 157, 143, 0.6)',
-      lineWidth: 1,
-      lineStyle: 2,
-      axisLabelVisible: true,
-      title: '30'
-    });
-  }
-
-  function destroyRsiChart() {
-    if (rsiChart) {
-      rsiChart.remove();
-      rsiChart = null;
-      rsiSeries = null;
-    }
-    if (els.rsiPanel) {
-      els.rsiPanel.hidden = true;
+    if (state.chartType === 'candlestick' && index === 0) {
+      series.setData(data.map(d => ({
+        time: d.time,
+        open: d.open,
+        high: d.high,
+        low: d.low,
+        close: d.close
+      })));
+    } else if (state.chartType === 'bar') {
+      series.setData(data.map(d => ({
+        time: d.time,
+        open: d.open,
+        high: d.high,
+        low: d.low,
+        close: d.close
+      })));
+    } else {
+      const lineData = state.normalize ? normalizeSeries(data) : data.map(d => ({
+        time: d.time,
+        value: d.close
+      }));
+      series.setData(lineData);
     }
   }
 
-  async function loadSymbolData(symbol, series, isPrimary = false) {
-    try {
-      const sumberDanaParam = state.sumberDana ? `&sumber_dana=${encodeURIComponent(state.sumberDana)}` : '';
-      const hasDanaSuffix = symbol.symbol.endsWith('_INV') || symbol.symbol.endsWith('_EKS') || symbol.symbol.startsWith('DANA_');
-      const finalDanaParam = hasDanaSuffix ? '' : sumberDanaParam;
-      const url = `${API_BASE}/api/procurement/data/${symbol.symbol}?timeframe=${state.timeframe}&limit=200&period_type=${state.periodType}&year=${state.year}${finalDanaParam}`;
-      const response = await fetch(url);
-      const result = await response.json();
+  function updateSummary(data) {
+    if (!data || data.length === 0) return;
+    const values = data.map(d => d.close);
+    const total = data.reduce((acc, d) => acc + (d.volume || d.close || 0), 0);
+    const peak = Math.max(...values);
+    const latest = values[values.length - 1];
+    const prev = values.length > 1 ? values[values.length - 2] : latest;
+    const change = prev ? ((latest - prev) / prev) * 100 : 0;
 
-      if (result.status === 'success' && result.data.length > 0) {
-        let chartData;
-
-        if (state.chartType === 'candlestick' && isPrimary) {
-          let prevClose = null;
-          chartData = result.data.map((d, idx) => {
-            const close = d.close;
-            const open = idx === 0 || prevClose === null ? d.open : prevClose;
-            const high = Math.max(d.high, open, close);
-            const low = Math.min(d.low, open, close);
-            prevClose = close;
-            return {
-              time: d.time,
-              open,
-              high,
-              low,
-              close
-            };
-          });
-        } else {
-          chartData = state.normalize
-            ? normalizeSeries(result.data)
-            : result.data.map(d => ({
-                time: d.time,
-                value: d.close
-              }));
-        }
-
-        series.setData(chartData);
-        return result.data;
-      }
-      return [];
-    } catch (error) {
-      console.error(`Error loading data for ${symbol.symbol}:`, error);
-      return [];
+    if (els.summaryTotal) els.summaryTotal.textContent = formatNumber(total);
+    if (els.summaryPeak) els.summaryPeak.textContent = formatNumber(peak);
+    if (els.summaryPeakLabel) els.summaryPeakLabel.textContent = 'Puncak mingguan';
+    if (els.summaryLatest) els.summaryLatest.textContent = formatNumber(latest);
+    if (els.summaryTrend) {
+      els.summaryTrend.textContent = `${change.toFixed(2)}%`;
+      els.summaryTrend.classList.toggle('trend-up', change >= 0);
+      els.summaryTrend.classList.toggle('trend-down', change < 0);
     }
   }
 
-  async function loadAllChartData() {
-    if (state.symbols.length === 0) {
+  function updateDataWindow(point, time) {
+    if (!els.dataWindow) return;
+    if (!point) {
+      els.dataWindow.textContent = 'Hover chart untuk lihat data.';
+      return;
+    }
+    const date = new Date(time * 1000);
+    const dateStr = date.toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric' });
+
+    if (state.chartType === 'candlestick' || state.chartType === 'bar') {
+      els.dataWindow.innerHTML = `
+        <span class="data-date">${dateStr}</span>
+        <span class="data-item">O: ${formatNumber(point.open)}</span>
+        <span class="data-item">H: ${formatNumber(point.high)}</span>
+        <span class="data-item">L: ${formatNumber(point.low)}</span>
+        <span class="data-item">C: ${formatNumber(point.close)}</span>
+      `;
+    } else {
+      els.dataWindow.innerHTML = `
+        <span class="data-date">${dateStr}</span>
+        <span class="data-item">Nilai: ${formatNumber(point.value)}</span>
+      `;
+    }
+  }
+
+  function formatNumber(value) {
+    if (value === null || value === undefined || Number.isNaN(value)) return '--';
+    return Number(value).toLocaleString('id-ID');
+  }
+
+  async function fetchSymbols() {
+    const res = await fetch(`${API_BASE}/api/symbols?with_data=true`);
+    const json = await res.json();
+    state.symbols = json.data || [];
+  }
+
+  function openSearchModal() {
+    if (!els.searchModal) return;
+    els.searchModal.classList.add('open');
+    els.searchModal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('modal-open');
+    renderSearchResults(state.symbols);
+    setTimeout(() => els.symbolSearch && els.symbolSearch.focus(), 0);
+  }
+
+  function closeSearchModal() {
+    if (!els.searchModal) return;
+    els.searchModal.classList.remove('open');
+    els.searchModal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('modal-open');
+  }
+
+  function renderSearchResults(list) {
+    if (!els.searchDropdown) return;
+    if (!list || list.length === 0) {
+      els.searchDropdown.innerHTML = `<div class="search-empty">Tidak ditemukan</div>`;
+      return;
+    }
+    const added = new Set(state.selectedSymbols.map(s => s.symbol));
+    els.searchDropdown.innerHTML = list.map((s, idx) => `
+      <div class="search-item${idx === 0 ? ' selected' : ''}${added.has(s.symbol) ? ' added' : ''}" data-symbol="${s.symbol}">
+        <span class="search-item-icon">S</span>
+        <div class="search-item-info">
+          <div class="search-item-name">${s.name || s.symbol}</div>
+          <div class="search-item-desc">${s.symbol}</div>
+        </div>
+        ${added.has(s.symbol) ? '<span class="search-item-added">OK</span>' : ''}
+      </div>
+    `).join('');
+
+    els.searchDropdown.querySelectorAll('.search-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const symbol = item.dataset.symbol;
+        const found = state.symbols.find(s => s.symbol === symbol);
+        if (found) addSymbol(found);
+        closeSearchModal();
+      });
+    });
+  }
+
+  function filterSymbols(query) {
+    const q = query.trim().toLowerCase();
+    if (!q) return state.symbols;
+    return state.symbols.filter(s => {
+      const name = (s.name || '').toLowerCase();
+      return s.symbol.toLowerCase().includes(q) || name.includes(q);
+    });
+  }
+
+  function renderSelectedSeries() {
+    if (!els.selectedSeriesRow) return;
+    if (state.selectedSymbols.length === 0) {
+      els.selectedSeriesRow.innerHTML = `
+        <div class="selected-series-placeholder">Pilih kode data untuk mulai.</div>
+      `;
+      if (els.searchTrigger) els.searchTrigger.value = '';
       return;
     }
 
-    // Clear existing series
-    seriesMap.forEach((series) => {
-      chart.removeSeries(series);
+    const chips = state.selectedSymbols.map(s => `
+      <div class="series-chip">
+        <span class="series-name">${s.name || s.symbol}</span>
+        <span class="series-code">${s.symbol}</span>
+        <button type="button" class="remove-series" data-symbol="${s.symbol}" title="Hapus">x</button>
+      </div>
+    `).join('');
+
+    els.selectedSeriesRow.innerHTML = `${chips}`;
+
+    els.selectedSeriesRow.querySelectorAll('.remove-series').forEach(btn => {
+      btn.addEventListener('click', () => removeSymbol(btn.dataset.symbol));
     });
-    seriesMap.clear();
-    state.seriesData.clear();
-
-    // Load data for each symbol
-    let primaryData = null;
-
-    const symbolsToRender = state.chartType === 'candlestick'
-      ? state.symbols.slice(0, 1)
-      : state.symbols;
-
-    for (let i = 0; i < symbolsToRender.length; i++) {
-      const symbol = symbolsToRender[i];
-      if (i === 0) {
-        state.currentSymbol = symbol;
-      }
-
-      const series = createSeriesForSymbol(symbol, i);
-      seriesMap.set(symbol.symbol, series);
-
-      const data = await loadSymbolData(symbol, series, i === 0);
-      state.seriesData.set(symbol.symbol, data);
-
-      if (i === 0) {
-        primaryData = data;
-      }
+    if (els.searchTrigger) {
+      const primary = state.selectedSymbols[0];
+      els.searchTrigger.value = primary ? `${primary.symbol} - ${primary.name || ''}`.trim() : '';
     }
+  }
 
-    chart.timeScale().fitContent();
+  function bindAddSeriesButton() {
+    if (els.addSeriesBtn) els.addSeriesBtn.addEventListener('click', openSearchModal);
+  }
 
-    // Update summary for primary symbol
-    if (primaryData && primaryData.length > 0) {
-      updateSummary(primaryData);
+  function updateTitles() {
+    if (state.selectedSymbols.length === 0) {
+      if (els.chartTitle) els.chartTitle.textContent = 'Procurement Chart';
+      if (els.chartSubtitle) els.chartSubtitle.textContent = 'Pilih kode data untuk melihat data';
+      return;
     }
-
-    updateIndicators();
-    renderDrawings();
-    updateDataWindow(null);
-
-    // Update total list (per-series + combined)
-    updateTotalsSummary();
-
-    // Update chart title
-    updateChartTitle();
+    const primary = state.selectedSymbols[0];
+    if (els.chartTitle) els.chartTitle.textContent = primary.name || primary.symbol;
+    if (els.chartSubtitle) els.chartSubtitle.textContent = `Kode: ${primary.symbol}`;
   }
 
   function applyScaleOptions() {
@@ -434,979 +393,194 @@
     const scaleMode = (window.LightweightCharts && LightweightCharts.PriceScaleMode)
       ? (state.logScale ? LightweightCharts.PriceScaleMode.Logarithmic : LightweightCharts.PriceScaleMode.Normal)
       : undefined;
-
-    const scaleOptions = {
-      autoScale: state.autoScale
-    };
-
-    if (scaleMode !== undefined) {
-      scaleOptions.mode = scaleMode;
-    }
-
+    const scaleOptions = { autoScale: state.autoScale };
+    if (scaleMode !== undefined) scaleOptions.mode = scaleMode;
     chart.applyOptions({
       rightPriceScale: scaleOptions,
       leftPriceScale: scaleOptions
     });
   }
 
-  function updateChartTitle() {
-    if (state.symbols.length === 0) return;
-
-    if (state.symbols.length === 1) {
-      els.chartTitle.textContent = state.symbols[0].name;
-    } else {
-      const shortNames = state.symbols.map((s) => {
-        let name = s.name || '';
-        if (name.toLowerCase().startsWith('jumlah ')) {
-          name = name.slice(7).trim();
-        } else if (name.toLowerCase().startsWith('total ')) {
-          name = name.slice(6).trim();
-        }
-        return name || s.name;
-      });
-
-      const counts = shortNames.reduce((acc, name) => {
-        acc[name] = (acc[name] || 0) + 1;
-        return acc;
-      }, {});
-
-      const display = shortNames.map((name, idx) => {
-        if (counts[name] > 1) return state.symbols[idx].name;
-        return name;
-      });
-
-      els.chartTitle.textContent = display.join(' vs ');
-    }
-
-    const unitText = state.currentSymbol?.unit || '';
-    let subtitle = `${unitText} - ${getTimeframeLabel(state.timeframe)}`;
-    if (state.normalize && state.chartType !== 'candlestick') {
-      subtitle += ' • Index 100';
-    }
-    if (state.chartType === 'candlestick' && state.symbols.length > 1) {
-      subtitle += ' • Candle hanya untuk 1 series';
-    }
-    els.chartSubtitle.textContent = subtitle;
-  }
-
-  function updateSummary(data) {
-    if (!data || data.length === 0) return;
-
-    const values = data.map(d => d.close);
-    const total = values.reduce((sum, v) => sum + v, 0);
-    const peak = Math.max(...values);
-    const peakIndex = values.indexOf(peak);
-    const latest = values[values.length - 1];
-    const previous = values.length > 1 ? values[values.length - 2] : latest;
-    const change = previous ? ((latest - previous) / previous) * 100 : 0;
-
-    const isRupiah = state.currentSymbol?.unit === 'Rp';
-
-    if (els.summaryTotal && state.symbols.length <= 1) {
-      els.summaryTotal.textContent = formatValue(total, isRupiah);
-    }
-    if (els.summaryPeak) {
-      els.summaryPeak.textContent = formatValue(peak, isRupiah);
-    }
-    if (els.summaryPeakLabel) {
-      const peakDate = new Date(data[peakIndex].time * 1000);
-      els.summaryPeakLabel.textContent = peakDate.toLocaleDateString('id-ID', {
-        month: 'short',
-        year: 'numeric'
-      });
-    }
-    if (els.summaryLatest) {
-      els.summaryLatest.textContent = formatValue(latest, isRupiah);
-    }
-    if (els.summaryTrend) {
-      els.summaryTrend.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(1)}%`;
-      els.summaryTrend.classList.toggle('trend-down', change < 0);
-    }
-  }
-
-  function updateTotalsSummary() {
-    if (!els.summaryTotal) return;
-
-    if (!state.symbols || state.symbols.length === 0) {
-      els.summaryTotal.textContent = '--';
-      if (els.summarySeriesList) els.summarySeriesList.innerHTML = '';
-      return;
-    }
-
-    const rows = state.symbols.map((symbol, index) => {
-      const data = state.seriesData.get(symbol.symbol) || [];
-      const total = data.reduce((sum, d) => sum + (d.close || 0), 0);
-      return {
-        symbol,
-        total,
-        color: SERIES_COLORS[index % SERIES_COLORS.length].line
-      };
-    });
-
-    const units = new Set(rows.map(r => r.symbol.unit || ''));
-    const sameUnit = units.size <= 1;
-    const combinedTotal = sameUnit
-      ? rows.reduce((sum, r) => sum + r.total, 0)
-      : null;
-
-    const combinedIsRupiah = rows[0]?.symbol.unit === 'Rp';
-    els.summaryTotal.textContent = sameUnit
-      ? formatValue(combinedTotal, combinedIsRupiah)
-      : '--';
-
-    if (!els.summarySeriesList) return;
-
-    if (rows.length <= 1) {
-      els.summarySeriesList.innerHTML = '';
-      return;
-    }
-
-    const listHtml = rows.map((r) => `
-      <div class="summary-series-row">
-        <span class="summary-series-dot" style="background:${r.color}"></span>
-        <span class="summary-series-name">${r.symbol.name}</span>
-        <span class="summary-series-value">${formatValue(r.total, r.symbol.unit === 'Rp')}</span>
-      </div>
-    `).join('');
-
-    const combinedLabel = sameUnit ? 'Gabungan' : 'Gabungan (beda unit)';
-    const combinedValue = sameUnit ? formatValue(combinedTotal, combinedIsRupiah) : '--';
-
-    els.summarySeriesList.innerHTML = `
-      ${listHtml}
-      <div class="summary-series-row summary-series-combined">
-        <span class="summary-series-dot is-combined"></span>
-        <span class="summary-series-name">${combinedLabel}</span>
-        <span class="summary-series-value">${combinedValue}</span>
-      </div>
-    `;
-  }
-
-  function formatValue(value, isRupiah) {
-    if (isRupiah) {
-      if (value >= 1e12) return `Rp ${(value / 1e12).toFixed(1)}T`;
-      if (value >= 1e9) return `Rp ${(value / 1e9).toFixed(1)}M`;
-      if (value >= 1e6) return `Rp ${(value / 1e6).toFixed(1)}Jt`;
-      return `Rp ${Math.round(value).toLocaleString('id-ID')}`;
-    }
-    return Math.round(value).toLocaleString('id-ID');
-  }
-
-  function computeSMA(data, period = 14) {
-    const result = [];
-    let sum = 0;
-    for (let i = 0; i < data.length; i++) {
-      sum += data[i].close;
-      if (i >= period) {
-        sum -= data[i - period].close;
-      }
-      if (i >= period - 1) {
-        result.push({ time: data[i].time, value: sum / period });
-      }
-    }
-    return result;
-  }
-
-  function computeEMA(data, period = 14) {
-    const result = [];
-    if (data.length === 0) return result;
-    const k = 2 / (period + 1);
-    let ema = data[0].close;
-    for (let i = 0; i < data.length; i++) {
-      const price = data[i].close;
-      ema = i === 0 ? price : (price - ema) * k + ema;
-      if (i >= period - 1) {
-        result.push({ time: data[i].time, value: ema });
-      }
-    }
-    return result;
-  }
-
-  function computeRSI(data, period = 14) {
-    const result = [];
-    if (data.length <= period) return result;
-
-    let gains = 0;
-    let losses = 0;
-
-    for (let i = 1; i <= period; i++) {
-      const diff = data[i].close - data[i - 1].close;
-      if (diff >= 0) gains += diff;
-      else losses -= diff;
-    }
-
-    let avgGain = gains / period;
-    let avgLoss = losses / period;
-    let rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
-    let rsi = 100 - (100 / (1 + rs));
-    result.push({ time: data[period].time, value: rsi });
-
-    for (let i = period + 1; i < data.length; i++) {
-      const diff = data[i].close - data[i - 1].close;
-      const gain = diff > 0 ? diff : 0;
-      const loss = diff < 0 ? -diff : 0;
-
-      avgGain = (avgGain * (period - 1) + gain) / period;
-      avgLoss = (avgLoss * (period - 1) + loss) / period;
-
-      rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
-      rsi = 100 - (100 / (1 + rs));
-
-      result.push({ time: data[i].time, value: rsi });
-    }
-
-    return result;
-  }
-
-  function updateIndicators() {
-    const primaryData = state.currentSymbol ? (state.seriesData.get(state.currentSymbol.symbol) || []) : [];
-    const primarySeries = getPrimarySeries();
-
-    if (!primarySeries || primaryData.length === 0) {
-      if (smaSeries) { chart.removeSeries(smaSeries); smaSeries = null; }
-      if (emaSeries) { chart.removeSeries(emaSeries); emaSeries = null; }
-      destroyRsiChart();
-      return;
-    }
-
-    if (state.indicators.sma) {
-      if (!smaSeries) {
-        smaSeries = chart.addLineSeries({
-          color: '#264653',
-          lineWidth: 2,
-          priceScaleId: 'right'
-        });
-      }
-      smaSeries.setData(computeSMA(primaryData, 14));
-    } else if (smaSeries) {
-      chart.removeSeries(smaSeries);
-      smaSeries = null;
-    }
-
-    if (state.indicators.ema) {
-      if (!emaSeries) {
-        emaSeries = chart.addLineSeries({
-          color: '#e76f51',
-          lineWidth: 2,
-          priceScaleId: 'right'
-        });
-      }
-      emaSeries.setData(computeEMA(primaryData, 14));
-    } else if (emaSeries) {
-      chart.removeSeries(emaSeries);
-      emaSeries = null;
-    }
-
-    if (state.indicators.rsi) {
-      ensureRsiChart();
-      if (rsiSeries) {
-        rsiSeries.setData(computeRSI(primaryData, 14));
-      }
-      if (rsiChart) {
-        const range = chart.timeScale().getVisibleLogicalRange();
-        if (range) rsiChart.timeScale().setVisibleLogicalRange(range);
-      }
-    } else {
-      destroyRsiChart();
-    }
+  function zoomTimeScale(factor) {
+    if (!chart) return;
+    const timeScale = chart.timeScale();
+    const range = timeScale.getVisibleLogicalRange();
+    if (!range) return;
+    const center = (range.from + range.to) / 2;
+    const half = (range.to - range.from) / 2;
+    const newHalf = half * factor;
+    timeScale.setVisibleLogicalRange({ from: center - newHalf, to: center + newHalf });
   }
 
   function exportChartImage() {
     if (!chart) return;
-
-    let canvas = null;
-    if (typeof chart.takeScreenshot === 'function') {
-      canvas = chart.takeScreenshot();
-    } else {
-      canvas = els.chartContainer ? els.chartContainer.querySelector('canvas') : null;
-    }
-
-    if (!canvas) return;
-
+    const canvas = chart.takeScreenshot();
     const link = document.createElement('a');
-    link.download = 'procurement-chart.png';
+    const primary = state.selectedSymbols[0];
+    const name = primary ? primary.symbol : 'chart';
+    link.download = `${name}-${state.periodType}-${state.year}.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
   }
 
   function exportSeriesCsv() {
-    if (!state.seriesData || state.seriesData.size === 0) return;
-
-    const symbols = state.symbols || [];
-    const rowsByTime = new Map();
-
-    symbols.forEach((symbol) => {
-      const data = state.seriesData.get(symbol.symbol) || [];
-      data.forEach((d) => {
-        const timeKey = d.time;
-        if (!rowsByTime.has(timeKey)) {
-          rowsByTime.set(timeKey, {});
-        }
-        rowsByTime.get(timeKey)[symbol.symbol] = d.close;
-      });
+    if (state.selectedSymbols.length === 0) return;
+    const timeSet = new Set();
+    state.selectedSymbols.forEach(s => {
+      const data = state.seriesData.get(s.symbol) || [];
+      data.forEach(d => timeSet.add(d.time));
     });
-
-    const times = Array.from(rowsByTime.keys()).sort((a, b) => a - b);
-    const header = ['date'].concat(symbols.map((s) => s.name));
-    const lines = [header.join(',')];
-
-    times.forEach((t) => {
-      const row = rowsByTime.get(t) || {};
-      const date = new Date(t * 1000).toISOString().split('T')[0];
-      const values = symbols.map((s) => {
-        const val = row[s.symbol];
-        if (val === undefined || val === null) return '';
-        return Number(val).toFixed(2);
+    const times = Array.from(timeSet).sort((a, b) => a - b);
+    const header = ['date'].concat(state.selectedSymbols.map(s => s.symbol));
+    const rows = [header.join(',')];
+    times.forEach(t => {
+      const date = new Date(t * 1000).toISOString().slice(0, 10);
+      const cols = [date];
+      state.selectedSymbols.forEach(s => {
+        const data = state.seriesData.get(s.symbol) || [];
+        const match = data.find(d => d.time === t);
+        cols.push(match ? String(match.close) : '');
       });
-      lines.push([date].concat(values).join(','));
+      rows.push(cols.join(','));
     });
-
-    const csv = lines.join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
-    link.href = url;
-    link.download = 'chart-series.csv';
+    const primary = state.selectedSymbols[0];
+    const name = primary ? primary.symbol : 'series';
+    link.download = `${name}-${state.periodType}-${state.year}.csv`;
+    link.href = URL.createObjectURL(blob);
     link.click();
-    URL.revokeObjectURL(url);
   }
 
-  function updateDataWindow(param) {
-    if (!els.dataWindow) return;
-    if (!param || !param.time) {
-      els.dataWindow.textContent = 'Hover chart untuk lihat data.';
+  function applySettings() {
+    if (els.chartHeader) els.chartHeader.classList.toggle('is-hidden', !state.settings.showHeader);
+    if (els.chartToolbar) els.chartToolbar.classList.toggle('is-hidden', !state.settings.showToolbar);
+    if (els.summaryGrid) els.summaryGrid.classList.toggle('is-hidden', !state.settings.showSummary);
+    if (els.dataWindow) els.dataWindow.classList.toggle('is-hidden', !state.settings.showDataWindow);
+    if (els.selectedSeriesRow) els.selectedSeriesRow.classList.toggle('is-hidden', !state.settings.showSeries);
+    if (els.chartToolbar) {
+      els.chartToolbar.classList.toggle('is-undocked', !state.dockToolbar);
+    }
+    if (els.toolDock) els.toolDock.classList.toggle('is-active', !state.dockToolbar);
+    if (els.toolNormalize) {
+      els.toolNormalize.classList.toggle('is-muted', state.chartType === 'candlestick' || state.chartType === 'bar');
+    }
+  }
+
+  async function fetchSeriesData(symbol) {
+    const url = `${API_BASE}/api/ohlc/${symbol.symbol}?period_type=${state.periodType}&year=${state.year}&limit=500&cumulative=false`;
+    const res = await fetch(url);
+    const json = await res.json();
+    return json.data || [];
+  }
+
+  async function loadAllChartData() {
+    if (!chart || state.selectedSymbols.length === 0) {
+      if (els.dataWindow) els.dataWindow.textContent = 'Data kosong.';
       return;
     }
 
-    let dateText = '';
-    if (typeof param.time === 'object' && param.time.year) {
-      const { year, month, day } = param.time;
-      dateText = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    } else {
-      dateText = new Date(param.time * 1000).toISOString().split('T')[0];
-    }
+    resetSeries();
+    state.seriesData.clear();
 
-    const items = [];
-    state.symbols.forEach((symbol, index) => {
-      const series = seriesMap.get(symbol.symbol);
-      if (!series) return;
-      const point = param.seriesData.get(series);
-      if (!point) return;
-      const rawValue = point.value ?? point.close;
-      const isRupiah = symbol.unit === 'Rp' && !state.normalize;
-      const displayValue = state.normalize
-        ? rawValue.toFixed(2)
-        : formatValue(rawValue, isRupiah);
-      items.push({
-        name: symbol.name,
-        value: displayValue,
-        color: SERIES_COLORS[index % SERIES_COLORS.length].line
-      });
+    const list = state.selectedSymbols;
+    const dataList = await Promise.all(list.map(fetchSeriesData));
+
+    list.forEach((symbol, index) => {
+      const series = createSeries(symbol, index);
+      seriesMap.set(symbol.symbol, series);
+      const data = dataList[index] || [];
+      state.seriesData.set(symbol.symbol, data);
+      setSeriesData(symbol, data, index);
     });
 
-    if (items.length === 0) {
-      els.dataWindow.textContent = 'Hover chart untuk lihat data.';
-      return;
-    }
-
-    const listHtml = items.map((item) => `
-      <span class="data-item">
-        <span class="data-dot" style="background:${item.color}"></span>
-        ${item.name}: ${item.value}
-      </span>
-    `).join('');
-
-    els.dataWindow.innerHTML = `
-      <span class="data-date">${dateText}</span>
-      ${listHtml}
-    `;
+    chart.timeScale().fitContent();
+    updateSummary(state.seriesData.get(list[0].symbol) || []);
   }
-
-  function getTemplateStore() {
-    try {
-      return JSON.parse(localStorage.getItem('procurementTemplates') || '{}');
-    } catch (e) {
-      return {};
-    }
-  }
-
-  function saveTemplateStore(store) {
-    localStorage.setItem('procurementTemplates', JSON.stringify(store));
-  }
-
-  function getTemplateNames() {
-    return Object.keys(getTemplateStore()).sort();
-  }
-
-  function refreshTemplateOptions() {
-    if (!els.templateSelect) return;
-    const current = els.templateSelect.value;
-    const names = getTemplateNames();
-    const options = ['<option value="">-- pilih template --</option>']
-      .concat(names.map(name => `<option value="${name}">${name}</option>`));
-    els.templateSelect.innerHTML = options.join('');
-    if (names.includes(current)) {
-      els.templateSelect.value = current;
-    }
-
-    const hasTemplates = names.length > 0;
-    if (els.toolTemplateLoad) els.toolTemplateLoad.disabled = !hasTemplates;
-    if (els.toolTemplateDelete) els.toolTemplateDelete.disabled = !hasTemplates;
-  }
-
-  function getDefaultTemplateName() {
-    const names = getTemplateNames();
-    let i = 1;
-    while (names.includes(`Template ${i}`)) i += 1;
-    return `Template ${i}`;
-  }
-
-  async function ensureSymbolIndex() {
-    if (symbolIndex) return symbolIndex;
-    try {
-      const response = await fetch(`${API_BASE}/api/procurement/symbols`);
-      const result = await response.json();
-      if (result.status === 'success') {
-        symbolIndex = new Map(result.data.map(s => [s.symbol, s]));
-      } else {
-        symbolIndex = new Map();
-      }
-    } catch (e) {
-      symbolIndex = new Map();
-    }
-    return symbolIndex;
-  }
-
-  async function applyTemplate(name) {
-    const store = getTemplateStore();
-    const template = store[name];
-    if (!template || !Array.isArray(template.symbols)) return;
-
-    const index = await ensureSymbolIndex();
-    const symbols = template.symbols.map(code => index.get(code)).filter(Boolean);
-
-    if (symbols.length === 0) {
-      alert('Template tidak bisa dipakai (symbol tidak ditemukan).');
-      return;
-    }
-
-    state.symbols = symbols;
-    updateSelectedSymbolsDisplay();
-    loadAllChartData();
-  }
-
-  function saveCurrentTemplate() {
-    if (!state.symbols || state.symbols.length === 0) {
-      alert('Pilih minimal 1 symbol sebelum menyimpan template.');
-      return;
-    }
-
-    const defaultName = getDefaultTemplateName();
-    const name = prompt('Nama template:', defaultName);
-    if (!name) return;
-
-    const store = getTemplateStore();
-    store[name] = {
-      symbols: state.symbols.map(s => s.symbol),
-      createdAt: new Date().toISOString()
-    };
-    saveTemplateStore(store);
-    refreshTemplateOptions();
-    if (els.templateSelect) els.templateSelect.value = name;
-  }
-
-  function deleteCurrentTemplate() {
-    if (!els.templateSelect) return;
-    const name = els.templateSelect.value;
-    if (!name) return;
-    const ok = confirm(`Hapus template "${name}"?`);
-    if (!ok) return;
-    const store = getTemplateStore();
-    delete store[name];
-    saveTemplateStore(store);
-    refreshTemplateOptions();
-  }
-
-  function zoomTimeScale(factor) {
-    if (!chart) return;
-    const range = chart.timeScale().getVisibleLogicalRange();
-    if (!range) return;
-    const mid = (range.from + range.to) / 2;
-    const newRange = {
-      from: mid + (range.from - mid) * factor,
-      to: mid + (range.to - mid) * factor
-    };
-    chart.timeScale().setVisibleLogicalRange(newRange);
-  }
-
-  function initDrawingLayer() {
-    if (!els.chartContainer || drawingCanvas) return;
-
-    drawingCanvas = document.createElement('canvas');
-    drawingCanvas.className = 'drawing-layer';
-    els.chartContainer.appendChild(drawingCanvas);
-
-    drawingCtx = drawingCanvas.getContext('2d');
-    resizeDrawingLayer();
-
-    drawingCanvas.addEventListener('click', handleDrawingClick);
-  }
-
-  function resizeDrawingLayer() {
-    if (!drawingCanvas || !els.chartContainer) return;
-    const rect = els.chartContainer.getBoundingClientRect();
-    drawingCanvas.width = rect.width * window.devicePixelRatio;
-    drawingCanvas.height = rect.height * window.devicePixelRatio;
-    drawingCanvas.style.width = `${rect.width}px`;
-    drawingCanvas.style.height = `${rect.height}px`;
-    if (drawingCtx) {
-      drawingCtx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
-    }
-    renderDrawings();
-  }
-
-  function setDrawingTool(tool) {
-    state.drawingTool = tool;
-    state.pendingPoint = null;
-
-    if (drawingCanvas) {
-      drawingCanvas.style.pointerEvents = tool === 'none' ? 'none' : 'auto';
-      drawingCanvas.style.cursor = tool === 'none' ? 'default' : 'crosshair';
-    }
-
-    const buttons = [
-      { el: els.toolHLine, name: 'hline' },
-      { el: els.toolVLine, name: 'vline' },
-      { el: els.toolTrend, name: 'trend' }
-    ];
-    buttons.forEach(({ el, name }) => {
-      if (el) el.classList.toggle('is-active', tool === name);
-    });
-  }
-
-  function handleDrawingClick(event) {
-    if (state.drawingTool === 'none') return;
-    const primarySeries = getPrimarySeries();
-    if (!primarySeries) return;
-
-    const rect = drawingCanvas.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-
-    const time = chart.timeScale().coordinateToTime(x);
-    const price = primarySeries.coordinateToPrice(y);
-    if (time === null || price === null) return;
-
-    if (state.drawingTool === 'hline') {
-      state.drawings.push({ type: 'hline', price });
-    } else if (state.drawingTool === 'vline') {
-      state.drawings.push({ type: 'vline', time });
-    } else if (state.drawingTool === 'trend') {
-      if (!state.pendingPoint) {
-        state.pendingPoint = { time, price };
-      } else {
-        state.drawings.push({
-          type: 'trend',
-          p1: state.pendingPoint,
-          p2: { time, price }
-        });
-        state.pendingPoint = null;
-      }
-    }
-
-    renderDrawings();
-  }
-
-  function clearDrawings() {
-    state.drawings = [];
-    state.pendingPoint = null;
-    renderDrawings();
-  }
-
-  function renderDrawings() {
-    if (!drawingCanvas || !drawingCtx || !chart) return;
-    const primarySeries = getPrimarySeries();
-    if (!primarySeries) {
-      drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
-      return;
-    }
-
-    drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
-    drawingCtx.lineWidth = 1;
-    drawingCtx.strokeStyle = 'rgba(20, 32, 25, 0.7)';
-    drawingCtx.setLineDash([4, 4]);
-
-    const width = drawingCanvas.width / window.devicePixelRatio;
-    const height = drawingCanvas.height / window.devicePixelRatio;
-
-    state.drawings.forEach((draw) => {
-      if (draw.type === 'hline') {
-        const y = primarySeries.priceToCoordinate(draw.price);
-        if (y === null) return;
-        drawingCtx.beginPath();
-        drawingCtx.moveTo(0, y);
-        drawingCtx.lineTo(width, y);
-        drawingCtx.stroke();
-      } else if (draw.type === 'vline') {
-        const x = chart.timeScale().timeToCoordinate(draw.time);
-        if (x === null) return;
-        drawingCtx.beginPath();
-        drawingCtx.moveTo(x, 0);
-        drawingCtx.lineTo(x, height);
-        drawingCtx.stroke();
-      } else if (draw.type === 'trend') {
-        const x1 = chart.timeScale().timeToCoordinate(draw.p1.time);
-        const y1 = primarySeries.priceToCoordinate(draw.p1.price);
-        const x2 = chart.timeScale().timeToCoordinate(draw.p2.time);
-        const y2 = primarySeries.priceToCoordinate(draw.p2.price);
-        if (x1 === null || y1 === null || x2 === null || y2 === null) return;
-        drawingCtx.beginPath();
-        drawingCtx.moveTo(x1, y1);
-        drawingCtx.lineTo(x2, y2);
-        drawingCtx.stroke();
-      }
-    });
-
-    if (state.pendingPoint) {
-      const x = chart.timeScale().timeToCoordinate(state.pendingPoint.time);
-      const y = primarySeries.priceToCoordinate(state.pendingPoint.price);
-      if (x !== null && y !== null) {
-        drawingCtx.setLineDash([]);
-        drawingCtx.beginPath();
-        drawingCtx.arc(x, y, 3, 0, Math.PI * 2);
-        drawingCtx.fillStyle = 'rgba(20, 32, 25, 0.8)';
-        drawingCtx.fill();
-        drawingCtx.setLineDash([4, 4]);
-      }
-    }
-  }
-
-  function getTimeframeLabel(tf) {
-    const labels = { '1D': 'Daily', '1W': 'Weekly', '1M': 'Monthly', '1Y': 'Yearly' };
-    return labels[tf] || tf;
-  }
-
-  // ==================== Symbol Management ====================
 
   function addSymbol(symbol) {
-    // Check if already added
-    if (state.symbols.find(s => s.symbol === symbol.symbol)) {
-      console.log('Symbol already added:', symbol.symbol);
-      return;
-    }
-
-    // Limit to 5 symbols
-    if (state.symbols.length >= 5) {
-      alert('Maksimal 5 symbol dapat ditampilkan bersamaan');
-      return;
-    }
-
-    state.symbols.push(symbol);
-
-    // Update selected symbol display
-    updateSelectedSymbolsDisplay();
-
-    // Reload chart
+    if (state.selectedSymbols.find(s => s.symbol === symbol.symbol)) return;
+    state.selectedSymbols.push(symbol);
+    renderSelectedSeries();
+    updateTitles();
     loadAllChartData();
   }
 
   function removeSymbol(symbolCode) {
-    state.symbols = state.symbols.filter(s => s.symbol !== symbolCode);
-
-    // Update display
-    updateSelectedSymbolsDisplay();
-
-    // Reload chart
-    if (state.symbols.length > 0) {
-      loadAllChartData();
-    } else {
-      // Clear chart
-      seriesMap.forEach((series) => {
-        chart.removeSeries(series);
-      });
-      seriesMap.clear();
-      els.chartTitle.textContent = 'Pilih Symbol';
-      els.chartSubtitle.textContent = 'Ketik di search untuk mencari';
-    }
+    state.selectedSymbols = state.selectedSymbols.filter(s => s.symbol !== symbolCode);
+    renderSelectedSeries();
+    updateTitles();
+    loadAllChartData();
   }
 
-  function clearAllSymbols() {
-    state.symbols = [];
-    state.currentSymbol = null;
-    seriesMap.forEach((series) => {
-      chart.removeSeries(series);
-    });
-    seriesMap.clear();
-    updateSelectedSymbolsDisplay();
-  }
-
-  function updateSelectedSymbolsDisplay() {
-    const container = document.getElementById('selectedSymbol');
-    if (!container) return;
-
-    if (state.symbols.length === 0) {
-      container.innerHTML = `
-        <div class="symbol-icon">📊</div>
-        <div class="symbol-info">
-          <div class="symbol-name">Pilih Symbol</div>
-          <div class="symbol-desc">Ketik di search untuk mencari</div>
-        </div>
-      `;
-      return;
-    }
-
-    // Show all selected symbols with color indicators
-    const symbolsHtml = state.symbols.map((s, i) => {
-      const color = SERIES_COLORS[i % SERIES_COLORS.length].line;
-      return `
-        <div class="selected-symbol-item" data-symbol="${s.symbol}">
-          <span class="symbol-color-dot" style="background-color: ${color}"></span>
-          <span class="symbol-item-name">${s.name}</span>
-          <button class="symbol-remove-btn" data-symbol="${s.symbol}" title="Hapus">×</button>
-        </div>
-      `;
-    }).join('');
-
-    container.innerHTML = `
-      <div class="selected-symbols-list">
-        ${symbolsHtml}
-      </div>
-      ${state.symbols.length > 1 ? '<button class="clear-all-btn" id="clearAllBtn">Hapus Semua</button>' : ''}
-    `;
-
-    // Add remove handlers
-    container.querySelectorAll('.symbol-remove-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
+  function bindControls() {
+    if (els.searchTrigger) {
+      els.searchTrigger.addEventListener('click', (e) => {
         e.stopPropagation();
-        removeSymbol(btn.dataset.symbol);
+        openSearchModal();
       });
-    });
-
-    const clearBtn = document.getElementById('clearAllBtn');
-    if (clearBtn) {
-      clearBtn.addEventListener('click', clearAllSymbols);
     }
-  }
+    bindAddSeriesButton();
 
-  // ==================== Search Functions ====================
-
-  let searchDebounce = null;
-
-  async function searchSymbols(query) {
-    if (query.length < 1) {
-      closeSearchDropdown();
-      return;
-    }
-
-    try {
-      const response = await fetch(`${API_BASE}/api/procurement/search?q=${encodeURIComponent(query)}&limit=15`);
-      const result = await response.json();
-
-      if (result.status === 'success') {
-        renderSearchResults(result.data);
-      }
-    } catch (error) {
-      console.error('Search error:', error);
-      renderSearchError();
-    }
-  }
-
-  function renderSearchResults(symbols) {
-    if (symbols.length === 0) {
-      els.searchDropdown.innerHTML = `
-        <div class="search-empty">Tidak ditemukan</div>
-      `;
-    } else {
-      // Check which symbols are already added
-      const addedSymbols = new Set(state.symbols.map(s => s.symbol));
-
-      els.searchDropdown.innerHTML = symbols.map((s, i) => {
-        const isAdded = addedSymbols.has(s.symbol);
-        return `
-          <div class="search-item${i === 0 ? ' selected' : ''}${isAdded ? ' added' : ''}" data-index="${i}">
-            <span class="search-item-icon">${getCategoryIcon(s.category)}</span>
-            <div class="search-item-info">
-              <div class="search-item-name">${s.name}</div>
-              <div class="search-item-desc">${s.description || ''}</div>
-            </div>
-            <span class="search-item-badge">${formatCategory(s.category)}</span>
-            ${isAdded ? '<span class="search-item-added">✓</span>' : ''}
-          </div>
-        `;
-      }).join('');
-
-      // Add click handlers
-      els.searchDropdown.querySelectorAll('.search-item').forEach((item, index) => {
-        item.addEventListener('click', () => {
-          selectSymbol(symbols[index]);
-        });
+    if (els.symbolSearch) {
+      els.symbolSearch.addEventListener('input', (e) => {
+        const filtered = filterSymbols(e.target.value);
+        renderSearchResults(filtered);
       });
     }
 
-    openSearchDropdown();
-  }
-
-  function renderSearchError() {
-    els.searchDropdown.innerHTML = `
-      <div class="search-empty">Error loading results</div>
-    `;
-    openSearchDropdown();
-  }
-
-  function getCategoryIcon(category) {
-    const icons = {
-      'metric': 'M',
-      'plant': 'P',
-      'sumber_dana': '$',
-      'kategori': 'K'
-    };
-    return icons[category] || '.';
-  }
-
-  function formatCategory(category) {
-    const labels = {
-      'metric': 'Metric',
-      'plant': 'Plant',
-      'sumber_dana': 'Dana',
-      'kategori': 'Kategori'
-    };
-    return labels[category] || category;
-  }
-
-  function selectSymbol(symbol) {
-    els.symbolSearch.value = '';
-    closeSearchDropdown();
-    addSymbol(symbol);
-  }
-
-  function openSearchDropdown() {
-    els.searchDropdown.classList.add('open');
-  }
-
-  function closeSearchDropdown() {
-    els.searchDropdown.classList.remove('open');
-  }
-
-  // ==================== Segmented Controls ====================
-
-  function initSegmentedControl(controlName, onChange) {
-    const control = document.querySelector(`[data-control="${controlName}"]`);
-    if (!control) return;
-
-    control.querySelectorAll('button').forEach(btn => {
-      btn.addEventListener('click', () => {
-        control.querySelectorAll('button').forEach(b => {
-          b.classList.remove('is-active');
-          b.setAttribute('aria-pressed', 'false');
-        });
-        btn.classList.add('is-active');
-        btn.setAttribute('aria-pressed', 'true');
-
-        onChange(btn.dataset.value);
+    if (els.searchModal) {
+      els.searchModal.querySelectorAll('[data-action="close-search"]').forEach((btn) => {
+        btn.addEventListener('click', closeSearchModal);
       });
-    });
-  }
+    }
 
-  // ==================== Event Handlers ====================
-
-  function attachEvents() {
-    // Search input
-    els.symbolSearch.addEventListener('input', (e) => {
-      clearTimeout(searchDebounce);
-      searchDebounce = setTimeout(() => {
-        searchSymbols(e.target.value.trim());
-      }, 300);
-    });
-
-    els.symbolSearch.addEventListener('focus', () => {
-      if (els.symbolSearch.value.length >= 1) {
-        searchSymbols(els.symbolSearch.value.trim());
-      }
-    });
-
-    // Close dropdown when clicking outside
     document.addEventListener('click', (e) => {
-      if (!els.symbolSearch.contains(e.target) && !els.searchDropdown.contains(e.target)) {
-        closeSearchDropdown();
-      }
+      if (!els.searchModal || !els.searchModal.classList.contains('open')) return;
+      const panel = els.searchModal.querySelector('.search-modal-panel');
+      if (panel && panel.contains(e.target)) return;
+      if (els.searchTrigger && els.searchTrigger.contains(e.target)) return;
+      if (els.addSeriesBtn && els.addSeriesBtn.contains(e.target)) return;
+      closeSearchModal();
     });
 
-    // Keyboard navigation for search
-    els.symbolSearch.addEventListener('keydown', (e) => {
-      if (!els.searchDropdown.classList.contains('open')) return;
-
-      const items = els.searchDropdown.querySelectorAll('.search-item');
-      const selected = els.searchDropdown.querySelector('.search-item.selected');
-      const currentIndex = Array.from(items).indexOf(selected);
-
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        const nextIndex = Math.min(currentIndex + 1, items.length - 1);
-        items.forEach((item, i) => item.classList.toggle('selected', i === nextIndex));
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        const prevIndex = Math.max(currentIndex - 1, 0);
-        items.forEach((item, i) => item.classList.toggle('selected', i === prevIndex));
-      } else if (e.key === 'Enter') {
-        e.preventDefault();
-        if (selected) selected.click();
-      } else if (e.key === 'Escape') {
-        closeSearchDropdown();
-      }
+    document.querySelectorAll('[data-control="periodType"] button').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-control="periodType"] button').forEach(b => {
+          b.classList.toggle('is-active', b === btn);
+          b.setAttribute('aria-pressed', b === btn ? 'true' : 'false');
+        });
+        state.periodType = btn.dataset.value;
+        if (els.badgePeriod) els.badgePeriod.textContent = state.periodType === 'calendar' ? 'Kalender' : 'Anggaran';
+        loadAllChartData();
+      });
     });
 
-    // Year select
-    if (els.yearSelect) {
-      els.yearSelect.addEventListener('change', (e) => {
-        state.year = parseInt(e.target.value);
+    const yearSelect = document.getElementById('year');
+    if (yearSelect) {
+      yearSelect.addEventListener('change', (e) => {
+        state.year = parseInt(e.target.value, 10);
         if (els.badgeYear) els.badgeYear.textContent = state.year;
         loadAllChartData();
       });
     }
 
-    if (els.sumberDanaSelect) {
-      els.sumberDanaSelect.addEventListener('change', (e) => {
-        state.sumberDana = e.target.value;
-        loadAllChartData();
+    document.querySelectorAll('[data-control="chartType"] button').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-control="chartType"] button').forEach(b => {
+          b.classList.toggle('is-active', b === btn);
+          b.setAttribute('aria-pressed', b === btn ? 'true' : 'false');
+        });
+        state.chartType = btn.dataset.value;
+        applyChartType();
       });
-    }
-
-    // Period type (Kalender / Anggaran)
-    initSegmentedControl('periodType', (value) => {
-      state.periodType = value;
-      if (els.badgePeriod) els.badgePeriod.textContent = value === 'calendar' ? 'Kalender' : 'Anggaran';
-      loadAllChartData();
     });
 
-    // Timeframe
-    initSegmentedControl('timeframe', (value) => {
-      state.timeframe = value;
-      if (els.badgeTimeframe) els.badgeTimeframe.textContent = getTimeframeLabel(value);
-      loadAllChartData();
-    });
-
-    // Chart type
-    initSegmentedControl('chartType', (value) => {
-      state.chartType = value;
-      if (state.chartType === 'candlestick' && state.normalize) {
-        state.normalize = false;
-        if (els.toolNormalize) {
-          els.toolNormalize.classList.remove('is-active');
-        }
-      }
-      if (els.toolNormalize) {
-        els.toolNormalize.classList.toggle('is-muted', state.chartType === 'candlestick');
-      }
-      loadAllChartData();
-    });
-
-    // Chart tools
     if (els.toolFit) {
       els.toolFit.addEventListener('click', () => {
         if (chart) chart.timeScale().fitContent();
       });
     }
-
     if (els.toolAutoScale) {
       els.toolAutoScale.addEventListener('click', () => {
         state.autoScale = !state.autoScale;
@@ -1414,7 +588,6 @@
         applyScaleOptions();
       });
     }
-
     if (els.toolLogScale) {
       els.toolLogScale.addEventListener('click', () => {
         state.logScale = !state.logScale;
@@ -1422,125 +595,292 @@
         applyScaleOptions();
       });
     }
-
     if (els.toolNormalize) {
       els.toolNormalize.addEventListener('click', () => {
-        if (state.chartType === 'candlestick') {
-          return;
-        }
+        if (state.chartType === 'candlestick' || state.chartType === 'bar') return;
         state.normalize = !state.normalize;
         els.toolNormalize.classList.toggle('is-active', state.normalize);
         loadAllChartData();
       });
     }
-
-    if (els.toolExport) {
-      els.toolExport.addEventListener('click', exportChartImage);
-    }
-
-    if (els.toolExportCsv) {
-      els.toolExportCsv.addEventListener('click', exportSeriesCsv);
-    }
-
     if (els.toolZoomIn) {
       els.toolZoomIn.addEventListener('click', () => zoomTimeScale(0.8));
     }
-
     if (els.toolZoomOut) {
       els.toolZoomOut.addEventListener('click', () => zoomTimeScale(1.25));
     }
-
-    if (els.toolSMA) {
-      els.toolSMA.addEventListener('click', () => {
-        state.indicators.sma = !state.indicators.sma;
-        els.toolSMA.classList.toggle('is-active', state.indicators.sma);
-        updateIndicators();
+    if (els.toolExport) {
+      els.toolExport.addEventListener('click', exportChartImage);
+    }
+    if (els.toolExportCsv) {
+      els.toolExportCsv.addEventListener('click', exportSeriesCsv);
+    }
+    if (els.toolDock) {
+      els.toolDock.addEventListener('click', () => {
+        state.dockToolbar = !state.dockToolbar;
+        applySettings();
+      });
+    }
+    if (els.toolSettings) {
+      els.toolSettings.addEventListener('click', () => {
+        if (!els.settingsPanel) return;
+        els.settingsPanel.hidden = !els.settingsPanel.hidden;
       });
     }
 
-    if (els.toolEMA) {
-      els.toolEMA.addEventListener('click', () => {
-        state.indicators.ema = !state.indicators.ema;
-        els.toolEMA.classList.toggle('is-active', state.indicators.ema);
-        updateIndicators();
+    if (els.settingsToggles && els.settingsToggles.length > 0) {
+      els.settingsToggles.forEach((input) => {
+        input.addEventListener('change', () => {
+          const key = input.dataset.setting;
+          if (!key) return;
+          if (key === 'dockToolbar') {
+            state.dockToolbar = input.checked;
+          } else if (Object.prototype.hasOwnProperty.call(state.settings, key)) {
+            state.settings[key] = input.checked;
+          }
+          applySettings();
+          if (key === 'enableCandle' && !state.settings.enableCandle && state.chartType === 'candlestick') {
+            state.chartType = 'line';
+            document.querySelector('[data-control="chartType"] button[data-value="line"]')?.click();
+          }
+          if (key === 'enableBar' && !state.settings.enableBar && state.chartType === 'bar') {
+            state.chartType = 'line';
+            document.querySelector('[data-control="chartType"] button[data-value="line"]')?.click();
+          }
+        });
       });
     }
 
-    if (els.toolRSI) {
-      els.toolRSI.addEventListener('click', () => {
-        state.indicators.rsi = !state.indicators.rsi;
-        els.toolRSI.classList.toggle('is-active', state.indicators.rsi);
-        updateIndicators();
-      });
-    }
-
-    if (els.toolHLine) {
-      els.toolHLine.addEventListener('click', () => {
-        setDrawingTool(state.drawingTool === 'hline' ? 'none' : 'hline');
-      });
-    }
-
-    if (els.toolVLine) {
-      els.toolVLine.addEventListener('click', () => {
-        setDrawingTool(state.drawingTool === 'vline' ? 'none' : 'vline');
-      });
-    }
-
-    if (els.toolTrend) {
-      els.toolTrend.addEventListener('click', () => {
-        setDrawingTool(state.drawingTool === 'trend' ? 'none' : 'trend');
-      });
-    }
-
-    if (els.toolClearDraw) {
-      els.toolClearDraw.addEventListener('click', clearDrawings);
-    }
-
-    if (els.toolTemplateSave) {
-      els.toolTemplateSave.addEventListener('click', saveCurrentTemplate);
-    }
-
-    if (els.toolTemplateLoad) {
-      els.toolTemplateLoad.addEventListener('click', () => {
-        if (els.templateSelect && els.templateSelect.value) {
-          applyTemplate(els.templateSelect.value);
+    document.querySelectorAll('.sidebar-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        if (!drawingLayer) return;
+        const tool = btn.dataset.tool;
+        if (!tool) return;
+        document.querySelectorAll('.sidebar-btn').forEach(b => b.classList.remove('is-active'));
+        btn.classList.add('is-active');
+        if (tool === 'clear') {
+          drawingLayer.clearAllDrawings();
+          return;
         }
+        drawingLayer.setTool(tool);
       });
-    }
-
-    if (els.toolTemplateDelete) {
-      els.toolTemplateDelete.addEventListener('click', deleteCurrentTemplate);
-    }
+    });
   }
 
-  // ==================== Init ====================
-
-  function init() {
-    initChart();
-    attachEvents();
-    updateSelectedSymbolsDisplay();
-
-    // Set initial badge values
+  function initBadges() {
     if (els.badgePeriod) els.badgePeriod.textContent = 'Kalender';
-    if (els.badgeYear) els.badgeYear.textContent = '2025';
+    if (els.badgeYear) els.badgeYear.textContent = String(state.year);
     if (els.badgeTimeframe) els.badgeTimeframe.textContent = 'Weekly';
+  }
+
+  async function init() {
+    initChart();
+    bindControls();
+    initBadges();
+    await fetchSymbols();
+    renderSelectedSeries();
+    applySettings();
     if (els.toolAutoScale) els.toolAutoScale.classList.toggle('is-active', state.autoScale);
     if (els.toolLogScale) els.toolLogScale.classList.toggle('is-active', state.logScale);
-    if (els.toolNormalize) {
-      els.toolNormalize.classList.toggle('is-active', state.normalize);
-      els.toolNormalize.classList.toggle('is-muted', state.chartType === 'candlestick');
-    }
-    if (els.toolSMA) els.toolSMA.classList.toggle('is-active', state.indicators.sma);
-    if (els.toolEMA) els.toolEMA.classList.toggle('is-active', state.indicators.ema);
-    if (els.toolRSI) els.toolRSI.classList.toggle('is-active', state.indicators.rsi);
-    setDrawingTool('none');
-    refreshTemplateOptions();
+    if (els.toolNormalize) els.toolNormalize.classList.toggle('is-active', state.normalize);
+    const crosshairBtn = document.querySelector('.sidebar-btn[data-tool="crosshair"]');
+    if (crosshairBtn) crosshairBtn.classList.add('is-active');
   }
 
-  // Start when DOM ready
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
     init();
+  }
+
+  function initDrawingLayer() {
+    if (!els.chartContainer) return;
+    drawingLayer = createDrawingLayer(els.chartContainer);
+  }
+
+  function createDrawingLayer(container) {
+    const layer = {
+      canvas: null,
+      ctx: null,
+      isDrawing: false,
+      currentTool: 'crosshair',
+      startPoint: null,
+      drawings: [],
+      tempDrawing: null,
+      styles: {
+        trendline: { color: '#e76f51', width: 2 },
+        hline: { color: '#0f766e', width: 1, dash: [5, 5] },
+        vline: { color: '#0f766e', width: 1, dash: [5, 5] },
+        rectangle: { color: '#2a9d8f', width: 2, fill: 'rgba(42, 157, 143, 0.08)' }
+      }
+    };
+
+    layer.canvas = document.createElement('canvas');
+    layer.canvas.className = 'drawing-canvas';
+    layer.canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:9;';
+    container.style.position = 'relative';
+    container.appendChild(layer.canvas);
+    layer.ctx = layer.canvas.getContext('2d');
+
+    const resize = () => {
+      const rect = container.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      layer.canvas.width = rect.width * dpr;
+      layer.canvas.height = rect.height * dpr;
+      layer.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      redraw();
+    };
+
+    const getPos = (e) => {
+      const rect = container.getBoundingClientRect();
+      return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    };
+
+    const redraw = () => {
+      const rect = container.getBoundingClientRect();
+      layer.ctx.clearRect(0, 0, rect.width, rect.height);
+      layer.drawings.forEach(d => renderDrawing(d));
+      if (layer.tempDrawing) renderDrawing(layer.tempDrawing, true);
+    };
+
+    const renderDrawing = (drawing, isPreview = false) => {
+      const style = drawing.style || layer.styles[drawing.type];
+      const ctx = layer.ctx;
+      ctx.save();
+      ctx.strokeStyle = isPreview ? 'rgba(231, 111, 81, 0.5)' : style.color;
+      ctx.lineWidth = style.width || 2;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      if (style.dash) ctx.setLineDash(style.dash);
+      switch (drawing.type) {
+        case 'trendline':
+          ctx.beginPath();
+          ctx.moveTo(drawing.x1, drawing.y1);
+          ctx.lineTo(drawing.x2, drawing.y2);
+          ctx.stroke();
+          break;
+        case 'hline':
+          ctx.beginPath();
+          ctx.moveTo(0, drawing.y);
+          ctx.lineTo(container.getBoundingClientRect().width, drawing.y);
+          ctx.stroke();
+          break;
+        case 'vline':
+          ctx.beginPath();
+          ctx.moveTo(drawing.x, 0);
+          ctx.lineTo(drawing.x, container.getBoundingClientRect().height);
+          ctx.stroke();
+          break;
+        case 'rectangle': {
+          const x = Math.min(drawing.x1, drawing.x2);
+          const y = Math.min(drawing.y1, drawing.y2);
+          const w = Math.abs(drawing.x2 - drawing.x1);
+          const h = Math.abs(drawing.y2 - drawing.y1);
+          if (style.fill) {
+            ctx.fillStyle = style.fill;
+            ctx.fillRect(x, y, w, h);
+          }
+          ctx.strokeRect(x, y, w, h);
+          break;
+        }
+        default:
+          break;
+      }
+      ctx.restore();
+    };
+
+    const addDrawing = (drawing) => {
+      drawing.id = Date.now();
+      drawing.style = { ...layer.styles[drawing.type] };
+      layer.drawings.push(drawing);
+      redraw();
+    };
+
+    const onMouseDown = (e) => {
+      if (layer.currentTool === 'crosshair') return;
+      if (e.button !== 0) return;
+      const pos = getPos(e);
+      if (layer.currentTool === 'hline') {
+        addDrawing({ type: 'hline', y: pos.y });
+        return;
+      }
+      if (layer.currentTool === 'vline') {
+        addDrawing({ type: 'vline', x: pos.x });
+        return;
+      }
+      if (!layer.isDrawing) {
+        layer.isDrawing = true;
+        layer.startPoint = pos;
+      } else {
+        completeDrawing(pos);
+      }
+    };
+
+    const onMouseMove = (e) => {
+      if (!layer.isDrawing || layer.currentTool === 'crosshair') return;
+      const pos = getPos(e);
+      if (layer.currentTool === 'trendline') {
+        layer.tempDrawing = {
+          type: 'trendline',
+          x1: layer.startPoint.x,
+          y1: layer.startPoint.y,
+          x2: pos.x,
+          y2: pos.y
+        };
+      } else if (layer.currentTool === 'rectangle') {
+        layer.tempDrawing = {
+          type: 'rectangle',
+          x1: layer.startPoint.x,
+          y1: layer.startPoint.y,
+          x2: pos.x,
+          y2: pos.y
+        };
+      }
+      redraw();
+    };
+
+    const completeDrawing = (endPos) => {
+      if (layer.currentTool === 'trendline') {
+        addDrawing({
+          type: 'trendline',
+          x1: layer.startPoint.x,
+          y1: layer.startPoint.y,
+          x2: endPos.x,
+          y2: endPos.y
+        });
+      } else if (layer.currentTool === 'rectangle') {
+        addDrawing({
+          type: 'rectangle',
+          x1: layer.startPoint.x,
+          y1: layer.startPoint.y,
+          x2: endPos.x,
+          y2: endPos.y
+        });
+      }
+      layer.isDrawing = false;
+      layer.startPoint = null;
+      layer.tempDrawing = null;
+    };
+
+    container.addEventListener('mousedown', onMouseDown);
+    container.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('resize', resize);
+    resize();
+
+    return {
+      setTool(tool) {
+        layer.currentTool = tool;
+        layer.isDrawing = false;
+        layer.startPoint = null;
+        layer.tempDrawing = null;
+        layer.canvas.style.pointerEvents = tool === 'crosshair' ? 'none' : 'auto';
+        redraw();
+      },
+      clearAllDrawings() {
+        layer.drawings = [];
+        layer.tempDrawing = null;
+        redraw();
+      }
+    };
   }
 })();

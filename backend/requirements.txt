@@ -6,6 +6,7 @@ numpy==1.26.4
 python-dotenv==0.21.0
 pydantic==2.8.2
 yfinance==0.2.48
+psycopg2-binary==2.9.9
 
 # Testing dependencies
 pytest==8.3.4

@@ -6,7 +6,6 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from typing import List, Dict
 import asyncio
 import json
-import random
 from ..services.data_service import data_service
 
 router = APIRouter()
@@ -124,11 +123,5 @@ async def price_broadcaster():
         
         for symbol in symbols:
             price_data = await asyncio.to_thread(data_service.get_latest_price, symbol)
-            # Add small random price movement for simulation
-            movement = random.uniform(-0.0005, 0.0005)
-            adjusted_price = price_data["price"] * (1 + movement)
-            decimals = data_service._get_price_decimals(symbol, float(adjusted_price))
-            broadcast_data = dict(price_data)
-            broadcast_data["price"] = round(adjusted_price, decimals)
-            
-            await manager.broadcast_price(symbol, broadcast_data)
+            # Send latest value without simulated movement
+            await manager.broadcast_price(symbol, price_data)

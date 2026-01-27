@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     DB_NAME: str = "olahproc"
     DB_USER: str = "postgres"
     DB_PASSWORD: str = "postgres"
+
+    # Data adapter + mapping (for flexible data sources)
+    DATA_ADAPTER: str = "postgres"
+    DATA_MAPPING_PATH: str = "data_mapping.json"
     
     @property
     def DATABASE_URL(self) -> str:

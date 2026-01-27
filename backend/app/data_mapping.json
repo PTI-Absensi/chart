@@ -1,0 +1,24 @@
+{
+  "symbols": {
+    "table": "public.analitic",
+    "columns": {
+      "symbol": "kode_data",
+      "name": "desc",
+      "fallback_parts": ["nama_dokumen", "status", "sumber_dana", "kategori_plant"]
+    },
+    "filters": {
+      "with_data": {
+        "table": "public.fact_doc_weekly",
+        "column": "kode_data"
+      }
+    }
+  },
+  "series": {
+    "table": "public.fact_doc_weekly",
+    "time_column": "week_start",
+    "value_column": "count_doc",
+    "symbol_column": "kode_data",
+    "period_type_column": "period_type",
+    "year_column": "period_year"
+  }
+}
