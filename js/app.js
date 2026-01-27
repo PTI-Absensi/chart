@@ -31,6 +31,7 @@
     chartContainer: document.getElementById('chartContainer'),
     chartTitle: document.getElementById('chartTitle'),
     chartSubtitle: document.getElementById('chartSubtitle'),
+    chartLoading: document.getElementById('chartLoading'),
     badgePeriod: document.querySelector('[data-badge="period"]'),
     badgeYear: document.querySelector('[data-badge="year"]'),
     badgeTimeframe: document.querySelector('[data-badge="timeframe"]'),
@@ -176,6 +177,12 @@
   function resetSeries() {
     seriesMap.forEach(series => chart.removeSeries(series));
     seriesMap.clear();
+  }
+
+  function setChartLoading(isLoading) {
+    if (!els.chartContainer || !els.chartLoading) return;
+    els.chartContainer.classList.toggle('is-loading', isLoading);
+    els.chartLoading.setAttribute('aria-hidden', isLoading ? 'false' : 'true');
   }
 
   function applyChartType() {
@@ -477,25 +484,33 @@
   async function loadAllChartData() {
     if (!chart || state.selectedSymbols.length === 0) {
       if (els.dataWindow) els.dataWindow.textContent = 'Data kosong.';
+      setChartLoading(false);
       return;
     }
 
+    setChartLoading(true);
     resetSeries();
     state.seriesData.clear();
 
-    const list = state.selectedSymbols;
-    const dataList = await Promise.all(list.map(fetchSeriesData));
+    try {
+      const list = state.selectedSymbols;
+      const dataList = await Promise.all(list.map(fetchSeriesData));
 
-    list.forEach((symbol, index) => {
-      const series = createSeries(symbol, index);
-      seriesMap.set(symbol.symbol, series);
-      const data = dataList[index] || [];
-      state.seriesData.set(symbol.symbol, data);
-      setSeriesData(symbol, data, index);
-    });
+      list.forEach((symbol, index) => {
+        const series = createSeries(symbol, index);
+        seriesMap.set(symbol.symbol, series);
+        const data = dataList[index] || [];
+        state.seriesData.set(symbol.symbol, data);
+        setSeriesData(symbol, data, index);
+      });
 
-    chart.timeScale().fitContent();
-    updateSummary(state.seriesData.get(list[0].symbol) || []);
+      chart.timeScale().fitContent();
+      updateSummary(state.seriesData.get(list[0].symbol) || []);
+    } catch (err) {
+      console.error('Failed to load chart data', err);
+    } finally {
+      setChartLoading(false);
+    }
   }
 
   function addSymbol(symbol) {
@@ -673,10 +688,26 @@
     if (els.badgeTimeframe) els.badgeTimeframe.textContent = 'Weekly';
   }
 
+  function applyIntroAnimations() {
+    document.querySelectorAll('.animate-in').forEach((el, idx) => {
+      el.style.setProperty('--i', idx);
+      el.classList.add('fade-up');
+    });
+    if (els.chartToolbar) els.chartToolbar.classList.add('fade-up');
+    if (els.dataWindow) els.dataWindow.classList.add('fade-up');
+    if (els.summaryGrid) {
+      els.summaryGrid.classList.add('stagger');
+      Array.from(els.summaryGrid.children).forEach((card, idx) => {
+        card.style.setProperty('--i', idx + 1);
+      });
+    }
+  }
+
   async function init() {
     initChart();
     bindControls();
     initBadges();
+    applyIntroAnimations();
     await fetchSymbols();
     renderSelectedSeries();
     applySettings();
@@ -685,6 +716,13 @@
     if (els.toolNormalize) els.toolNormalize.classList.toggle('is-active', state.normalize);
     const crosshairBtn = document.querySelector('.sidebar-btn[data-tool="crosshair"]');
     if (crosshairBtn) crosshairBtn.classList.add('is-active');
+    const sideNavToggle = document.getElementById('sideNavToggle');
+    const sideNav = document.getElementById('sideNav');
+    if (sideNavToggle && sideNav) {
+      sideNavToggle.addEventListener('click', () => {
+        sideNav.classList.toggle('is-collapsed');
+      });
+    }
   }
 
   if (document.readyState === 'loading') {
