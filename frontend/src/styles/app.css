@@ -286,6 +286,29 @@ body[data-theme="dark"] .search-modal-backdrop {
   background: rgba(0, 0, 0, 0.55);
 }
 
+body[data-theme="dark"] select,
+body[data-theme="dark"] .tool-select,
+body[data-theme="dark"] .tool-input,
+body[data-theme="dark"] .search-trigger,
+body[data-theme="dark"] .search-input,
+body[data-theme="dark"] .series-add-btn,
+body[data-theme="dark"] .sidebar-btn,
+body[data-theme="dark"] .dock-toggle,
+body[data-theme="dark"] .tool-btn {
+  background: var(--surface-alt);
+  color: var(--ink);
+  border-color: var(--stroke);
+}
+
+body[data-theme="dark"] .segmented {
+  background: color-mix(in srgb, var(--surface-alt) 80%, transparent);
+}
+
+body[data-theme="dark"] .segmented button.is-active {
+  background: var(--accent);
+  color: #fff;
+}
+
 .page {
   min-height: 100vh;
   position: relative;
@@ -422,7 +445,7 @@ select {
   padding: 10px 12px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--stroke);
-  background: #fff;
+  background: var(--surface);
   font-size: 0.98rem;
   font-family: var(--font-body);
   transition: border var(--transition), box-shadow var(--transition);
@@ -885,7 +908,7 @@ select:focus {
   padding: 6px 10px;
   border-radius: 999px;
   border: 1px solid var(--stroke);
-  background: #ffffff;
+  background: var(--surface);
   color: var(--muted);
   font-weight: 600;
   font-size: 0.8rem;
@@ -897,7 +920,7 @@ select:focus {
   padding: 6px 12px;
   border-radius: 999px;
   border: 1px solid var(--stroke);
-  background: #ffffff;
+  background: var(--surface);
   color: var(--muted);
   font-weight: 600;
   font-size: 0.8rem;

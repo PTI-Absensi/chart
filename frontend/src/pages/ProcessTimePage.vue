@@ -1,6 +1,6 @@
 <template>
   <div class="page-content process-page">
-    <header>
+    <header class="animate-in">
       <div class="title-wrap">
         <h1>Rekap Waktu Proses</h1>
         <h2>Manajemen Pengadaan</h2>
@@ -9,7 +9,7 @@
     </header>
 
     <div class="grid">
-      <div class="card">
+      <div class="card animate-in">
         <h3>Create Recap</h3>
         <p class="muted">
           Jalankan CLI untuk menghasilkan rekap, lalu muat file CSV/JSON ke tabel preview.
@@ -60,7 +60,7 @@
         </div>
       </div>
 
-      <div class="card">
+      <div class="card animate-in">
         <h3>Table Preview</h3>
         <table>
           <thead>
@@ -229,6 +229,12 @@ h2 {
   border: 1px solid var(--stroke);
   padding: 18px;
   box-shadow: 0 18px 30px rgba(15, 46, 35, 0.1);
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 24px 40px rgba(15, 46, 35, 0.18);
 }
 
 .muted {

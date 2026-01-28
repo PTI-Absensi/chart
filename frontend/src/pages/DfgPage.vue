@@ -1,6 +1,6 @@
 <template>
   <div class="page-content dfg-page">
-    <header>
+    <header class="animate-in">
       <div class="title-wrap">
         <h1>Directly-Folows Graph (DFG)</h1>
         <h2>Manajemen Pengadaan</h2>
@@ -9,7 +9,7 @@
     </header>
 
     <div class="grid">
-      <section class="card">
+      <section class="card animate-in">
         <h3>Create DFG</h3>
         <div class="field">
           <label for="table">Event log table</label>
@@ -68,7 +68,7 @@
         <pre id="commandPreview"></pre>
       </section>
 
-      <section class="card">
+      <section class="card animate-in">
         <h3>DFG Preview</h3>
         <div class="tabs">
           <button class="tab active" data-tab="image">Image</button>
@@ -294,6 +294,12 @@ h2 {
   border: 1px solid var(--stroke);
   padding: 18px;
   box-shadow: 0 18px 30px rgba(15, 46, 35, 0.1);
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 24px 40px rgba(15, 46, 35, 0.18);
 }
 
 .field {
