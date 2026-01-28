@@ -1,34 +1,32 @@
-# Dokumentasi Sistem Chart (Procurement Charting Suite)
+﻿# Dokumentasi Sistem Chart (Procurement Charting Suite)
 
-Dokumen ini adalah dokumentasi tunggal untuk folder `chart/`.  
+Dokumen ini adalah dokumentasi tunggal untuk folder `chart/`.
 Mencakup arsitektur, frontend (Vue + Vite), backend (Node.js), API, struktur folder, konfigurasi, dan legacy.
 
 ## 1. Ringkasan
 
 Sistem saat ini terdiri dari:
-- **Frontend Vue + Vite + Vue Router** (SPA) untuk charting tools + DFG + Process Time.
-- **Backend Node.js (Express + PostgreSQL)** untuk REST API data chart.
-- **Legacy** disimpan di folder `legacy/` (FastAPI dan HTML statis lama).
+- Frontend Vue + Vite + Vue Router (SPA) untuk charting tools + DFG + Process Time.
+- Backend Node.js (Express + PostgreSQL) untuk REST API data chart.
+- Legacy disimpan di folder `legacy/` (FastAPI dan HTML statis lama).
 
-Fokus aplikasi: **charting tools fleksibel untuk data procurement**, bukan trading.
+Fokus aplikasi: charting tools fleksibel untuk data procurement, bukan trading.
 
 ---
 
 ## 2. Arsitektur (ASCII)
 
 ```
-┌──────────────────────────────┐       HTTP/JSON       ┌──────────────────────────────┐
-│  FRONTEND (Vue + Vite SPA)    │ <-------------------> │  BACKEND (Node.js + Express) │
-│  - /dashboard (SPA routes)    │                       │  - /api/*                   │
-│  - /dfg, /process-time        │                       │  - /api/procurement/*       │
-└───────────────┬───────────────┘                       └───────────────┬───────────────┘
-                │                                                       │
-                │ static assets (Vite dev/build)                        │ PostgreSQL
-                v                                                       v
-      Vite dev server / build output                          Schema: olahproc
-                                                              Tables: fact_value_weekly,
-                                                                      fact_doc_weekly,
-                                                                      dim_plant, analitic
++------------------------------------+       HTTP/JSON       +------------------------------------+
+| FRONTEND (Vue + Vite SPA)          | <-------------------> | BACKEND (Node.js + Express)         |
+| - /dashboard (SPA routes)          |                       | - /api/*                            |
+| - /dfg, /process-time              |                       | - /api/procurement/*                |
++---------------------+--------------+                       +---------------------+--------------+
+                      |                                        | PostgreSQL
+                      | static assets (Vite dev/build)         | Schema: olahproc
+                      v                                        | Tables: fact_value_weekly,
+           Vite dev server / build output                      |         fact_doc_weekly,
+                                                               |         dim_plant, analitic
 ```
 
 ---
@@ -43,9 +41,9 @@ Fokus aplikasi: **charting tools fleksibel untuk data procurement**, bukan tradi
 
 ### Backend
 - Node.js (Express)
-- PostgreSQL (`pg`)
-- `pg-format` untuk safe identifier formatting
-- `dotenv` untuk konfigurasi
+- PostgreSQL (pg)
+- pg-format untuk safe identifier formatting
+- dotenv untuk konfigurasi
 
 ---
 
@@ -53,38 +51,38 @@ Fokus aplikasi: **charting tools fleksibel untuk data procurement**, bukan tradi
 
 ```
 chart/
-├── backend-node/                 # Backend Node.js (baru)
-│   ├── src/
-│   │   ├── index.js               # Express server + routes
-│   │   ├── config.js              # env loader
-│   │   ├── db.js                  # PG Pool
-│   │   ├── mapping.js             # mapping loader
-│   │   └── services/
-│   │       ├── dataService.js     # /api (symbols, ohlc, price)
-│   │       └── procurementService.js # /api/procurement
-│   ├── config/
-│   │   └── data_mapping.json
-│   ├── package.json
-│   └── .env.example
-├── frontend/                     # Vue + Vite SPA
-│   ├── src/
-│   │   ├── App.vue
-│   │   ├── main.ts
-│   │   ├── router/index.ts
-│   │   ├── layouts/AppShell.vue
-│   │   ├── components/SideNav.vue
-│   │   ├── pages/
-│   │   │   ├── ChartPage.vue
-│   │   │   ├── DfgPage.vue
-│   │   │   └── ProcessTimePage.vue
-│   │   ├── legacy/chart-app.ts    # port JS chart lama
-│   │   └── styles/app.css
-│   ├── index.html
-│   └── vite.config.ts
-├── legacy/
-│   ├── backend-python/            # FastAPI lama
-│   └── web-static/                # HTML/CSS/JS lama
-└── dokumentasi_chart.md
+|-- backend-node/                 # Backend Node.js (baru)
+|   |-- src/
+|   |   |-- index.js               # Express server + routes
+|   |   |-- config.js              # env loader
+|   |   |-- db.js                  # PG Pool
+|   |   |-- mapping.js             # mapping loader
+|   |   `-- services/
+|   |       |-- dataService.js     # /api (symbols, ohlc, price)
+|   |       `-- procurementService.js # /api/procurement
+|   |-- config/
+|   |   `-- data_mapping.json
+|   |-- package.json
+|   `-- .env.example
+|-- frontend/                     # Vue + Vite SPA
+|   |-- src/
+|   |   |-- App.vue
+|   |   |-- main.ts
+|   |   |-- router/index.ts
+|   |   |-- layouts/AppShell.vue
+|   |   |-- components/SideNav.vue
+|   |   |-- pages/
+|   |   |   |-- ChartPage.vue
+|   |   |   |-- DfgPage.vue
+|   |   |   `-- ProcessTimePage.vue
+|   |   |-- legacy/chart-app.ts    # port JS chart lama
+|   |   `-- styles/app.css
+|   |-- index.html
+|   `-- vite.config.ts
+|-- legacy/
+|   |-- backend-python/            # FastAPI lama
+|   `-- web-static/                # HTML/CSS/JS lama
+`-- dokumentasi_chart.md
 ```
 
 ---
@@ -100,21 +98,19 @@ SPA routes:
 
 ### 5.2 Layout Global
 Navbar global via:
-```
-frontend/src/layouts/AppShell.vue
-frontend/src/components/SideNav.vue
-```
+- `frontend/src/layouts/AppShell.vue`
+- `frontend/src/components/SideNav.vue`
 
 ### 5.3 Dark/Light Mode
-Theme disimpan di `localStorage`:
+Theme disimpan di localStorage:
 - `light`
 - `dark`
 
 CSS theme memakai CSS variables di `frontend/src/styles/app.css`.
 
 ### 5.4 Animasi & Hover
-Kelas `.animate-in` dipakai di seluruh page.  
-Card di DFG/Process Time menggunakan hover `transform` + `shadow`.
+Kelas `.animate-in` dipakai di semua page.
+Card di DFG/Process Time menggunakan hover transform + shadow.
 
 ---
 
@@ -151,6 +147,10 @@ Jika `AUTH_ENABLED=true` dan file user tersedia, semua endpoint `/api/*` dan
 Authorization: Bearer <token>
 ```
 
+Catatan host:
+- Vite proxy mengarah ke `http://127.0.0.1:8000`.
+- Backend wajib listen ke IPv4 (`0.0.0.0` atau `127.0.0.1`) agar proxy tidak gagal.
+
 ### 6.4 Endpoint DFG & Process Time
 ```
 GET  /api/dfg/preview?table=...&mode=...&format=...&min_edge=...
@@ -158,7 +158,7 @@ GET  /api/dfg/file?name=...
 POST /api/process-time/parse (multipart file)
 ```
 
-### 6.3 Response Format
+### 6.5 Response Format
 Umumnya:
 ```
 { "status": "success", "data": [...] }
@@ -176,7 +176,7 @@ OHLC-like:
 }
 ```
 
-### 6.4 Mapping DB (Adapter)
+### 6.6 Mapping DB (Adapter)
 Mapping file:
 ```
 backend-node/config/data_mapping.json
@@ -249,6 +249,7 @@ Tambahan auth:
 ```
 AUTH_ENABLED=true
 JWT_SECRET=...
+HOST=0.0.0.0
 ```
 
 User default (config/users.json):
@@ -267,6 +268,25 @@ URL:
 - `http://localhost:5173/dashboard/dfg`
 - `http://localhost:5173/dashboard/process-time`
 
+### 8.3 Penting: Jalankan 2 Terminal
+Untuk development harus dua terminal:
+1) Terminal A: `chart/backend-node` -> `npm run dev`
+2) Terminal B: `chart/frontend` -> `npm run dev`
+
+Jika salah satu mati, login/HTTP request akan gagal.
+
+### 8.4 Troubleshooting Login (500 / gagal login)
+Checklist cepat:
+- Backend hidup di port 8000 (`http://127.0.0.1:8000/health` -> OK).
+- Vite proxy menunjuk `127.0.0.1:8000` (cek `frontend/vite.config.ts`).
+- User ada di `chart/backend-node/config/users.json`.
+- Jika memakai ENV, set:
+```
+AUTH_ENABLED=true
+JWT_SECRET=your-secret
+HOST=0.0.0.0
+```
+
 ---
 
 ## 9. Produksi (Opsional)
@@ -277,7 +297,7 @@ cd chart/frontend
 npm run build
 ```
 
-Output akan di `frontend/dist`.  
+Output akan di `frontend/dist`.
 Gunakan server statis (Nginx) atau satu service Node/PM2 untuk serving + API.
 
 ---
@@ -296,9 +316,8 @@ Dipertahankan hanya untuk referensi/rollback.
 
 ## 11. Catatan Penting
 
-- UI menggunakan **Lightweight Charts**, watermark sudah dimatikan.
+- UI menggunakan Lightweight Charts, watermark sudah dimatikan.
 - Multi-series diproses di frontend (Promise.all).
-- DFG / Process Time tidak pakai API backend, hanya file preview lokal.
 - DFG / Process Time sekarang memakai API backend untuk preview/parse file.
 - Dark/Light mode sudah dipakai di semua page.
 - Auth JWT tersedia dan dapat diaktifkan dari ENV.
@@ -317,4 +336,85 @@ Dipertahankan hanya untuk referensi/rollback.
 
 ---
 
-Last updated: **2026-01-28**
+## 13. Roadmap (Menuju Charting Tools Fleksibel ala Looker Studio)
+
+### 13.1 Tahap 1 - Data Source & Field Mapping (Fondasi)
+Target: aplikasi bisa menerima banyak sumber data, bukan hanya DB olahproc.
+
+Checklist:
+- Data source manager (UI):
+  - Tambah sumber: PostgreSQL, CSV upload, JSON upload.
+  - Simpan koneksi (nama, host, db, user).
+  - List & remove source.
+- Data profiling:
+  - Detect tipe data (string, number, date).
+  - Preview sample rows.
+- Field mapping:
+  - Mapping kolom -> field standar (date, metric, dimension).
+  - Rename field + format (currency, percent).
+- API backend:
+  - `/api/sources` CRUD
+  - `/api/sources/:id/schema`
+  - `/api/sources/:id/preview`
+
+### 13.2 Tahap 2 - Chart Builder & Dashboard Layout
+Target: user bisa bikin chart secara visual dan menyimpan dashboard.
+
+Checklist:
+- Chart builder UI:
+  - Drag drop: Dimension, Metric, Filter.
+  - Pilih tipe chart (line, area, bar).
+  - Setting axis (format, label, scale).
+- Multi-series:
+  - Add series, color, label.
+- Dashboard layout:
+  - Grid layout (resize, drag).
+  - Save layout + restore.
+- API backend:
+  - `/api/charts` CRUD (config chart)
+  - `/api/dashboards` CRUD (layout)
+
+### 13.3 Tahap 3 - Template, Export, Permission
+Target: seperti analytics platform, siap multi-user.
+
+Checklist:
+- Template report:
+  - Simpan, duplikasi, share.
+- Export:
+  - PNG, PDF, CSV.
+- Permissions:
+  - Role: admin/editor/viewer.
+  - Dataset access control.
+- Versioning:
+  - Audit log perubahan.
+
+---
+
+## 14. Checklist Otak-Atik (Developer Quick Guide)
+
+### 14.1 Area Frontend
+- Layout global + sidebar: `frontend/src/layouts/AppShell.vue`, `frontend/src/components/SideNav.vue`
+- Chart page: `frontend/src/pages/ChartPage.vue`
+- Chart engine: `frontend/src/components/ChartApp.vue`
+- Legacy chart JS: `frontend/src/legacy/chart-app.ts`
+- Theme (dark/light + CSS vars): `frontend/src/styles/app.css`
+- Router: `frontend/src/router/index.ts`
+
+### 14.2 Area Backend
+- Express entry: `backend-node/src/index.js`
+- Config ENV: `backend-node/src/config.js`
+- DB connection: `backend-node/src/db.js`
+- Mapping field: `backend-node/config/data_mapping.json`
+- Procurement series logic: `backend-node/src/services/procurementService.js`
+- Auth JWT: `backend-node/src/auth.js`
+
+### 14.3 Checklist Modifikasi Cepat
+- Ubah tema warna: edit CSS variables di `frontend/src/styles/app.css`
+- Ubah sidebar menu: `frontend/src/components/SideNav.vue`
+- Ubah chart UI: `frontend/src/components/ChartApp.vue`
+- Ubah API endpoint: `backend-node/src/index.js`
+- Ubah query data procurement: `backend-node/src/services/procurementService.js`
+
+---
+
+Last updated: 2026-01-28

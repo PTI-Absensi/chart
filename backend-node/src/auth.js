@@ -1,12 +1,25 @@
 import fs from 'fs'
+import path from 'path'
 import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
 import { config } from './config.js'
 
+function resolveUsersPath() {
+  const candidates = []
+  if (process.env.AUTH_USERS_PATH) {
+    candidates.push(path.resolve(process.cwd(), process.env.AUTH_USERS_PATH))
+  }
+  candidates.push(path.resolve(process.cwd(), 'config', 'users.json'))
+  candidates.push(path.resolve(process.cwd(), 'backend-node', 'config', 'users.json'))
+  return candidates.find((p) => fs.existsSync(p)) || candidates[0]
+}
+
 function loadUsers() {
   try {
-    const raw = fs.readFileSync(config.auth.usersPath, 'utf-8')
-    return JSON.parse(raw)
+    const usersPath = resolveUsersPath()
+    const raw = fs.readFileSync(usersPath, 'utf-8')
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed : []
   } catch (err) {
     return []
   }
@@ -20,9 +33,13 @@ export function isAuthEnabled() {
 export async function authenticate(username, password) {
   const users = loadUsers()
   const user = users.find((u) => u.username === username)
-  if (!user) return null
-  const ok = await bcrypt.compare(password, user.password_hash)
-  if (!ok) return null
+  if (!user || !user.password_hash) return null
+  try {
+    const ok = await bcrypt.compare(password, user.password_hash)
+    if (!ok) return null
+  } catch (err) {
+    return null
+  }
   return { username: user.username, roles: user.roles || [] }
 }
 

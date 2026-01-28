@@ -28,19 +28,23 @@ app.get('/health', (_req, res) => {
 })
 
 app.post('/api/auth/login', async (req, res) => {
-  if (!isAuthEnabled()) {
-    return res.json({ status: 'success', token: null, user: { username: 'guest', roles: [] } })
+  try {
+    if (!isAuthEnabled()) {
+      return res.json({ status: 'success', token: null, user: { username: 'guest', roles: [] } })
+    }
+    const { username, password } = req.body || {}
+    if (!username || !password) {
+      return res.status(400).json({ status: 'error', detail: 'Missing credentials' })
+    }
+    const user = await authenticate(username, password)
+    if (!user) {
+      return res.status(401).json({ status: 'error', detail: 'Invalid credentials' })
+    }
+    const token = signToken(user)
+    return res.json({ status: 'success', token, user })
+  } catch (err) {
+    return res.status(500).json({ status: 'error', detail: 'Auth error' })
   }
-  const { username, password } = req.body || {}
-  if (!username || !password) {
-    return res.status(400).json({ status: 'error', detail: 'Missing credentials' })
-  }
-  const user = await authenticate(username, password)
-  if (!user) {
-    return res.status(401).json({ status: 'error', detail: 'Invalid credentials' })
-  }
-  const token = signToken(user)
-  res.json({ status: 'success', token, user })
 })
 
 app.get('/api/auth/me', authMiddleware, (req, res) => {
@@ -265,6 +269,6 @@ app.post('/api/process-time/parse', authMiddleware, upload.single('file'), (req,
   }
 })
 
-app.listen(config.port, () => {
-  console.log(`Node backend listening on ${config.port}`)
+app.listen(config.port, config.host, () => {
+  console.log(`Node backend listening on ${config.host}:${config.port}`)
 })
