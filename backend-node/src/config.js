@@ -1,6 +1,11 @@
 import dotenv from 'dotenv'
+import path from 'path'
+import { fileURLToPath } from 'url'
 
 dotenv.config()
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 export const config = {
   port: Number(process.env.PORT || 8000),
@@ -14,6 +19,6 @@ export const config = {
   auth: {
     enabled: process.env.AUTH_ENABLED ? process.env.AUTH_ENABLED === 'true' : true,
     jwtSecret: process.env.JWT_SECRET || 'change-this-secret',
-    usersPath: process.env.AUTH_USERS_PATH || new URL('../config/users.json', import.meta.url).pathname
+    usersPath: process.env.AUTH_USERS_PATH || path.resolve(__dirname, '../config/users.json')
   }
 }

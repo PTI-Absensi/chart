@@ -3,17 +3,12 @@ import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
 import { config } from './config.js'
 
-let cachedUsers = null
-
 function loadUsers() {
-  if (cachedUsers) return cachedUsers
   try {
     const raw = fs.readFileSync(config.auth.usersPath, 'utf-8')
-    cachedUsers = JSON.parse(raw)
-    return cachedUsers
+    return JSON.parse(raw)
   } catch (err) {
-    cachedUsers = []
-    return cachedUsers
+    return []
   }
 }
 
