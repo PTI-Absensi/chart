@@ -469,7 +469,9 @@ class ProcurementService:
         elif timeframe == "1M":
             time_trunc = "month"
         else:  # 1Y
-            time_trunc = "year"
+            # If a specific year is selected, show monthly buckets inside that year.
+            # Otherwise, keep yearly aggregation across years.
+            time_trunc = "month" if year else "year"
         
         # Build query
         where_clauses = []

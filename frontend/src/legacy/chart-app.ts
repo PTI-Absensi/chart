@@ -6,7 +6,7 @@ let initialized = false
 export function initChartApp() {
   if (initialized) return
   initialized = true
-  const API_BASE = window.location.origin;
+  const API_BASE = (import.meta as any).env?.VITE_API_BASE || ''
 
   const state = {
     symbols: [],
@@ -123,6 +123,9 @@ export function initChartApp() {
         background: { type: 'solid', color: 'transparent' },
         textColor,
         fontFamily: "'Source Sans 3', sans-serif"
+      },
+      watermark: {
+        visible: false
       },
       grid: {
         vertLines: { color: gridColor },
