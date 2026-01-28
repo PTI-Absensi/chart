@@ -24,6 +24,18 @@ import {
   removeSource,
   updateMapping
 } from './services/sourceService.js'
+import {
+  addChart,
+  addDashboard,
+  getChart,
+  getDashboard,
+  listCharts,
+  listDashboards,
+  removeChart,
+  removeDashboard,
+  updateChart,
+  updateDashboard
+} from './services/chartService.js'
 
 const app = express()
 app.use(cors())
@@ -340,6 +352,74 @@ app.delete('/api/sources/:id', authMiddleware, (req, res) => {
     return res.status(404).json({ status: 'error', detail: 'Source not found' })
   }
   return res.json({ status: 'success' })
+})
+
+app.get('/api/charts', authMiddleware, (_req, res) => {
+  res.json({ status: 'success', data: listCharts() })
+})
+
+app.post('/api/charts', authMiddleware, (req, res) => {
+  const chart = addChart(req.body || {})
+  res.json({ status: 'success', data: chart })
+})
+
+app.get('/api/charts/:id', authMiddleware, (req, res) => {
+  const chart = getChart(req.params.id)
+  if (!chart) return res.status(404).json({ status: 'error', detail: 'Chart not found' })
+  return res.json({ status: 'success', data: chart })
+})
+
+app.put('/api/charts/:id', authMiddleware, (req, res) => {
+  const chart = updateChart(req.params.id, req.body || {})
+  if (!chart) return res.status(404).json({ status: 'error', detail: 'Chart not found' })
+  return res.json({ status: 'success', data: chart })
+})
+
+app.delete('/api/charts/:id', authMiddleware, (req, res) => {
+  const ok = removeChart(req.params.id)
+  if (!ok) return res.status(404).json({ status: 'error', detail: 'Chart not found' })
+  return res.json({ status: 'success' })
+})
+
+app.get('/api/dashboards', authMiddleware, (_req, res) => {
+  res.json({ status: 'success', data: listDashboards() })
+})
+
+app.post('/api/dashboards', authMiddleware, (req, res) => {
+  const dash = addDashboard(req.body || {})
+  res.json({ status: 'success', data: dash })
+})
+
+app.get('/api/dashboards/:id', authMiddleware, (req, res) => {
+  const dash = getDashboard(req.params.id)
+  if (!dash) return res.status(404).json({ status: 'error', detail: 'Dashboard not found' })
+  return res.json({ status: 'success', data: dash })
+})
+
+app.put('/api/dashboards/:id', authMiddleware, (req, res) => {
+  const dash = updateDashboard(req.params.id, req.body || {})
+  if (!dash) return res.status(404).json({ status: 'error', detail: 'Dashboard not found' })
+  return res.json({ status: 'success', data: dash })
+})
+
+app.delete('/api/dashboards/:id', authMiddleware, (req, res) => {
+  const ok = removeDashboard(req.params.id)
+  if (!ok) return res.status(404).json({ status: 'error', detail: 'Dashboard not found' })
+  return res.json({ status: 'success' })
+})
+
+app.get('/api/exports/chart/:id', authMiddleware, (req, res) => {
+  const chart = getChart(req.params.id)
+  if (!chart) return res.status(404).json({ status: 'error', detail: 'Chart not found' })
+  res.setHeader('Content-Disposition', `attachment; filename=${chart.id}.json`)
+  return res.json(chart)
+})
+
+app.get('/api/exports/dashboard/:id', authMiddleware, (req, res) => {
+  const dash = getDashboard(req.params.id)
+  if (!dash) return res.status(404).json({ status: 'error', detail: 'Dashboard not found' })
+  res.setHeader('Content-Disposition', `attachment; filename=${dash.id}.json`)
+  return res.json(dash)
 })
 
 app.listen(config.port, config.host, () => {

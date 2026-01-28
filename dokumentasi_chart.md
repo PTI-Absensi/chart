@@ -161,14 +161,32 @@ POST   /api/sources/:id/mapping  (JSON: { dimension, metric, date })
 DELETE /api/sources/:id
 ```
 
-### 6.5 Endpoint DFG & Process Time
+### 6.5 Endpoint Chart Builder (Stage 2)
+```
+GET    /api/charts
+POST   /api/charts
+GET    /api/charts/:id
+PUT    /api/charts/:id
+DELETE /api/charts/:id
+```
+
+### 6.6 Endpoint Dashboards (Stage 2)
+```
+GET    /api/dashboards
+POST   /api/dashboards
+GET    /api/dashboards/:id
+PUT    /api/dashboards/:id
+DELETE /api/dashboards/:id
+```
+
+### 6.7 Endpoint DFG & Process Time
 ```
 GET  /api/dfg/preview?table=...&mode=...&format=...&min_edge=...
 GET  /api/dfg/file?name=...
 POST /api/process-time/parse (multipart file)
 ```
 
-### 6.6 Response Format
+### 6.8 Response Format
 Umumnya:
 ```
 { "status": "success", "data": [...] }
@@ -186,7 +204,7 @@ OHLC-like:
 }
 ```
 
-### 6.7 Mapping DB (Adapter)
+### 6.9 Mapping DB (Adapter)
 Mapping file:
 ```
 backend-node/config/data_mapping.json
@@ -366,6 +384,8 @@ berbagai sumber data (DB/CSV/JSON), lalu mapping kolom ke standar charting.
 - Animasi + hover diterapkan ke semua halaman.
 - Auth JWT + login page.
 - DFG & Process Time pakai API backend.
+- Stage 1: Data Sources (CSV/JSON) + mapping sederhana.
+- Stage 2: Chart Builder + Dashboard layout MVP.
 
 ---
 

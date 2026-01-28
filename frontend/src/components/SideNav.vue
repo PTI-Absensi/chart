@@ -42,6 +42,23 @@
         </span>
         <span class="side-nav-text">Data Sources</span>
       </RouterLink>
+      <RouterLink class="side-nav-item" to="/builder" exact-active-class="is-active">
+        <span class="side-nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M5 5h14v14H5z" fill="none" stroke="currentColor" stroke-width="2" />
+            <path d="M8 9h8M8 12h5M8 15h6" fill="none" stroke="currentColor" stroke-width="2" />
+          </svg>
+        </span>
+        <span class="side-nav-text">Chart Builder</span>
+      </RouterLink>
+      <RouterLink class="side-nav-item" to="/dashboards" exact-active-class="is-active">
+        <span class="side-nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M4 4h7v7H4zM13 4h7v5h-7zM13 11h7v9h-7zM4 13h7v7H4z" fill="none" stroke="currentColor" stroke-width="2" />
+          </svg>
+        </span>
+        <span class="side-nav-text">Dashboards</span>
+      </RouterLink>
       <RouterLink class="side-nav-item" to="/dfg" exact-active-class="is-active">
         <span class="side-nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">
