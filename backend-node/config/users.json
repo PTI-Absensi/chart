@@ -1,7 +1,12 @@
 [
   {
     "username": "admin",
-    "password_hash": "$2b$10$DZSKTQIre7N.VC.PJdW26ONr7JSe8MPRRdmv7ryRde981uii0g922",
+    "password_hash": "$2b$10$De9Avr19XO2HfdA21v4Jx.gSRbCw5nUZGfVZuzQoSfYLqlxoqN3xy",
     "roles": ["admin"]
+  },
+  {
+    "username": "tester",
+    "password_hash": "$2b$10$bKU6SU/RlnsrhjoaEoJ/7OQwHzSfrYyYaH/a15tIiUItkAwtNQcVK",
+    "roles": ["viewer"]
   }
 ]
