@@ -28,6 +28,20 @@
         </span>
         <span class="side-nav-text">Procurement Charting</span>
       </RouterLink>
+      <RouterLink class="side-nav-item" to="/sources" exact-active-class="is-active">
+        <span class="side-nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path
+              d="M6 5h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            />
+            <path d="M8 9h8M8 13h6" fill="none" stroke="currentColor" stroke-width="2" />
+          </svg>
+        </span>
+        <span class="side-nav-text">Data Sources</span>
+      </RouterLink>
       <RouterLink class="side-nav-item" to="/dfg" exact-active-class="is-active">
         <span class="side-nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">

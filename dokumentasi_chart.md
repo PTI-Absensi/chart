@@ -151,14 +151,24 @@ Catatan host:
 - Vite proxy mengarah ke `http://127.0.0.1:8000`.
 - Backend wajib listen ke IPv4 (`0.0.0.0` atau `127.0.0.1`) agar proxy tidak gagal.
 
-### 6.4 Endpoint DFG & Process Time
+### 6.4 Endpoint Data Sources (Stage 1)
+```
+GET    /api/sources
+POST   /api/sources              (multipart file: csv/json, optional name)
+GET    /api/sources/:id/schema
+GET    /api/sources/:id/preview?limit=50
+POST   /api/sources/:id/mapping  (JSON: { dimension, metric, date })
+DELETE /api/sources/:id
+```
+
+### 6.5 Endpoint DFG & Process Time
 ```
 GET  /api/dfg/preview?table=...&mode=...&format=...&min_edge=...
 GET  /api/dfg/file?name=...
 POST /api/process-time/parse (multipart file)
 ```
 
-### 6.5 Response Format
+### 6.6 Response Format
 Umumnya:
 ```
 { "status": "success", "data": [...] }
@@ -176,7 +186,7 @@ OHLC-like:
 }
 ```
 
-### 6.6 Mapping DB (Adapter)
+### 6.7 Mapping DB (Adapter)
 Mapping file:
 ```
 backend-node/config/data_mapping.json
@@ -324,7 +334,30 @@ Dipertahankan hanya untuk referensi/rollback.
 
 ---
 
-## 12. Perubahan Terbaru (Log)
+## 12. Arah ETL / ELT (Untuk Client)
+
+Jika client sudah punya database sendiri, aplikasi ini bisa diintegrasikan dengan dua pendekatan:
+
+### 12.1 Direct Read (Tanpa DB Baru)
+- App langsung query read-only ke DB client.
+- Cocok untuk data kecil/sederhana.
+- Risiko: performa dan query berat di DB produksi client.
+
+### 12.2 ETL/ELT ke Analytics DB (Disarankan)
+- Extract: ambil data dari DB client (read-only).
+- Transform: mapping kolom, normalisasi tanggal, agregasi.
+- Load: simpan ke DB analytics (schema charting).
+- Hasil: query cepat, konsisten, aman dari beban DB produksi.
+
+### 12.3 Hybrid
+- Data utama disalin ke analytics DB, sisanya query langsung jika dibutuhkan.
+
+Catatan: roadmap tahap 1 fokus ke “Data Source Manager” agar app bisa menerima
+berbagai sumber data (DB/CSV/JSON), lalu mapping kolom ke standar charting.
+
+---
+
+## 13. Perubahan Terbaru (Log)
 
 - Migrasi backend ke Node.js.
 - Port endpoint `/api/procurement/*`.
@@ -336,9 +369,9 @@ Dipertahankan hanya untuk referensi/rollback.
 
 ---
 
-## 13. Roadmap (Menuju Charting Tools Fleksibel ala Looker Studio)
+## 14. Roadmap (Menuju Charting Tools Fleksibel ala Looker Studio)
 
-### 13.1 Tahap 1 - Data Source & Field Mapping (Fondasi)
+### 14.1 Tahap 1 - Data Source & Field Mapping (Fondasi)
 Target: aplikasi bisa menerima banyak sumber data, bukan hanya DB olahproc.
 
 Checklist:
@@ -357,7 +390,7 @@ Checklist:
   - `/api/sources/:id/schema`
   - `/api/sources/:id/preview`
 
-### 13.2 Tahap 2 - Chart Builder & Dashboard Layout
+### 14.2 Tahap 2 - Chart Builder & Dashboard Layout
 Target: user bisa bikin chart secara visual dan menyimpan dashboard.
 
 Checklist:
@@ -374,7 +407,7 @@ Checklist:
   - `/api/charts` CRUD (config chart)
   - `/api/dashboards` CRUD (layout)
 
-### 13.3 Tahap 3 - Template, Export, Permission
+### 14.3 Tahap 3 - Template, Export, Permission
 Target: seperti analytics platform, siap multi-user.
 
 Checklist:
@@ -390,9 +423,9 @@ Checklist:
 
 ---
 
-## 14. Checklist Otak-Atik (Developer Quick Guide)
+## 15. Checklist Otak-Atik (Developer Quick Guide)
 
-### 14.1 Area Frontend
+### 15.1 Area Frontend
 - Layout global + sidebar: `frontend/src/layouts/AppShell.vue`, `frontend/src/components/SideNav.vue`
 - Chart page: `frontend/src/pages/ChartPage.vue`
 - Chart engine: `frontend/src/components/ChartApp.vue`
@@ -400,7 +433,7 @@ Checklist:
 - Theme (dark/light + CSS vars): `frontend/src/styles/app.css`
 - Router: `frontend/src/router/index.ts`
 
-### 14.2 Area Backend
+### 15.2 Area Backend
 - Express entry: `backend-node/src/index.js`
 - Config ENV: `backend-node/src/config.js`
 - DB connection: `backend-node/src/db.js`
@@ -408,7 +441,7 @@ Checklist:
 - Procurement series logic: `backend-node/src/services/procurementService.js`
 - Auth JWT: `backend-node/src/auth.js`
 
-### 14.3 Checklist Modifikasi Cepat
+### 15.3 Checklist Modifikasi Cepat
 - Ubah tema warna: edit CSS variables di `frontend/src/styles/app.css`
 - Ubah sidebar menu: `frontend/src/components/SideNav.vue`
 - Ubah chart UI: `frontend/src/components/ChartApp.vue`

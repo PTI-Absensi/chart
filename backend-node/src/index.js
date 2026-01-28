@@ -15,6 +15,15 @@ import {
   getPlants
 } from './services/procurementService.js'
 import { authMiddleware, authenticate, isAuthEnabled, signToken } from './auth.js'
+import {
+  addSource,
+  getSource,
+  getSourceData,
+  getSourceSchema,
+  listSources,
+  removeSource,
+  updateMapping
+} from './services/sourceService.js'
 
 const app = express()
 app.use(cors())
@@ -267,6 +276,70 @@ app.post('/api/process-time/parse', authMiddleware, upload.single('file'), (req,
   } catch (err) {
     res.status(500).json({ status: 'error', detail: 'Failed to parse file' })
   }
+})
+
+app.get('/api/sources', authMiddleware, (_req, res) => {
+  const sources = listSources()
+  res.json({ status: 'success', count: sources.length, data: sources })
+})
+
+app.post('/api/sources', authMiddleware, upload.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ status: 'error', detail: 'File missing' })
+  }
+  const name = req.body?.name ? String(req.body.name) : ''
+  const ext = path.extname(req.file.originalname || '').toLowerCase()
+  const type = ext === '.json' ? 'json' : 'csv'
+  if (!['.csv', '.json'].includes(ext)) {
+    return res.status(400).json({ status: 'error', detail: 'Only CSV or JSON supported' })
+  }
+  try {
+    const source = addSource({
+      name,
+      type,
+      originalName: req.file.originalname,
+      buffer: req.file.buffer
+    })
+    return res.json({ status: 'success', data: source })
+  } catch (err) {
+    return res.status(500).json({ status: 'error', detail: 'Failed to save source' })
+  }
+})
+
+app.get('/api/sources/:id/schema', authMiddleware, (req, res) => {
+  const source = getSource(req.params.id)
+  if (!source) {
+    return res.status(404).json({ status: 'error', detail: 'Source not found' })
+  }
+  const data = getSourceSchema(source, 50)
+  return res.json({ status: 'success', data: { source, ...data } })
+})
+
+app.get('/api/sources/:id/preview', authMiddleware, (req, res) => {
+  const source = getSource(req.params.id)
+  if (!source) {
+    return res.status(404).json({ status: 'error', detail: 'Source not found' })
+  }
+  const limit = Number(req.query.limit || 50)
+  const data = getSourceData(source, limit)
+  return res.json({ status: 'success', data: { source, ...data } })
+})
+
+app.post('/api/sources/:id/mapping', authMiddleware, (req, res) => {
+  const mapping = req.body || {}
+  const updated = updateMapping(req.params.id, mapping)
+  if (!updated) {
+    return res.status(404).json({ status: 'error', detail: 'Source not found' })
+  }
+  return res.json({ status: 'success', data: updated })
+})
+
+app.delete('/api/sources/:id', authMiddleware, (req, res) => {
+  const ok = removeSource(req.params.id)
+  if (!ok) {
+    return res.status(404).json({ status: 'error', detail: 'Source not found' })
+  }
+  return res.json({ status: 'success' })
 })
 
 app.listen(config.port, config.host, () => {
