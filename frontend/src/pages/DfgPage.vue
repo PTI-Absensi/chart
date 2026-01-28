@@ -186,7 +186,7 @@ onMounted(() => {
   startEl.addEventListener('change', rebuild)
   endEl.addEventListener('change', rebuild)
 
-  await rebuild()
+  void rebuild()
 
   const tabs = document.querySelectorAll('.tab')
   const panels = {
