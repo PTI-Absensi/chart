@@ -14,7 +14,7 @@ import {
   getMetricSymbols,
   getPlants
 } from './services/procurementService.js'
-import { authMiddleware, authenticate, isAuthEnabled, signToken } from './auth.js'
+import { authMiddleware, authenticate, isAuthEnabled, listUsersSafe, signToken } from './auth.js'
 import {
   addSource,
   getSource,
@@ -36,6 +36,7 @@ import {
   updateChart,
   updateDashboard
 } from './services/chartService.js'
+import { addTemplate, getTemplate, listTemplates } from './services/templateService.js'
 
 const app = express()
 app.use(cors())
@@ -420,6 +421,36 @@ app.get('/api/exports/dashboard/:id', authMiddleware, (req, res) => {
   if (!dash) return res.status(404).json({ status: 'error', detail: 'Dashboard not found' })
   res.setHeader('Content-Disposition', `attachment; filename=${dash.id}.json`)
   return res.json(dash)
+})
+
+app.get('/api/templates', authMiddleware, (_req, res) => {
+  res.json({ status: 'success', data: listTemplates() })
+})
+
+app.post('/api/templates', authMiddleware, (req, res) => {
+  const tpl = addTemplate(req.body || {})
+  res.json({ status: 'success', data: tpl })
+})
+
+app.get('/api/templates/:id', authMiddleware, (req, res) => {
+  const tpl = getTemplate(req.params.id)
+  if (!tpl) return res.status(404).json({ status: 'error', detail: 'Template not found' })
+  return res.json({ status: 'success', data: tpl })
+})
+
+app.get('/api/exports/template/:id', authMiddleware, (req, res) => {
+  const tpl = getTemplate(req.params.id)
+  if (!tpl) return res.status(404).json({ status: 'error', detail: 'Template not found' })
+  res.setHeader('Content-Disposition', `attachment; filename=${tpl.id}.json`)
+  return res.json(tpl)
+})
+
+app.get('/api/permissions/roles', authMiddleware, (_req, res) => {
+  res.json({ status: 'success', data: ['admin', 'editor', 'viewer'] })
+})
+
+app.get('/api/permissions/users', authMiddleware, (_req, res) => {
+  res.json({ status: 'success', data: listUsersSafe() })
 })
 
 app.listen(config.port, config.host, () => {

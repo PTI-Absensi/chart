@@ -59,6 +59,24 @@
         </span>
         <span class="side-nav-text">Dashboards</span>
       </RouterLink>
+      <RouterLink class="side-nav-item" to="/templates" exact-active-class="is-active">
+        <span class="side-nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M6 4h9l3 3v13H6z" fill="none" stroke="currentColor" stroke-width="2" />
+            <path d="M9 10h6M9 13h6M9 16h4" fill="none" stroke="currentColor" stroke-width="2" />
+          </svg>
+        </span>
+        <span class="side-nav-text">Templates</span>
+      </RouterLink>
+      <RouterLink class="side-nav-item" to="/admin" exact-active-class="is-active">
+        <span class="side-nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M12 5a4 4 0 1 1 0 8 4 4 0 0 1 0-8z" fill="none" stroke="currentColor" stroke-width="2" />
+            <path d="M4 20c1.5-3.5 6-5 8-5s6.5 1.5 8 5" fill="none" stroke="currentColor" stroke-width="2" />
+          </svg>
+        </span>
+        <span class="side-nav-text">Admin</span>
+      </RouterLink>
       <RouterLink class="side-nav-item" to="/dfg" exact-active-class="is-active">
         <span class="side-nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">

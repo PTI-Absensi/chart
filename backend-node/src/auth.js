@@ -51,6 +51,14 @@ export function verifyToken(token) {
   return jwt.verify(token, config.auth.jwtSecret)
 }
 
+export function listUsersSafe() {
+  const users = loadUsers()
+  return users.map((u) => ({
+    username: u.username,
+    roles: u.roles || []
+  }))
+}
+
 export function authMiddleware(req, res, next) {
   if (!isAuthEnabled()) return next()
   const header = req.headers.authorization || ''

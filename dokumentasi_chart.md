@@ -179,14 +179,30 @@ PUT    /api/dashboards/:id
 DELETE /api/dashboards/:id
 ```
 
-### 6.7 Endpoint DFG & Process Time
+### 6.7 Endpoint Templates & Export (Stage 3)
+```
+GET    /api/templates
+POST   /api/templates
+GET    /api/templates/:id
+GET    /api/exports/chart/:id
+GET    /api/exports/dashboard/:id
+GET    /api/exports/template/:id
+```
+
+### 6.8 Endpoint Permissions (Stage 3)
+```
+GET /api/permissions/roles
+GET /api/permissions/users
+```
+
+### 6.9 Endpoint DFG & Process Time
 ```
 GET  /api/dfg/preview?table=...&mode=...&format=...&min_edge=...
 GET  /api/dfg/file?name=...
 POST /api/process-time/parse (multipart file)
 ```
 
-### 6.8 Response Format
+### 6.10 Response Format
 Umumnya:
 ```
 { "status": "success", "data": [...] }
@@ -204,7 +220,7 @@ OHLC-like:
 }
 ```
 
-### 6.9 Mapping DB (Adapter)
+### 6.11 Mapping DB (Adapter)
 Mapping file:
 ```
 backend-node/config/data_mapping.json
@@ -386,6 +402,7 @@ berbagai sumber data (DB/CSV/JSON), lalu mapping kolom ke standar charting.
 - DFG & Process Time pakai API backend.
 - Stage 1: Data Sources (CSV/JSON) + mapping sederhana.
 - Stage 2: Chart Builder + Dashboard layout MVP.
+- Stage 3: Templates + Export JSON + Permissions scaffolding.
 
 ---
 
