@@ -3,6 +3,12 @@ import { query } from '../db.js'
 import { loadMapping } from '../mapping.js'
 
 const mapping = loadMapping()
+const cache = {
+  symbols: null,
+  symbolsWithData: null,
+  symbolsAt: 0,
+  ttlMs: 5 * 60 * 1000
+}
 
 const ident = (qualified) => {
   const parts = qualified.split('.').filter(Boolean)
@@ -10,6 +16,13 @@ const ident = (qualified) => {
 }
 
 export async function getSymbols(onlyWithData = false) {
+  const now = Date.now()
+  if (onlyWithData && cache.symbolsWithData && now - cache.symbolsAt < cache.ttlMs) {
+    return cache.symbolsWithData
+  }
+  if (!onlyWithData && cache.symbols && now - cache.symbolsAt < cache.ttlMs) {
+    return cache.symbols
+  }
   const symbolsCfg = mapping.symbols
   if (!symbolsCfg) return []
   const { table, columns } = symbolsCfg
@@ -31,7 +44,7 @@ export async function getSymbols(onlyWithData = false) {
   sql += ` ORDER BY ${format.ident(symbol)}`
   const result = await query(sql)
 
-  return result.rows.map((row) => {
+  const data = result.rows.map((row) => {
     let displayName = row.name || ''
     if (!displayName && fallbackParts.length) {
       const parts = fallbackParts.map((p) => row[p]).filter(Boolean)
@@ -44,6 +57,13 @@ export async function getSymbols(onlyWithData = false) {
       exchange: 'OLAH'
     }
   })
+  if (onlyWithData) {
+    cache.symbolsWithData = data
+  } else {
+    cache.symbols = data
+  }
+  cache.symbolsAt = now
+  return data
 }
 
 export function getTimeframes() {

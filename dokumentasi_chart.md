@@ -96,6 +96,7 @@ SPA routes:
 - `/dashboard/` -> Chart page
 - `/dashboard/dfg` -> DFG page
 - `/dashboard/process-time` -> Process Time page
+- `/dashboard/login` -> Login page (JWT)
 
 ### 5.2 Layout Global
 Navbar global via:
@@ -136,6 +137,25 @@ GET  /api/procurement/data/:symbol?timeframe=1W&limit=200&plant=...&sumber_dana=
 GET  /api/procurement/latest/:symbol
 GET  /api/procurement/metrics
 GET  /api/procurement/plants
+```
+
+### 6.3 Endpoint Auth (JWT)
+```
+POST /api/auth/login
+GET  /api/auth/me
+```
+
+Jika `AUTH_ENABLED=true` dan file user tersedia, semua endpoint `/api/*` dan
+`/api/procurement/*` memerlukan header:
+```
+Authorization: Bearer <token>
+```
+
+### 6.4 Endpoint DFG & Process Time
+```
+GET  /api/dfg/preview?table=...&mode=...&format=...&min_edge=...
+GET  /api/dfg/file?name=...
+POST /api/process-time/parse (multipart file)
 ```
 
 ### 6.3 Response Format
@@ -225,6 +245,16 @@ copy .env.example .env
 npm run dev
 ```
 
+Tambahan auth:
+```
+AUTH_ENABLED=true
+JWT_SECRET=...
+```
+
+User default (config/users.json):
+- username: `admin`
+- password: `admin123`
+
 ### 8.2 Frontend Vue
 ```
 cd chart/frontend
@@ -269,7 +299,9 @@ Dipertahankan hanya untuk referensi/rollback.
 - UI menggunakan **Lightweight Charts**, watermark sudah dimatikan.
 - Multi-series diproses di frontend (Promise.all).
 - DFG / Process Time tidak pakai API backend, hanya file preview lokal.
+- DFG / Process Time sekarang memakai API backend untuk preview/parse file.
 - Dark/Light mode sudah dipakai di semua page.
+- Auth JWT tersedia dan dapat diaktifkan dari ENV.
 
 ---
 
@@ -280,6 +312,8 @@ Dipertahankan hanya untuk referensi/rollback.
 - Migrasi frontend ke Vue + Vite + Router.
 - Navbar global (modular).
 - Animasi + hover diterapkan ke semua halaman.
+- Auth JWT + login page.
+- DFG & Process Time pakai API backend.
 
 ---
 

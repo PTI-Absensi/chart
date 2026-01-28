@@ -96,24 +96,39 @@ const METRICS = {
 
 const TIMEFRAMES = ['1D', '1W', '1M', '1Y']
 
+const cache = {
+  plants: null,
+  plantsAt: 0,
+  kategori: null,
+  kategoriAt: 0,
+  ttlMs: 10 * 60 * 1000
+}
+
 export function getTimeframes() {
   return TIMEFRAMES
 }
 
 export async function getPlants() {
+  const now = Date.now()
+  if (cache.plants && now - cache.plantsAt < cache.ttlMs) {
+    return cache.plants
+  }
   const sql = `
     SELECT kode, nama, kategori, regional
     FROM dim_plant
     ORDER BY nama
   `
   const result = await query(sql)
-  return result.rows.map((row) => ({
+  const data = result.rows.map((row) => ({
     symbol: `PLANT_${row.kode}`,
     name: row.nama,
     category: 'plant',
     description: `${row.kategori || ''} - ${row.regional || ''}`.trim(),
     unit: 'Unit'
   }))
+  cache.plants = data
+  cache.plantsAt = now
+  return data
 }
 
 export function getSumberDanaSymbols() {
@@ -136,6 +151,10 @@ export function getSumberDanaSymbols() {
 }
 
 export async function getKategoriSymbols() {
+  const now = Date.now()
+  if (cache.kategori && now - cache.kategoriAt < cache.ttlMs) {
+    return cache.kategori
+  }
   const sql = `
     SELECT DISTINCT kategori_plant
     FROM fact_value_weekly
@@ -143,7 +162,7 @@ export async function getKategoriSymbols() {
     ORDER BY kategori_plant
   `
   const result = await query(sql)
-  return result.rows
+  const data = result.rows
     .map((row) => row.kategori_plant)
     .filter(Boolean)
     .map((kategori) => ({
@@ -153,6 +172,9 @@ export async function getKategoriSymbols() {
       description: 'Kategori plant (agregat)',
       unit: 'Rp'
     }))
+  cache.kategori = data
+  cache.kategoriAt = now
+  return data
 }
 
 export async function getKategoriDanaSymbols() {

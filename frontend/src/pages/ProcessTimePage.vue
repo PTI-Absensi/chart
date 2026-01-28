@@ -83,6 +83,7 @@
 
 <script setup lang="ts">
 import { onMounted } from 'vue'
+import { authFetch } from '../utils/auth'
 
 type Row = {
   metric: string
@@ -114,25 +115,6 @@ onMounted(() => {
       .join('')
   }
 
-  const parseCSV = (text: string) => {
-    const lines = text.trim().split('\n')
-    const header = lines.shift()
-    if (!header) return []
-    const cols = header.split(',').map((c) => c.trim())
-    return lines.map((line) => {
-      const values = line.split(',').map((v) => v.trim())
-      const record: any = {}
-      cols.forEach((col, idx) => {
-        record[col] = values[idx]
-      })
-      return {
-        metric: record.metric ?? record.Metric ?? '',
-        avg_hari_kerja: record.avg_hari_kerja ?? record.avg ?? record['Avg hari kerja'] ?? '',
-        jumlah_paket: record.jumlah_paket ?? record.count ?? record['Jumlah paket'] ?? ''
-      } as Row
-    })
-  }
-
   loadFileBtn?.addEventListener('click', () => {
     if (!fileInput) return
     fileInput.click()
@@ -141,23 +123,18 @@ onMounted(() => {
   fileInput?.addEventListener('change', (e) => {
     const file = (e.target as HTMLInputElement).files?.[0]
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => {
-      try {
-        let records: Row[] = []
-        if (file.name.endsWith('.json')) {
-          records = JSON.parse(reader.result as string)
-        } else {
-          records = parseCSV(reader.result as string)
-        }
-        renderTable(records)
-      } catch (err) {
+    const form = new FormData()
+    form.append('file', file)
+    authFetch('/api/process-time/parse', { method: 'POST', body: form })
+      .then((res) => res.json())
+      .then((json) => {
+        renderTable(json.data || [])
+      })
+      .catch(() => {
         if (tableBody) {
           tableBody.innerHTML = '<tr><td class="empty" colspan="3">Gagal membaca file.</td></tr>'
         }
-      }
-    }
-    reader.readAsText(file)
+      })
   })
 })
 </script>

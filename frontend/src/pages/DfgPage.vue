@@ -119,6 +119,7 @@ SPPBJ_FINISH -->|8902| End((End))</textarea>
 
 <script setup lang="ts">
 import { onMounted } from 'vue'
+import { authFetch } from '../utils/auth'
 
 onMounted(() => {
   const formatEl = document.getElementById('format') as HTMLSelectElement | null
@@ -137,45 +138,55 @@ onMounted(() => {
     return
   }
 
-  const buildCommand = () => {
+  const buildCommand = async () => {
     const format = formatEl.value
     const mode = modeEl.value
     const table = tableEl.value.trim() || 'fact_event_log_v2'
     const minEdge = minEdgeEl.value || '1'
     const tahun = tahunEl.value.trim()
 
-    let cmd = `dfg_cli --table ${table} --mode ${mode} --format ${format} --min-edge ${minEdge}`
-    if (tahun) cmd += ` --tahun-anggaran ${tahun}`
-    if (sumberEl.value.trim()) cmd += ` --sumber-dana ${sumberEl.value.trim()}`
-    if (kategoriEl.value.trim()) cmd += ` --kategori-plant ${kategoriEl.value.trim()}`
-    if (startEl.value) cmd += ` --start-date ${startEl.value}`
-    if (endEl.value) cmd += ` --end-date ${endEl.value}`
+    const params = new URLSearchParams({
+      table,
+      mode,
+      format,
+      min_edge: minEdge
+    })
+    if (tahun) params.set('tahun_anggaran', tahun)
+    if (sumberEl.value.trim()) params.set('sumber_dana', sumberEl.value.trim())
+    if (kategoriEl.value.trim()) params.set('kategori_plant', kategoriEl.value.trim())
+    if (startEl.value) params.set('start_date', startEl.value)
+    if (endEl.value) params.set('end_date', endEl.value)
 
-    if (commandPreview) commandPreview.textContent = cmd
-    const previewPath = `/dashboard/static/dfg/${table}_${mode}_${tahun || 'all'}.${format}`
-    return previewPath
+    const res = await authFetch(`/api/dfg/preview?${params.toString()}`)
+    const json = await res.json()
+    if (commandPreview) commandPreview.textContent = json.command || ''
+    return json.file_url
   }
 
   const loadLatestBtn = document.getElementById('loadLatest')
-  loadLatestBtn?.addEventListener('click', () => {
-    const output = buildCommand()
+  loadLatestBtn?.addEventListener('click', async () => {
+    const output = await buildCommand()
     const img = document.getElementById('imagePreview') as HTMLImageElement | null
     if (img && output) img.src = `${output}?t=${Date.now()}`
   })
 
-  formatEl.addEventListener('change', buildCommand)
-  modeEl.addEventListener('change', buildCommand)
-  tableEl.addEventListener('input', buildCommand)
-  minEdgeEl.addEventListener('input', buildCommand)
-  tahunEl.addEventListener('input', buildCommand)
-  sumberEl.addEventListener('input', buildCommand)
-  kategoriEl.addEventListener('input', buildCommand)
-  startEl.addEventListener('change', buildCommand)
-  endEl.addEventListener('change', buildCommand)
+  const rebuild = async () => {
+    const output = await buildCommand()
+    const imagePreview = document.getElementById('imagePreview') as HTMLImageElement | null
+    if (imagePreview && output) imagePreview.src = `${output}?t=${Date.now()}`
+  }
 
-  const initialPreview = buildCommand()
-  const imagePreview = document.getElementById('imagePreview') as HTMLImageElement | null
-  if (imagePreview && initialPreview) imagePreview.src = `${initialPreview}?t=${Date.now()}`
+  formatEl.addEventListener('change', rebuild)
+  modeEl.addEventListener('change', rebuild)
+  tableEl.addEventListener('input', rebuild)
+  minEdgeEl.addEventListener('input', rebuild)
+  tahunEl.addEventListener('input', rebuild)
+  sumberEl.addEventListener('input', rebuild)
+  kategoriEl.addEventListener('input', rebuild)
+  startEl.addEventListener('change', rebuild)
+  endEl.addEventListener('change', rebuild)
+
+  await rebuild()
 
   const tabs = document.querySelectorAll('.tab')
   const panels = {

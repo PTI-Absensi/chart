@@ -3,6 +3,20 @@ import { createChart, CrosshairMode, PriceScaleMode } from 'lightweight-charts'
 
 let initialized = false
 
+function apiFetch(url, options = {}) {
+  const token = localStorage.getItem('auth_token')
+  const headers = { ...(options.headers || {}) }
+  if (token) headers.Authorization = `Bearer ${token}`
+  return fetch(url, { ...options, headers }).then((res) => {
+    if (res.status === 401) {
+      localStorage.removeItem('auth_token')
+      window.location.href = '/dashboard/login'
+      throw new Error('Unauthorized')
+    }
+    return res
+  })
+}
+
 export function initChartApp() {
   if (initialized) return
   initialized = true
@@ -393,7 +407,7 @@ export function initChartApp() {
   }
 
   async function fetchSymbols() {
-    const res = await fetch(`${API_BASE}/api/symbols?with_data=true`);
+    const res = await apiFetch(`${API_BASE}/api/symbols?with_data=true`);
     const json = await res.json();
     state.symbols = json.data || [];
   }
@@ -664,7 +678,7 @@ export function initChartApp() {
 
   async function fetchSeriesData(symbol) {
     const url = `${API_BASE}/api/ohlc/${symbol.symbol}?period_type=${state.periodType}&year=${state.year}&limit=500&cumulative=false`;
-    const res = await fetch(url);
+    const res = await apiFetch(url);
     const json = await res.json();
     return json.data || [];
   }
