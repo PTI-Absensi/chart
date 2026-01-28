@@ -20,15 +20,29 @@
     <div class="side-nav-section">
       <div class="side-nav-label">Apps</div>
       <RouterLink class="side-nav-item" to="/" exact-active-class="is-active">
-        <span class="side-nav-icon">🌐</span>
+        <span class="side-nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
+            <path d="M3 12h18M12 3c3.5 4 3.5 14 0 18M12 3c-3.5 4-3.5 14 0 18" fill="none" stroke="currentColor" stroke-width="2" />
+          </svg>
+        </span>
         <span class="side-nav-text">Procurement Charting</span>
       </RouterLink>
       <RouterLink class="side-nav-item" to="/dfg" exact-active-class="is-active">
-        <span class="side-nav-icon">📊</span>
+        <span class="side-nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M4 19h16M6 17V9M12 17V5M18 17v-6" fill="none" stroke="currentColor" stroke-width="2" />
+          </svg>
+        </span>
         <span class="side-nav-text">DFG</span>
       </RouterLink>
       <RouterLink class="side-nav-item" to="/process-time" exact-active-class="is-active">
-        <span class="side-nav-icon">⏱️</span>
+        <span class="side-nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <circle cx="12" cy="13" r="7" fill="none" stroke="currentColor" stroke-width="2" />
+            <path d="M12 13l3-2M9 4h6M12 4V2" fill="none" stroke="currentColor" stroke-width="2" />
+          </svg>
+        </span>
         <span class="side-nav-text">Process Time</span>
       </RouterLink>
     </div>
