@@ -36,7 +36,7 @@ import {
   updateChart,
   updateDashboard
 } from './services/chartService.js'
-import { addTemplate, getTemplate, listTemplates } from './services/templateService.js'
+import { addTemplate, getTemplate, listTemplates, removeTemplate } from './services/templateService.js'
 
 const app = express()
 app.use(cors())
@@ -436,6 +436,12 @@ app.get('/api/templates/:id', authMiddleware, (req, res) => {
   const tpl = getTemplate(req.params.id)
   if (!tpl) return res.status(404).json({ status: 'error', detail: 'Template not found' })
   return res.json({ status: 'success', data: tpl })
+})
+
+app.delete('/api/templates/:id', authMiddleware, (req, res) => {
+  const ok = removeTemplate(req.params.id)
+  if (!ok) return res.status(404).json({ status: 'error', detail: 'Template not found' })
+  return res.json({ status: 'success' })
 })
 
 app.get('/api/exports/template/:id', authMiddleware, (req, res) => {

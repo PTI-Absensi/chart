@@ -8,15 +8,15 @@
     },
     "filters": {
       "with_data": {
-        "table": "public.fact_value_weekly",
+        "table": "public.fact_doc_weekly",
         "column": "kode_data"
       }
     }
   },
   "series": {
-    "table": "public.fact_value_weekly",
+    "table": "public.fact_doc_weekly",
     "time_column": "week_start",
-    "value_column": "total_nilai",
+    "value_column": "count_doc",
     "symbol_column": "kode_data",
     "period_type_column": "period_type",
     "year_column": "period_year"

@@ -1,7 +1,30 @@
 // @ts-nocheck
-import { createChart, CrosshairMode, PriceScaleMode } from 'lightweight-charts'
+import {
+  createChart,
+  CrosshairMode,
+  PriceScaleMode,
+  LineSeries,
+  AreaSeries,
+  CandlestickSeries,
+  BarSeries
+} from 'lightweight-charts'
 
 let initialized = false
+let chartInstance = null
+
+export function destroyChartApp() {
+  if (chartInstance) {
+    try {
+      chartInstance.remove()
+    } catch (e) {
+      // chart may already be removed
+    }
+    chartInstance = null
+  }
+  initialized = false
+  // Remove modal-open class from body if present
+  document.body.classList.remove('modal-open')
+}
 
 function apiFetch(url, options = {}) {
   const token = localStorage.getItem('auth_token')
@@ -10,7 +33,7 @@ function apiFetch(url, options = {}) {
   return fetch(url, { ...options, headers }).then((res) => {
     if (res.status === 401) {
       localStorage.removeItem('auth_token')
-      window.location.href = '/dashboard/login'
+      window.location.href = '/login'
       throw new Error('Unauthorized')
     }
     return res
@@ -97,7 +120,13 @@ export function initChartApp() {
     symbolSearch: document.getElementById('symbolSearch'),
     searchTrigger: document.getElementById('symbolSearchTrigger'),
     lineWidthInput: document.getElementById('lineWidth'),
-    areaOpacityInput: document.getElementById('areaOpacity')
+    areaOpacityInput: document.getElementById('areaOpacity'),
+    templateScope: document.getElementById('templateScope'),
+    templateUser: document.getElementById('templateUser'),
+    templateSelect: document.getElementById('templateSelect'),
+    toolTemplateSave: document.getElementById('toolTemplateSave'),
+    toolTemplateLoad: document.getElementById('toolTemplateLoad'),
+    toolTemplateDelete: document.getElementById('toolTemplateDelete')
   };
 
   let chart = null;
@@ -158,6 +187,8 @@ export function initChartApp() {
         secondsVisible: false
       }
     });
+    chartInstance = chart;
+
 
     bindChartEvents();
     applyScaleOptions();
@@ -196,7 +227,7 @@ export function initChartApp() {
     let series;
 
     if (state.chartType === 'candlestick' && index === 0) {
-      series = chart.addCandlestickSeries({
+      series = chart.addSeries(CandlestickSeries, {
         upColor: color,
         downColor: '#e76f51',
         borderUpColor: color,
@@ -205,13 +236,13 @@ export function initChartApp() {
         wickDownColor: '#e76f51'
       });
     } else if (state.chartType === 'bar') {
-      series = chart.addBarSeries({
+      series = chart.addSeries(BarSeries, {
         upColor: color,
         downColor: '#e76f51',
         priceScaleId: index === 0 ? 'right' : 'left'
       });
     } else if (state.chartType === 'area') {
-      series = chart.addAreaSeries({
+      series = chart.addSeries(AreaSeries, {
         lineColor: color,
         topColor: hexToRgba(color, state.appearance.areaOpacity),
         bottomColor: 'rgba(15, 118, 110, 0.05)',
@@ -219,7 +250,7 @@ export function initChartApp() {
         priceScaleId: index === 0 ? 'right' : 'left'
       });
     } else {
-      series = chart.addLineSeries({
+      series = chart.addSeries(LineSeries, {
         color,
         lineWidth: state.appearance.lineWidth,
         crosshairMarkerVisible: true,
@@ -899,6 +930,135 @@ export function initChartApp() {
         drawingLayer.setTool(tool);
       });
     });
+
+    // Template handlers
+    async function loadTemplateList() {
+      try {
+        const res = await apiFetch('/api/templates');
+        const json = await res.json();
+        const templates = json.data || [];
+        if (els.templateSelect) {
+          els.templateSelect.innerHTML = '<option value="">-- template --</option>';
+          templates.forEach(tpl => {
+            const opt = document.createElement('option');
+            opt.value = tpl.id;
+            opt.textContent = tpl.name;
+            els.templateSelect.appendChild(opt);
+          });
+        }
+      } catch (e) {
+        console.error('Failed to load templates:', e);
+      }
+    }
+
+    function getCurrentTemplateState() {
+      return {
+        selectedSymbols: state.selectedSymbols.map(s => s.symbol),
+        periodType: state.periodType,
+        year: state.year,
+        chartType: state.chartType,
+        normalize: state.normalize,
+        autoScale: state.autoScale,
+        logScale: state.logScale,
+        appearance: { ...state.appearance },
+        settings: { ...state.settings }
+      };
+    }
+
+    if (els.toolTemplateSave) {
+      els.toolTemplateSave.addEventListener('click', async () => {
+        const templateName = prompt('Masukkan nama template:');
+        if (!templateName || !templateName.trim()) return;
+        try {
+          const content = getCurrentTemplateState();
+          const res = await apiFetch('/api/templates', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: templateName.trim(), content })
+          });
+          if (res.ok) {
+            alert('Template berhasil disimpan!');
+            loadTemplateList();
+          } else {
+            alert('Gagal menyimpan template');
+          }
+        } catch (e) {
+          console.error('Failed to save template:', e);
+          alert('Gagal menyimpan template');
+        }
+      });
+    }
+
+    if (els.toolTemplateLoad) {
+      els.toolTemplateLoad.addEventListener('click', async () => {
+        const templateId = els.templateSelect?.value;
+        if (!templateId) {
+          alert('Pilih template terlebih dahulu');
+          return;
+        }
+        try {
+          const res = await apiFetch(`/api/templates/${templateId}`);
+          const json = await res.json();
+          const template = json.data;
+          if (!template || !template.content) {
+            alert('Template tidak ditemukan');
+            return;
+          }
+          const content = template.content;
+          // Apply state
+          state.periodType = content.periodType || 'calendar';
+          state.year = content.year || 2025;
+          state.chartType = content.chartType || 'line';
+          state.normalize = content.normalize || false;
+          state.autoScale = content.autoScale ?? true;
+          state.logScale = content.logScale || false;
+          if (content.appearance) Object.assign(state.appearance, content.appearance);
+          if (content.settings) Object.assign(state.settings, content.settings);
+          // Clear and reload symbols
+          state.selectedSymbols = [];
+          seriesMap.clear();
+          if (content.selectedSymbols && content.selectedSymbols.length > 0) {
+            for (const symbolCode of content.selectedSymbols) {
+              const found = state.symbols.find(s => s.symbol === symbolCode);
+              if (found) addSymbol(found);
+            }
+          }
+          // Update UI
+          applySettings();
+          applyScaleOptions();
+          alert('Template berhasil dimuat!');
+        } catch (e) {
+          console.error('Failed to load template:', e);
+          alert('Gagal memuat template');
+        }
+      });
+    }
+
+    if (els.toolTemplateDelete) {
+      els.toolTemplateDelete.addEventListener('click', async () => {
+        const templateId = els.templateSelect?.value;
+        if (!templateId) {
+          alert('Pilih template terlebih dahulu');
+          return;
+        }
+        if (!confirm('Hapus template ini?')) return;
+        try {
+          const res = await apiFetch(`/api/templates/${templateId}`, { method: 'DELETE' });
+          if (res.ok) {
+            alert('Template berhasil dihapus!');
+            loadTemplateList();
+          } else {
+            alert('Gagal menghapus template');
+          }
+        } catch (e) {
+          console.error('Failed to delete template:', e);
+          alert('Gagal menghapus template');
+        }
+      });
+    }
+
+    // Load templates on init
+    loadTemplateList();
   }
 
   function initBadges() {

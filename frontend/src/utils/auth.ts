@@ -17,7 +17,7 @@ export async function authFetch(input: RequestInfo | URL, init: RequestInit = {}
   const res = await fetch(input, { ...init, headers })
   if (res.status === 401) {
     setToken(null)
-    window.location.href = '/dashboard/login'
+    window.location.href = '/login'
     throw new Error('Unauthorized')
   }
   return res

@@ -67,3 +67,11 @@ export function addTemplate(payload) {
   writeJsonSafe(templatesFile(), items)
   return template
 }
+
+export function removeTemplate(id) {
+  const items = listTemplates()
+  const next = items.filter((item) => item.id !== id)
+  if (next.length === items.length) return false
+  writeJsonSafe(templatesFile(), next)
+  return true
+}

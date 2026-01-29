@@ -11,7 +11,7 @@ const router = createRouter({
 })
 
 router.beforeEach((to) => {
-  if (to.path === '/login') return true
+  if (to.path === '/login' || to.path === '/dashboard/login') return true
   const token = getToken()
   if (!token) {
     return { path: '/login' }
