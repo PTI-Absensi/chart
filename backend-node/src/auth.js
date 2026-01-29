@@ -11,6 +11,7 @@ function resolveUsersPath() {
   }
   candidates.push(path.resolve(process.cwd(), 'config', 'users.json'))
   candidates.push(path.resolve(process.cwd(), 'backend-node', 'config', 'users.json'))
+  candidates.push(path.resolve(process.cwd(), 'chart', 'backend-node', 'config', 'users.json'))
   return candidates.find((p) => fs.existsSync(p)) || candidates[0]
 }
 

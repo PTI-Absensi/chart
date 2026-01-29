@@ -87,6 +87,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { authFetch } from '../utils/auth'
 
 type Source = {
   id: string
@@ -113,7 +114,7 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const formatDate = (value: string) => new Date(value).toLocaleString()
 
 const loadSources = async () => {
-  const res = await fetch('/api/sources')
+  const res = await authFetch('/api/sources')
   const json = await res.json()
   sources.value = json.data || []
 }
@@ -121,7 +122,7 @@ const loadSources = async () => {
 const selectSource = async (source: Source) => {
   activeSource.value = source
   mappingSaved.value = false
-  const res = await fetch(`/api/sources/${source.id}/schema`)
+  const res = await authFetch(`/api/sources/${source.id}/schema`)
   const json = await res.json()
   schema.value = json.data?.schema || []
   preview.value = json.data?.preview || []
@@ -153,7 +154,7 @@ const uploadSource = async () => {
   form.append('file', file)
   if (newName.value.trim()) form.append('name', newName.value.trim())
 
-  const res = await fetch('/api/sources', { method: 'POST', body: form })
+  const res = await authFetch('/api/sources', { method: 'POST', body: form })
   const json = await res.json()
   if (!res.ok || json.status !== 'success') {
     uploadError.value = json.detail || 'Upload gagal.'
@@ -183,7 +184,7 @@ const saveMapping = async () => {
     if (type === 'date') payload.date.push(field)
   })
 
-  const res = await fetch(`/api/sources/${activeSource.value.id}/mapping`, {
+  const res = await authFetch(`/api/sources/${activeSource.value.id}/mapping`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
@@ -196,7 +197,7 @@ const saveMapping = async () => {
 }
 
 const removeSource = async (id: string) => {
-  const res = await fetch(`/api/sources/${id}`, { method: 'DELETE' })
+  const res = await authFetch(`/api/sources/${id}`, { method: 'DELETE' })
   if (!res.ok) return
   activeSource.value = null
   schema.value = []

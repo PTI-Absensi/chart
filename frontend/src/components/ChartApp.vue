@@ -16,285 +16,442 @@
     <section class="chart-panel animate-in" aria-label="Grafik time series">
       <div class="chart-header">
         <div>
-          <h2 id="chartTitle">Procurement Chart</h2>
-          <p id="chartSubtitle" class="chart-subtitle">Pilih kode data untuk melihat data</p>
+          <h2>Procurement Chart</h2>
+          <p class="chart-subtitle">{{ selectedSymbols.length > 0 ? selectedSymbols.join(', ') : 'Pilih kode data untuk melihat data' }}</p>
         </div>
         <div class="chart-meta">
-          <span class="badge" data-badge="period">Kalender</span>
-          <span class="badge" data-badge="year">2025</span>
-          <span class="badge" data-badge="timeframe">Weekly</span>
+          <span class="badge">{{ periodType === 'calendar' ? 'Kalender' : 'Anggaran' }}</span>
+          <span class="badge">{{ year }}</span>
+          <span class="badge">Weekly</span>
         </div>
       </div>
+
       <div class="chart-toolbar" aria-label="Chart toolbar">
         <div class="toolbar-row toolbar-filters">
           <div class="toolbar-left">
             <div class="toolbar-group toolbar-search">
-              <input type="text" class="search-trigger" id="symbolSearchTrigger" placeholder="Cari kode data..." readonly />
-              <button type="button" class="series-add-btn inline-add" id="addSeriesBtn" title="Tambah series">+</button>
+              <input 
+                type="text" 
+                class="search-trigger" 
+                placeholder="Cari kode data..." 
+                readonly 
+                @click="openSearchModal"
+              />
+              <button type="button" class="series-add-btn inline-add" title="Tambah series" @click="openSearchModal">+</button>
             </div>
           </div>
           <div class="toolbar-right">
             <div class="toolbar-group">
-              <div class="segmented compact" data-control="periodType" role="group" aria-label="Tipe periode">
-                <button type="button" class="is-active" data-value="calendar" aria-pressed="true">Kalender</button>
-                <button type="button" data-value="fiscal" aria-pressed="false">Anggaran</button>
+              <div class="segmented compact" role="group" aria-label="Tipe periode">
+                <button 
+                  type="button" 
+                  :class="{ 'is-active': periodType === 'calendar' }"
+                  @click="periodType = 'calendar'"
+                >Kalender</button>
+                <button 
+                  type="button" 
+                  :class="{ 'is-active': periodType === 'fiscal' }"
+                  @click="periodType = 'fiscal'"
+                >Anggaran</button>
               </div>
             </div>
             <div class="toolbar-group">
-              <select id="year" class="tool-select compact" aria-label="Tahun">
-                <option value="2024">2024</option>
-                <option value="2025" selected>2025</option>
-                <option value="2026">2026</option>
+              <select v-model="year" class="tool-select compact" aria-label="Tahun">
+                <option :value="2024">2024</option>
+                <option :value="2025">2025</option>
+                <option :value="2026">2026</option>
               </select>
             </div>
             <div class="toolbar-group">
-              <div class="segmented compact" data-control="chartType" role="group" aria-label="Gaya grafik">
-                <button type="button" class="is-active" data-value="line" aria-pressed="true">Line</button>
-                <button type="button" data-value="area">Area</button>
-                <button type="button" data-value="bar">Bar</button>
-                <button type="button" data-value="candlestick">Candle</button>
+              <div class="segmented compact" role="group" aria-label="Gaya grafik">
+                <button 
+                  v-for="type in chartTypes" 
+                  :key="type.value"
+                  type="button" 
+                  :class="{ 'is-active': chartType === type.value }"
+                  @click="chartType = type.value"
+                >{{ type.label }}</button>
               </div>
             </div>
           </div>
         </div>
-        <div class="selected-series-row" id="selectedSeriesRow" aria-label="Series terpilih">
-          <div class="selected-series-placeholder">Pilih kode data untuk mulai.</div>
+
+        <!-- Selected series row -->
+        <div class="selected-series-row" aria-label="Series terpilih">
+          <div v-if="selectedSymbols.length === 0" class="selected-series-placeholder">
+            Pilih kode data untuk mulai.
+          </div>
+          <div v-else class="series-chips">
+            <span 
+              v-for="(symbol, index) in selectedSymbols" 
+              :key="symbol" 
+              class="series-chip"
+              :style="{ borderColor: colors[index % colors.length] }"
+            >
+              {{ symbol }}
+              <button type="button" class="chip-remove" @click="removeSymbol(symbol)">×</button>
+            </span>
+          </div>
         </div>
+
+        <!-- Chart tools -->
         <div class="chart-tools" role="toolbar" aria-label="Chart tools">
           <div class="tool-row">
-            <button type="button" class="tool-btn icon-btn" id="toolFit" title="Fit" data-tip="Fit">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" />
-              </svg>
+            <button type="button" class="tool-btn icon-btn" title="Fit" @click="chartRef?.refresh()">
+              <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" /></svg>
             </button>
-            <button type="button" class="tool-btn icon-btn is-active" id="toolAutoScale" title="Auto scale" data-tip="Auto">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M4 12h16M12 4v16" fill="none" stroke="currentColor" stroke-width="2" />
-              </svg>
+            <button type="button" class="tool-btn icon-btn" :class="{ 'is-active': normalize }" title="Normalize" @click="normalize = !normalize">
+              <svg viewBox="0 0 24 24"><path d="M4 7h16M4 17h16M7 4v16" fill="none" stroke="currentColor" stroke-width="2" /></svg>
             </button>
-            <button type="button" class="tool-btn icon-btn" id="toolLogScale" title="Log scale" data-tip="Log">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M4 19h16M6 16c2-3 4-4 6-4s4 1 6 4" fill="none" stroke="currentColor" stroke-width="2" />
-              </svg>
+            <button type="button" class="tool-btn icon-btn" :class="{ 'is-active': logScale }" title="Log scale" @click="logScale = !logScale">
+              <svg viewBox="0 0 24 24"><path d="M4 19h16M6 16c2-3 4-4 6-4s4 1 6 4" fill="none" stroke="currentColor" stroke-width="2" /></svg>
             </button>
-            <button type="button" class="tool-btn icon-btn" id="toolNormalize" title="Normalize (Index 100)" data-tip="Normalize">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M4 7h16M4 17h16M7 4v16" fill="none" stroke="currentColor" stroke-width="2" />
-              </svg>
+            <button type="button" class="tool-btn icon-btn" title="Zoom in" @click="chartRef?.zoomIn()">
+              <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2" /><path d="M11 8v6M8 11h6M20 20l-4-4" fill="none" stroke="currentColor" stroke-width="2" /></svg>
             </button>
-            <button type="button" class="tool-btn icon-btn" id="toolZoomIn" title="Zoom in" data-tip="Zoom +">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2" />
-                <path d="M11 8v6M8 11h6M20 20l-4-4" fill="none" stroke="currentColor" stroke-width="2" />
-              </svg>
+            <button type="button" class="tool-btn icon-btn" title="Zoom out" @click="chartRef?.zoomOut()">
+              <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2" /><path d="M8 11h6M20 20l-4-4" fill="none" stroke="currentColor" stroke-width="2" /></svg>
             </button>
-            <button type="button" class="tool-btn icon-btn" id="toolZoomOut" title="Zoom out" data-tip="Zoom -">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2" />
-                <path d="M8 11h6M20 20l-4-4" fill="none" stroke="currentColor" stroke-width="2" />
-              </svg>
+            <button type="button" class="tool-btn icon-btn" title="Export PNG" @click="chartRef?.exportPng()">
+              <svg viewBox="0 0 24 24"><path d="M12 3v12M8 7l4-4 4 4M5 14v6h14v-6" fill="none" stroke="currentColor" stroke-width="2" /></svg>
             </button>
-            <button type="button" class="tool-btn icon-btn" id="toolExport" title="Export image" data-tip="Export PNG">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12 3v12M8 7l4-4 4 4M5 14v6h14v-6" fill="none" stroke="currentColor" stroke-width="2" />
-              </svg>
-            </button>
-            <button type="button" class="tool-btn icon-btn" id="toolExportCsv" title="Export CSV" data-tip="Export CSV">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M4 4h12l4 4v12H4z" fill="none" stroke="currentColor" stroke-width="2" />
-                <path d="M8 16h8M8 12h8M8 8h4" fill="none" stroke="currentColor" stroke-width="2" />
-              </svg>
-            </button>
-            <button type="button" class="tool-btn icon-btn" id="toolDock" title="Dock/Undock" data-tip="Dock">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M4 4h16v6H4zM4 14h10v6H4z" fill="none" stroke="currentColor" stroke-width="2" />
-              </svg>
-            </button>
-            <button type="button" class="tool-btn icon-btn" id="toolSettings" title="Settings" data-tip="Settings">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2" />
-                <path
-                  d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                />
-              </svg>
-            </button>
-          </div>
-          <div class="tool-row tool-row-label template-label">Templates</div>
-          <div class="tool-row template-tools">
-            <select id="templateScope" class="tool-select" aria-label="Template scope" title="Scope" data-tip="Scope">
-              <option value="user">User</option>
-              <option value="global">Global</option>
-              <option value="all">All</option>
-            </select>
-            <input id="templateUser" class="tool-input" type="text" value="default" aria-label="User ID" title="User ID" data-tip="User ID" />
-            <select id="templateSelect" class="tool-select" aria-label="Template" title="Templates" data-tip="Template">
-              <option value="">-- template --</option>
-            </select>
-            <button type="button" class="tool-btn icon-btn" id="toolTemplateSave" title="Save template" data-tip="Save">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M4 4h12l4 4v12H4z" fill="none" stroke="currentColor" stroke-width="2" />
-                <path d="M8 20v-6h8v6" fill="none" stroke="currentColor" stroke-width="2" />
-              </svg>
-            </button>
-            <button type="button" class="tool-btn icon-btn" id="toolTemplateLoad" title="Load template" data-tip="Load">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M4 4h10l4 4v12H4z" fill="none" stroke="currentColor" stroke-width="2" />
-                <path d="M12 12v7M9 16l3 3 3-3" fill="none" stroke="currentColor" stroke-width="2" />
-              </svg>
-            </button>
-            <button type="button" class="tool-btn icon-btn" id="toolTemplateDelete" title="Delete template" data-tip="Delete">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13" fill="none" stroke="currentColor" stroke-width="2" />
-              </svg>
+            <button type="button" class="tool-btn icon-btn" title="Export CSV" @click="chartRef?.exportCsv()">
+              <svg viewBox="0 0 24 24"><path d="M4 4h12l4 4v12H4z" fill="none" stroke="currentColor" stroke-width="2" /><path d="M8 16h8M8 12h8M8 8h4" fill="none" stroke="currentColor" stroke-width="2" /></svg>
             </button>
           </div>
         </div>
       </div>
 
+      <!-- Chart area -->
       <div class="chart-main">
-        <div class="chart-canvas">
-          <div class="chart-area" id="chartContainer"></div>
-          <div class="chart-loading" id="chartLoading" aria-hidden="true">
-            <div class="loading-bar"></div>
-            <div class="loading-bar"></div>
-            <div class="loading-bar"></div>
-            <div class="loading-bar"></div>
-          </div>
-          <div class="chart-sidebar" id="drawingToolbar" aria-label="Drawing tools">
-            <button class="sidebar-btn" data-tool="crosshair" title="Crosshair">
-              <svg viewBox="0 0 24 24">
-                <circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2" />
-                <path d="M12 2v4M12 18v4M2 12h4M18 12h4" fill="none" stroke="currentColor" stroke-width="2" />
-              </svg>
-            </button>
-            <button class="sidebar-btn" data-tool="trendline" title="Trendline">
-              <svg viewBox="0 0 24 24">
-                <path d="M4 20L20 4" fill="none" stroke="currentColor" stroke-width="2" />
-                <circle cx="4" cy="20" r="2" fill="currentColor" />
-                <circle cx="20" cy="4" r="2" fill="currentColor" />
-              </svg>
-            </button>
-            <button class="sidebar-btn" data-tool="hline" title="Horizontal line">
-              <svg viewBox="0 0 24 24"><path d="M4 12h16" fill="none" stroke="currentColor" stroke-width="2" /></svg>
-            </button>
-            <button class="sidebar-btn" data-tool="vline" title="Vertical line">
-              <svg viewBox="0 0 24 24"><path d="M12 4v16" fill="none" stroke="currentColor" stroke-width="2" /></svg>
-            </button>
-            <button class="sidebar-btn" data-tool="rectangle" title="Rectangle">
-              <svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" fill="none" stroke="currentColor" stroke-width="2" /></svg>
-            </button>
-            <button class="sidebar-btn" data-tool="clear" title="Clear drawings">
-              <svg viewBox="0 0 24 24">
-                <path d="M4 7h16M8 7V5h8v2M7 7l1 12h8l1-12" fill="none" stroke="currentColor" stroke-width="2" />
-              </svg>
-            </button>
-          </div>
-
-          <div class="chart-dock" aria-label="Dock tools">
-            <div class="dock-group">
-              <button type="button" class="dock-toggle icon-btn indicator-label" id="toggleIndicatorDock" aria-expanded="false" title="Indicators" data-tip="Indicators">I</button>
-              <div class="dock-panel indicator-tools" id="indicatorDockPanel">
-                <button type="button" class="tool-btn icon-btn" id="toolSMA" title="SMA" data-tip="SMA">S</button>
-                <button type="button" class="tool-btn icon-btn" id="toolEMA" title="EMA" data-tip="EMA">E</button>
-                <button type="button" class="tool-btn icon-btn" id="toolRSI" title="RSI" data-tip="RSI">R</button>
-              </div>
-            </div>
-            <div class="dock-group">
-              <button type="button" class="dock-toggle icon-btn drawing-label" id="toggleDrawingDock" aria-expanded="false" title="Drawing" data-tip="Drawing">D</button>
-              <div class="dock-panel drawing-tools" id="drawingDockPanel">
-                <button type="button" class="tool-btn icon-btn" id="toolHLine" title="Horizontal line" data-tip="H-Line">H</button>
-                <button type="button" class="tool-btn icon-btn" id="toolVLine" title="Vertical line" data-tip="V-Line">V</button>
-                <button type="button" class="tool-btn icon-btn" id="toolTrend" title="Trend line" data-tip="Trend">T</button>
-                <button type="button" class="tool-btn icon-btn" id="toolFreeDraw" title="Free draw" data-tip="Free">FD</button>
-                <button type="button" class="tool-btn icon-btn" id="toolClearDraw" title="Clear drawings" data-tip="Clear">C</button>
-              </div>
-            </div>
-          </div>
+        <div class="chart-canvas" style="position: relative;">
+          <ProcurementChart
+            ref="chartRef"
+            :chart-type="chartType"
+            :period-type="periodType"
+            :year="year"
+            :symbols="selectedSymbols"
+            :normalize="normalize"
+            :log-scale="logScale"
+            :height="450"
+            @data-loaded="onDataLoaded"
+            @error="onChartError"
+          />
+          <DrawingLayer ref="drawingRef" :height="450" />
         </div>
 
-        <div class="data-window" id="dataWindow">Hover chart untuk lihat data.</div>
-        <div class="indicator-panel" id="rsiPanel" hidden>
-          <div class="indicator-header">RSI (14)</div>
-          <div class="indicator-area" id="rsiContainer"></div>
-        </div>
-
-        <div class="summary-grid">
+        <!-- Summary grid -->
+        <div v-if="summaryData" class="summary-grid">
           <div class="summary-card">
-            <div class="summary-label" data-summary-label="total">Total periode</div>
-            <div class="summary-value" data-summary="total">--</div>
-            <div class="summary-series-list" id="summarySeriesList"></div>
+            <div class="summary-label">Total periode</div>
+            <div class="summary-value">{{ formatNumber(summaryData.total) }}</div>
             <div class="summary-sub">Akumulasi data</div>
           </div>
           <div class="summary-card">
             <div class="summary-label">Puncak</div>
-            <div class="summary-value" data-summary="peak">--</div>
-            <div class="summary-sub" data-summary="peak-label">-</div>
+            <div class="summary-value">{{ formatNumber(summaryData.peak) }}</div>
+            <div class="summary-sub">{{ summaryData.peakDate || '-' }}</div>
           </div>
           <div class="summary-card">
             <div class="summary-label">Terakhir</div>
-            <div class="summary-value" data-summary="latest">--</div>
+            <div class="summary-value">{{ formatNumber(summaryData.latest) }}</div>
             <div class="summary-sub">Nilai terbaru</div>
           </div>
           <div class="summary-card">
             <div class="summary-label">Perubahan</div>
-            <div class="summary-value trend" data-summary="trend">0%</div>
+            <div class="summary-value trend" :class="summaryData.trend >= 0 ? 'up' : 'down'">
+              {{ summaryData.trend >= 0 ? '+' : '' }}{{ summaryData.trend?.toFixed(1) }}%
+            </div>
             <div class="summary-sub">vs sebelumnya</div>
           </div>
-        </div>
-      </div>
-
-      <div class="footnote" hidden></div>
-      <div class="settings-panel" id="settingsPanel" hidden>
-        <div class="settings-header">
-          <div class="settings-title">Chart Settings</div>
-          <button type="button" class="settings-close" id="settingsClose" aria-label="Close">x</button>
-        </div>
-        <div class="settings-grid">
-          <label><input type="checkbox" data-setting="showSeries" checked /> Tampilkan series stack</label>
-          <label><input type="checkbox" data-setting="showHeader" checked /> Tampilkan header chart</label>
-          <label><input type="checkbox" data-setting="showToolbar" checked /> Tampilkan toolbar</label>
-          <label><input type="checkbox" data-setting="showIndicators" checked /> Tampilkan indikator</label>
-          <label><input type="checkbox" data-setting="showDrawing" checked /> Tampilkan drawing</label>
-          <label><input type="checkbox" data-setting="showSummary" checked /> Tampilkan summary</label>
-          <label><input type="checkbox" data-setting="showDataWindow" checked /> Tampilkan data window</label>
-          <label><input type="checkbox" data-setting="showRsiPanel" /> Tampilkan panel RSI</label>
-          <label><input type="checkbox" data-setting="showGrid" checked /> Tampilkan grid</label>
-          <label><input type="checkbox" data-setting="showCrosshair" checked /> Tampilkan crosshair</label>
-          <label><input type="checkbox" data-setting="showLeftScale" /> Tampilkan sumbu kiri</label>
-          <label>Ketebalan garis <input type="range" id="lineWidth" min="1" max="4" step="1" value="2" /></label>
-          <label>Opacity area <input type="range" id="areaOpacity" min="0.05" max="0.4" step="0.05" value="0.2" /></label>
-          <label><input type="checkbox" data-setting="enableCandle" checked /> Aktifkan candlestick</label>
-          <label><input type="checkbox" data-setting="enableBar" checked /> Aktifkan bar chart</label>
-          <label><input type="checkbox" data-setting="dockToolbar" checked /> Dock toolbar</label>
-          <label>Limit template (admin): <input type="number" id="templateLimit" min="1" value="20" /></label>
         </div>
       </div>
     </section>
   </main>
 
-  <div class="search-modal" id="searchModal" aria-hidden="true">
-    <div class="search-modal-backdrop" data-action="close-search"></div>
+  <!-- Search Modal -->
+  <div class="search-modal" :class="{ 'is-open': searchModalOpen }" :aria-hidden="!searchModalOpen">
+    <div class="search-modal-backdrop" @click="closeSearchModal"></div>
     <div class="search-modal-panel" role="dialog" aria-modal="true" aria-label="Kode Data Search">
       <div class="search-modal-header">
         <div class="search-modal-title">Kode Data Search</div>
-        <button type="button" class="search-modal-close" data-action="close-search" aria-label="Close">x</button>
+        <button type="button" class="search-modal-close" @click="closeSearchModal" aria-label="Close">×</button>
       </div>
       <div class="search-modal-input">
-        <label class="sr-only" for="symbolSearch">Cari Kode Data</label>
-        <div class="search-container">
-          <input type="text" id="symbolSearch" class="search-input" placeholder="Cari kode data..." autocomplete="off" />
-        </div>
+        <input 
+          ref="searchInput"
+          v-model="searchQuery" 
+          type="text" 
+          class="search-input" 
+          placeholder="Cari kode data..." 
+          @input="filterSymbols"
+        />
       </div>
-      <div id="searchDropdown" class="search-dropdown search-results"></div>
+      <div class="search-dropdown search-results">
+        <div v-if="loadingSymbols" class="search-loading">Loading...</div>
+        <div v-else-if="filteredSymbols.length === 0" class="search-empty">Tidak ada hasil.</div>
+        <button 
+          v-for="sym in filteredSymbols" 
+          :key="sym.symbol"
+          type="button"
+          class="search-item"
+          :class="{ 'is-selected': selectedSymbols.includes(sym.symbol) }"
+          @click="toggleSymbol(sym.symbol)"
+        >
+          <span class="search-item-code">{{ sym.symbol }}</span>
+          <span class="search-item-name">{{ sym.name }}</span>
+        </button>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { useChartApp } from '../composables/useChartApp'
+import { ref, computed, onMounted, nextTick } from 'vue'
+import { authFetch } from '../utils/auth'
+import ProcurementChart from './ProcurementChart.vue'
+import DrawingLayer from './DrawingLayer.vue'
 
-useChartApp()
+// Types
+interface SymbolItem {
+  symbol: string
+  name: string
+  category: string
+  description: string
+  unit: string
+}
+
+interface SummaryData {
+  total: number
+  peak: number
+  peakDate: string
+  latest: number
+  trend: number
+}
+
+// Chart types
+const chartTypes = [
+  { value: 'line', label: 'Line' },
+  { value: 'area', label: 'Area' },
+  { value: 'bar', label: 'Bar' },
+  { value: 'candlestick', label: 'Candle' }
+] as const
+
+// Colors for series
+const colors = [
+  '#2962ff', '#26a69a', '#ef5350', '#ab47bc', '#ff9800',
+  '#00bcd4', '#8bc34a', '#e91e63', '#3f51b5', '#009688'
+]
+
+// Chart ref
+const chartRef = ref<InstanceType<typeof ProcurementChart> | null>(null)
+const drawingRef = ref<InstanceType<typeof DrawingLayer> | null>(null)
+
+// Chart state
+const chartType = ref<'line' | 'area' | 'bar' | 'candlestick'>('line')
+const periodType = ref<'calendar' | 'fiscal'>('calendar')
+const year = ref(2025)
+const normalize = ref(false)
+const logScale = ref(false)
+const selectedSymbols = ref<string[]>([])
+
+// Search modal state
+const searchModalOpen = ref(false)
+const searchQuery = ref('')
+const searchInput = ref<HTMLInputElement | null>(null)
+const allSymbols = ref<SymbolItem[]>([])
+const loadingSymbols = ref(false)
+
+// Summary data
+const summaryData = ref<SummaryData | null>(null)
+
+// Filtered symbols for search
+const filteredSymbols = computed(() => {
+  if (!searchQuery.value) return allSymbols.value.slice(0, 50)
+  const q = searchQuery.value.toLowerCase()
+  return allSymbols.value
+    .filter(s => s.symbol.toLowerCase().includes(q) || s.name.toLowerCase().includes(q))
+    .slice(0, 50)
+})
+
+// Load available symbols
+async function loadSymbols() {
+  loadingSymbols.value = true
+  try {
+    const res = await authFetch('/api/procurement/symbols')
+    const json = await res.json()
+    if (json.status === 'success') {
+      allSymbols.value = json.data || []
+    }
+  } catch (err) {
+    console.error('Failed to load symbols:', err)
+  } finally {
+    loadingSymbols.value = false
+  }
+}
+
+// Toggle symbol selection
+function toggleSymbol(symbol: string) {
+  const idx = selectedSymbols.value.indexOf(symbol)
+  if (idx >= 0) {
+    selectedSymbols.value.splice(idx, 1)
+  } else {
+    if (selectedSymbols.value.length < 10) {
+      selectedSymbols.value.push(symbol)
+    }
+  }
+}
+
+// Remove symbol
+function removeSymbol(symbol: string) {
+  const idx = selectedSymbols.value.indexOf(symbol)
+  if (idx >= 0) {
+    selectedSymbols.value.splice(idx, 1)
+  }
+}
+
+// Open search modal
+function openSearchModal() {
+  searchModalOpen.value = true
+  searchQuery.value = ''
+  nextTick(() => {
+    searchInput.value?.focus()
+  })
+}
+
+// Close search modal
+function closeSearchModal() {
+  searchModalOpen.value = false
+}
+
+// Filter symbols (no-op, computed handles it)
+function filterSymbols() {}
+
+// Handle data loaded
+function onDataLoaded(data: Record<string, any[]>) {
+  // Calculate summary from first symbol
+  const firstSymbol = selectedSymbols.value[0]
+  if (!firstSymbol || !data[firstSymbol]) {
+    summaryData.value = null
+    return
+  }
+
+  const values = data[firstSymbol]
+  if (values.length === 0) {
+    summaryData.value = null
+    return
+  }
+
+  const closes = values.map((d: any) => d.close)
+  const total = closes.reduce((a: number, b: number) => a + b, 0)
+  const peakVal = Math.max(...closes)
+  const peakIdx = closes.indexOf(peakVal)
+  const peakDate = new Date(values[peakIdx].time * 1000).toLocaleDateString('id-ID')
+  const latest = closes[closes.length - 1]
+  const prev = closes.length > 1 ? closes[closes.length - 2] : latest
+  const trend = prev > 0 ? ((latest - prev) / prev) * 100 : 0
+
+  summaryData.value = { total, peak: peakVal, peakDate, latest, trend }
+}
+
+// Handle chart error
+function onChartError(msg: string) {
+  console.error('Chart error:', msg)
+}
+
+// Format number
+function formatNumber(val: number | undefined): string {
+  if (val === undefined || val === null) return '--'
+  if (val >= 1000000) return (val / 1000000).toFixed(1) + 'M'
+  if (val >= 1000) return (val / 1000).toFixed(1) + 'K'
+  return val.toFixed(0)
+}
+
+// Init
+onMounted(() => {
+  loadSymbols()
+})
 </script>
+
+<style scoped>
+.series-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.series-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--surface);
+  border: 2px solid;
+  border-radius: 16px;
+  font-size: 0.85rem;
+}
+
+.chip-remove {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.chip-remove:hover {
+  color: var(--ink);
+}
+
+.search-modal.is-open {
+  display: flex;
+}
+
+.search-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--stroke);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.search-item:hover {
+  background: var(--surface-alt);
+}
+
+.search-item.is-selected {
+  background: rgba(41, 98, 255, 0.1);
+}
+
+.search-item-code {
+  font-weight: 600;
+}
+
+.search-item-name {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.search-loading,
+.search-empty {
+  padding: 20px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.trend.up {
+  color: #26a69a;
+}
+
+.trend.down {
+  color: #ef5350;
+}
+</style>

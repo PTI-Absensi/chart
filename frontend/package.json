@@ -14,8 +14,11 @@
   },
   "dependencies": {
     "@vitejs/plugin-vue": "^6.0.3",
+    "apexcharts": "^5.3.6",
+    "fabric": "^7.1.0",
     "lightweight-charts": "^5.1.0",
     "vue": "^3.5.27",
-    "vue-router": "^4.6.4"
+    "vue-router": "^4.6.4",
+    "vue3-apexcharts": "^1.10.0"
   }
 }

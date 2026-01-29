@@ -1,5 +1,6 @@
 import { createApp } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
+import VueApexCharts from 'vue3-apexcharts'
 import App from './App.vue'
 import routes from './router'
 import './styles/app.css'
@@ -19,4 +20,4 @@ router.beforeEach((to) => {
   return true
 })
 
-createApp(App).use(router).mount('#app')
+createApp(App).use(router).use(VueApexCharts).mount('#app')

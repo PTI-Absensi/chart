@@ -232,14 +232,39 @@ export function getMetricSymbols() {
 }
 
 export async function getAllSymbols() {
-  const symbols = []
-  symbols.push(...getMetricSymbols())
-  symbols.push(...(await getKategoriSymbols()))
-  symbols.push(...(await getKategoriDanaSymbols()))
-  symbols.push(...(await getPlants()))
-  symbols.push(...(await getPlantDanaSymbols()))
-  symbols.push(...getSumberDanaSymbols())
-  return symbols
+  // Query from analitic table in database
+  const sql = `
+    SELECT 
+      kode_data as symbol,
+      nama_dokumen as name,
+      COALESCE(status, 'metric') as category,
+      COALESCE("desc", nama_dokumen) as description,
+      COALESCE(sumber_dana, '') as sumber_dana,
+      COALESCE(kategori_plant, '') as kategori_plant
+    FROM analitic
+    ORDER BY kode_data
+  `
+  try {
+    const result = await query(sql)
+    return result.rows.map(row => ({
+      symbol: row.symbol,
+      name: row.name,
+      category: row.category,
+      description: row.description,
+      unit: 'Dokumen',
+      sumber_dana: row.sumber_dana,
+      kategori_plant: row.kategori_plant
+    }))
+  } catch (err) {
+    console.error('Error fetching symbols from analitic:', err)
+    // Fallback to hardcoded if table doesn't exist
+    const symbols = []
+    symbols.push(...getMetricSymbols())
+    symbols.push(...(await getKategoriSymbols()))
+    symbols.push(...(await getPlants()))
+    symbols.push(...getSumberDanaSymbols())
+    return symbols
+  }
 }
 
 export async function searchSymbols(queryText, limit = 20) {
@@ -391,7 +416,71 @@ export async function fetchTimeSeries(symbol, timeframe = '1W', limit = 500, pla
     )
   }
 
-  return []
+  // Default: query by kode_data from fact_doc_weekly
+  // This handles A1, A2, B001, C001, D001, E001, etc.
+  return fetchByKodeData(symbol, timeframe, limit, year, periodType)
+}
+
+// Fetch time series data by kode_data from fact_doc_weekly
+async function fetchByKodeData(kodeData, timeframe = '1W', limit = 500, year = null, periodType = null) {
+  let timeTrunc = 'week'
+  if (timeframe === '1D') timeTrunc = 'day'
+  if (timeframe === '1M') timeTrunc = 'month'
+  if (timeframe === '1Y') timeTrunc = year ? 'month' : 'year'
+
+  const whereClauses = ['kode_data = $1']
+  const params = [kodeData]
+
+  if (year) {
+    whereClauses.push('period_year = $' + (params.length + 1))
+    params.push(year)
+  }
+  if (periodType) {
+    whereClauses.push('period_type = $' + (params.length + 1))
+    params.push(periodType)
+  }
+
+  const whereSql = 'WHERE ' + whereClauses.join(' AND ')
+
+  const sql = `
+    SELECT
+      DATE_TRUNC('${timeTrunc}', week_start) as period,
+      SUM(count_doc) as total_value,
+      MIN(count_doc) as min_value,
+      MAX(count_doc) as max_value,
+      AVG(count_doc) as avg_value
+    FROM fact_doc_weekly
+    ${whereSql}
+    GROUP BY DATE_TRUNC('${timeTrunc}', week_start)
+    ORDER BY period DESC
+    LIMIT $${params.length + 1}
+  `
+  params.push(limit)
+
+  try {
+    const result = await query(sql, params)
+    const rows = result.rows || []
+    if (!rows.length) return []
+
+    return rows.reverse().map((row) => {
+      const value = Number(row.total_value || 0)
+      const minVal = Number(row.min_value || value)
+      const maxVal = Number(row.max_value || value)
+      const avgVal = Number(row.avg_value || value)
+      const timestamp = row.period ? Math.floor(new Date(row.period).getTime() / 1000) : 0
+      return {
+        time: timestamp,
+        open: minVal,
+        high: maxVal,
+        low: minVal,
+        close: avgVal,
+        volume: value
+      }
+    })
+  } catch (err) {
+    console.error('Error fetching by kode_data:', kodeData, err)
+    return []
+  }
 }
 
 export async function getLatestValue(symbol) {
