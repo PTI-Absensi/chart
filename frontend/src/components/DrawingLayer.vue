@@ -2,25 +2,53 @@
   <div class="drawing-layer" ref="containerRef" :class="{ 'is-drawing': activeTool !== 'select' }">
     <canvas ref="canvasRef" :id="canvasId"></canvas>
     
-    <!-- Drawing Toolbar -->
-    <div class="drawing-toolbar" v-if="showToolbar">
+    <!-- Drawing Toolbar - Collapsible -->
+    <div class="drawing-toolbar" v-if="showToolbar" :class="{ 'is-collapsed': toolbarCollapsed }">
+      <!-- Toggle button always visible -->
       <button 
-        v-for="tool in tools" 
-        :key="tool.id"
-        type="button"
-        class="tool-btn"
-        :class="{ 'is-active': activeTool === tool.id }"
-        :title="tool.label"
-        @click="setTool(tool.id)"
+        type="button" 
+        class="tool-btn toggle-btn" 
+        :title="toolbarCollapsed ? 'Expand tools' : 'Collapse tools'"
+        @click="toolbarCollapsed = !toolbarCollapsed"
       >
-        <span v-html="tool.icon"></span>
-      </button>
-      <div class="toolbar-divider"></div>
-      <button type="button" class="tool-btn danger" title="Clear all" @click="clearAll">
         <svg viewBox="0 0 24 24" width="18" height="18">
-          <path d="M4 7h16M8 7V5h8v2M7 7l1 12h8l1-12" fill="none" stroke="currentColor" stroke-width="2"/>
+          <path 
+            v-if="toolbarCollapsed" 
+            d="M9 18l6-6-6-6" 
+            fill="none" 
+            stroke="currentColor" 
+            stroke-width="2"
+          />
+          <path 
+            v-else 
+            d="M15 18l-6-6 6-6" 
+            fill="none" 
+            stroke="currentColor" 
+            stroke-width="2"
+          />
         </svg>
       </button>
+      
+      <!-- Tools (hidden when collapsed) -->
+      <template v-if="!toolbarCollapsed">
+        <button 
+          v-for="tool in tools" 
+          :key="tool.id"
+          type="button"
+          class="tool-btn"
+          :class="{ 'is-active': activeTool === tool.id }"
+          :title="tool.label"
+          @click="setTool(tool.id)"
+        >
+          <span v-html="tool.icon"></span>
+        </button>
+        <div class="toolbar-divider"></div>
+        <button type="button" class="tool-btn danger" title="Clear all" @click="clearAll">
+          <svg viewBox="0 0 24 24" width="18" height="18">
+            <path d="M4 7h16M8 7V5h8v2M7 7l1 12h8l1-12" fill="none" stroke="currentColor" stroke-width="2"/>
+          </svg>
+        </button>
+      </template>
     </div>
   </div>
 </template>
@@ -52,6 +80,7 @@ const activeTool = ref<string>('select')
 const isDrawing = ref(false)
 const startPoint = ref<{ x: number; y: number } | null>(null)
 const drawings = ref<Array<{type: string, points: number[], color: string}>>([])
+const toolbarCollapsed = ref(true) // Start collapsed to not block Y-axis
 
 // Colors for each tool
 const toolColors: Record<string, string> = {
@@ -361,5 +390,18 @@ defineExpose({
   height: 1px;
   background: var(--stroke, #2a2e39);
   margin: 4px 0;
+}
+
+/* Collapsed state */
+.drawing-toolbar.is-collapsed {
+  padding: 4px;
+}
+
+.toggle-btn {
+  opacity: 0.7;
+}
+
+.toggle-btn:hover {
+  opacity: 1;
 }
 </style>

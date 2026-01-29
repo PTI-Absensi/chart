@@ -354,7 +354,7 @@ async function fetchMetricData(metricInfo, timeframe, limit, plantFilter, sumber
   })
 }
 
-export async function fetchTimeSeries(symbol, timeframe = '1W', limit = 500, plant, sumberDana, year, periodType) {
+export async function fetchTimeSeries(symbol, timeframe = '1W', limit = 500, plant, sumberDana, year, periodType, raw = false) {
   if (symbol.startsWith('DOC_') || symbol.startsWith('VAL_')) {
     const metricInfo = METRICS[symbol]
     if (!metricInfo) return []
@@ -418,17 +418,13 @@ export async function fetchTimeSeries(symbol, timeframe = '1W', limit = 500, pla
 
   // Default: query by kode_data from fact_doc_weekly
   // This handles A1, A2, B001, C001, D001, E001, etc.
-  return fetchByKodeData(symbol, timeframe, limit, year, periodType)
+  return fetchByKodeData(symbol, timeframe, limit, year, periodType, raw)
 }
 
 // Fetch time series data by kode_data from fact_doc_weekly
-async function fetchByKodeData(kodeData, timeframe = '1W', limit = 500, year = null, periodType = null) {
-  let timeTrunc = 'week'
-  if (timeframe === '1D') timeTrunc = 'day'
-  if (timeframe === '1M') timeTrunc = 'month'
-  if (timeframe === '1Y') timeTrunc = year ? 'month' : 'year'
-
-  const whereClauses = ['kode_data = $1']
+async function fetchByKodeData(kodeData, timeframe = '1W', limit = 500, year = null, periodType = null, raw = false) {
+  // Case-insensitive matching for kode_data
+  const whereClauses = ['LOWER(kode_data) = LOWER($1)']
   const params = [kodeData]
 
   if (year) {
@@ -442,19 +438,41 @@ async function fetchByKodeData(kodeData, timeframe = '1W', limit = 500, year = n
 
   const whereSql = 'WHERE ' + whereClauses.join(' AND ')
 
-  const sql = `
-    SELECT
-      DATE_TRUNC('${timeTrunc}', week_start) as period,
-      SUM(count_doc) as total_value,
-      MIN(count_doc) as min_value,
-      MAX(count_doc) as max_value,
-      AVG(count_doc) as avg_value
-    FROM fact_doc_weekly
-    ${whereSql}
-    GROUP BY DATE_TRUNC('${timeTrunc}', week_start)
-    ORDER BY period DESC
-    LIMIT $${params.length + 1}
-  `
+  let sql
+  if (raw) {
+    // Raw mode: return individual rows without aggregation
+    sql = `
+      SELECT
+        week_start as period,
+        count_doc as value,
+        kategori_plant,
+        sumber_dana
+      FROM fact_doc_weekly
+      ${whereSql}
+      ORDER BY week_start DESC
+      LIMIT $${params.length + 1}
+    `
+  } else {
+    // Aggregated mode (default)
+    let timeTrunc = 'week'
+    if (timeframe === '1D') timeTrunc = 'day'
+    if (timeframe === '1M') timeTrunc = 'month'
+    if (timeframe === '1Y') timeTrunc = year ? 'month' : 'year'
+
+    sql = `
+      SELECT
+        DATE_TRUNC('${timeTrunc}', week_start) as period,
+        SUM(count_doc) as total_value,
+        MIN(count_doc) as min_value,
+        MAX(count_doc) as max_value,
+        AVG(count_doc) as avg_value
+      FROM fact_doc_weekly
+      ${whereSql}
+      GROUP BY DATE_TRUNC('${timeTrunc}', week_start)
+      ORDER BY period DESC
+      LIMIT $${params.length + 1}
+    `
+  }
   params.push(limit)
 
   try {
@@ -462,21 +480,40 @@ async function fetchByKodeData(kodeData, timeframe = '1W', limit = 500, year = n
     const rows = result.rows || []
     if (!rows.length) return []
 
-    return rows.reverse().map((row) => {
-      const value = Number(row.total_value || 0)
-      const minVal = Number(row.min_value || value)
-      const maxVal = Number(row.max_value || value)
-      const avgVal = Number(row.avg_value || value)
-      const timestamp = row.period ? Math.floor(new Date(row.period).getTime() / 1000) : 0
-      return {
-        time: timestamp,
-        open: minVal,
-        high: maxVal,
-        low: minVal,
-        close: avgVal,
-        volume: value
-      }
-    })
+    if (raw) {
+      // Return raw data format
+      return rows.reverse().map((row) => {
+        const value = Number(row.value || 0)
+        const timestamp = row.period ? Math.floor(new Date(row.period).getTime() / 1000) : 0
+        return {
+          time: timestamp,
+          open: value,
+          high: value,
+          low: value,
+          close: value,
+          volume: value,
+          kategori_plant: row.kategori_plant,
+          sumber_dana: row.sumber_dana
+        }
+      })
+    } else {
+      // Return aggregated data format
+      return rows.reverse().map((row) => {
+        const value = Number(row.total_value || 0)
+        const minVal = Number(row.min_value || value)
+        const maxVal = Number(row.max_value || value)
+        const avgVal = Number(row.avg_value || value)
+        const timestamp = row.period ? Math.floor(new Date(row.period).getTime() / 1000) : 0
+        return {
+          time: timestamp,
+          open: minVal,
+          high: maxVal,
+          low: minVal,
+          close: avgVal,
+          volume: value
+        }
+      })
+    }
   } catch (err) {
     console.error('Error fetching by kode_data:', kodeData, err)
     return []

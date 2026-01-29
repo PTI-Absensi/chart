@@ -63,6 +63,15 @@
               </select>
             </div>
             <div class="toolbar-group">
+              <button 
+                type="button" 
+                class="tool-btn compact"
+                :class="{ 'is-active': rawMode }"
+                @click="rawMode = !rawMode"
+                title="Raw data (tanpa aggregasi mingguan)"
+              >Raw</button>
+            </div>
+            <div class="toolbar-group">
               <div class="segmented compact" role="group" aria-label="Gaya grafik">
                 <button 
                   v-for="type in chartTypes" 
@@ -133,6 +142,7 @@
             :symbols="selectedSymbols"
             :normalize="normalize"
             :log-scale="logScale"
+            :raw-mode="rawMode"
             :height="450"
             @data-loaded="onDataLoaded"
             @error="onChartError"
@@ -253,6 +263,7 @@ const periodType = ref<'calendar' | 'fiscal'>('calendar')
 const year = ref(2025)
 const normalize = ref(false)
 const logScale = ref(false)
+const rawMode = ref(false)
 const selectedSymbols = ref<string[]>([])
 
 // Search modal state

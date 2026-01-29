@@ -23,6 +23,7 @@ const props = withDefaults(defineProps<{
   symbols?: string[]
   normalize?: boolean
   logScale?: boolean
+  rawMode?: boolean
 }>(), {
   chartType: 'line',
   periodType: 'calendar',
@@ -30,7 +31,8 @@ const props = withDefaults(defineProps<{
   height: 450,
   symbols: () => [],
   normalize: false,
-  logScale: false
+  logScale: false,
+  rawMode: false
 })
 
 // Emits
@@ -106,6 +108,8 @@ const chartOptions = computed(() => {
       type: 'datetime',
       labels: {
         style: { colors: '#d1d4dc' },
+        datetimeUTC: false,
+        format: 'dd MMM',
         datetimeFormatter: {
           year: 'yyyy',
           month: "MMM 'yy",
@@ -114,19 +118,41 @@ const chartOptions = computed(() => {
         }
       },
       axisBorder: { color: '#2a2e39' },
-      axisTicks: { color: '#2a2e39' }
+      axisTicks: { color: '#2a2e39' },
+      tickAmount: 12
     },
-    yaxis: {
-      logarithmic: props.logScale,
-      labels: {
-        style: { colors: '#d1d4dc' },
-        formatter: (val: number) => {
-          if (val >= 1000000) return (val / 1000000).toFixed(1) + 'M'
-          if (val >= 1000) return (val / 1000).toFixed(1) + 'K'
-          return val?.toFixed(0) || '0'
+    // Dynamic Y-axes: one per series for proper comparison
+    yaxis: props.symbols.length <= 1 
+      ? {
+          logarithmic: props.logScale,
+          labels: {
+            style: { colors: '#d1d4dc' },
+            formatter: (val: number) => {
+              if (val >= 1000000) return (val / 1000000).toFixed(1) + 'M'
+              if (val >= 1000) return (val / 1000).toFixed(1) + 'K'
+              return val?.toFixed(0) || '0'
+            }
+          }
         }
-      }
-    },
+      : props.symbols.map((symbol, index) => ({
+          seriesName: symbol,
+          opposite: index % 2 === 1, // Alternate left/right
+          logarithmic: props.logScale,
+          axisTicks: { show: true },
+          axisBorder: { show: true, color: colors[index % colors.length] },
+          labels: {
+            style: { colors: colors[index % colors.length] },
+            formatter: (val: number) => {
+              if (val >= 1000000) return (val / 1000000).toFixed(1) + 'M'
+              if (val >= 1000) return (val / 1000).toFixed(1) + 'K'
+              return val?.toFixed(0) || '0'
+            }
+          },
+          title: {
+            text: symbol,
+            style: { color: colors[index % colors.length] }
+          }
+        })),
     tooltip: {
       theme: 'dark',
       shared: true,
@@ -201,10 +227,11 @@ async function fetchSymbolData(symbol: string) {
   try {
     const params = new URLSearchParams({
       period_type: props.periodType,
-      year: props.year.toString()
+      year: props.year.toString(),
+      raw: props.rawMode ? 'true' : 'false'
     })
     const url = `/api/procurement/data/${symbol}?${params}`
-    console.log('Fetching:', url)
+    console.log('Fetching:', url, 'raw:', props.rawMode)
     const res = await authFetch(url)
     const json = await res.json()
     console.log('Response for', symbol, ':', json)
@@ -245,8 +272,8 @@ watch(() => props.symbols, () => {
   loadData()
 }, { deep: true })
 
-// Watch for period/year changes
-watch([() => props.periodType, () => props.year], () => {
+// Watch for period/year/rawMode changes
+watch([() => props.periodType, () => props.year, () => props.rawMode], () => {
   // Clear cache and reload
   rawData.value = {}
   loadData()

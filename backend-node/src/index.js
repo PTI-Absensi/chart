@@ -165,11 +165,12 @@ app.get('/api/procurement/timeframes', authMiddleware, (_req, res) => {
 app.get('/api/procurement/data/:symbol', authMiddleware, async (req, res) => {
   const symbol = String(req.params.symbol || '').toUpperCase()
   const timeframe = String(req.query.timeframe || '1W')
-  const limit = Number(req.query.limit || 200)
+  const limit = Number(req.query.limit || 1000)
   const plant = req.query.plant ? String(req.query.plant) : null
   const sumberDana = req.query.sumber_dana ? String(req.query.sumber_dana) : null
   const year = req.query.year ? Number(req.query.year) : null
   const periodType = req.query.period_type ? String(req.query.period_type) : null
+  const raw = req.query.raw === 'true' || req.query.raw === '1'
 
   const validTimeframes = getProcurementTimeframes()
   if (!validTimeframes.includes(timeframe)) {
@@ -180,8 +181,8 @@ app.get('/api/procurement/data/:symbol', authMiddleware, async (req, res) => {
   }
 
   try {
-    const data = await fetchTimeSeries(symbol, timeframe, limit, plant, sumberDana, year, periodType)
-    res.json({ status: 'success', symbol, timeframe, count: data.length, data })
+    const data = await fetchTimeSeries(symbol, timeframe, limit, plant, sumberDana, year, periodType, raw)
+    res.json({ status: 'success', symbol, timeframe, raw, count: data.length, data })
   } catch (err) {
     res.status(500).json({ status: 'error', detail: String(err) })
   }
