@@ -354,7 +354,7 @@ async function fetchMetricData(metricInfo, timeframe, limit, plantFilter, sumber
   })
 }
 
-export async function fetchTimeSeries(symbol, timeframe = '1W', limit = 500, plant, sumberDana, year, periodType, raw = false) {
+export async function fetchTimeSeries(symbol, timeframe = '1W', limit = 500, plant, sumberDana, year, periodType, raw = false, kategoriPlant = null, cumulative = false) {
   if (symbol.startsWith('DOC_') || symbol.startsWith('VAL_')) {
     const metricInfo = METRICS[symbol]
     if (!metricInfo) return []
@@ -418,11 +418,11 @@ export async function fetchTimeSeries(symbol, timeframe = '1W', limit = 500, pla
 
   // Default: query by kode_data from fact_doc_weekly
   // This handles A1, A2, B001, C001, D001, E001, etc.
-  return fetchByKodeData(symbol, timeframe, limit, year, periodType, raw)
+  return fetchByKodeData(symbol, timeframe, limit, year, periodType, raw, sumberDana, kategoriPlant, cumulative)
 }
 
 // Fetch time series data by kode_data from fact_doc_weekly
-async function fetchByKodeData(kodeData, timeframe = '1W', limit = 500, year = null, periodType = null, raw = false) {
+async function fetchByKodeData(kodeData, timeframe = '1W', limit = 500, year = null, periodType = null, raw = false, sumberDana = null, kategoriPlant = null, cumulative = false) {
   // Case-insensitive matching for kode_data
   const whereClauses = ['LOWER(kode_data) = LOWER($1)']
   const params = [kodeData]
@@ -434,6 +434,14 @@ async function fetchByKodeData(kodeData, timeframe = '1W', limit = 500, year = n
   if (periodType) {
     whereClauses.push('period_type = $' + (params.length + 1))
     params.push(periodType)
+  }
+  if (sumberDana) {
+    whereClauses.push('LOWER(sumber_dana) = LOWER($' + (params.length + 1) + ')')
+    params.push(sumberDana)
+  }
+  if (kategoriPlant) {
+    whereClauses.push('LOWER(kategori_plant) = LOWER($' + (params.length + 1) + ')')
+    params.push(kategoriPlant)
   }
 
   const whereSql = 'WHERE ' + whereClauses.join(' AND ')
@@ -450,6 +458,30 @@ async function fetchByKodeData(kodeData, timeframe = '1W', limit = 500, year = n
       FROM fact_doc_weekly
       ${whereSql}
       ORDER BY week_start DESC
+      LIMIT $${params.length + 1}
+    `
+  } else if (cumulative) {
+    // Cumulative mode: use window function for running total
+    let timeTrunc = 'week'
+    if (timeframe === '1D') timeTrunc = 'day'
+    if (timeframe === '1M') timeTrunc = 'month'
+    if (timeframe === '1Y') timeTrunc = year ? 'month' : 'year'
+
+    sql = `
+      WITH weekly_data AS (
+        SELECT
+          DATE_TRUNC('${timeTrunc}', week_start) as period,
+          SUM(count_doc) as weekly_value
+        FROM fact_doc_weekly
+        ${whereSql}
+        GROUP BY DATE_TRUNC('${timeTrunc}', week_start)
+      )
+      SELECT
+        period,
+        weekly_value,
+        SUM(weekly_value) OVER (ORDER BY period) as cum_value
+      FROM weekly_data
+      ORDER BY period DESC
       LIMIT $${params.length + 1}
     `
   } else {
@@ -494,6 +526,21 @@ async function fetchByKodeData(kodeData, timeframe = '1W', limit = 500, year = n
           volume: value,
           kategori_plant: row.kategori_plant,
           sumber_dana: row.sumber_dana
+        }
+      })
+    } else if (cumulative) {
+      // Return cumulative data format
+      return rows.reverse().map((row) => {
+        const cumValue = Number(row.cum_value || 0)
+        const weeklyValue = Number(row.weekly_value || 0)
+        const timestamp = row.period ? Math.floor(new Date(row.period).getTime() / 1000) : 0
+        return {
+          time: timestamp,
+          open: cumValue - weeklyValue,
+          high: cumValue,
+          low: cumValue - weeklyValue,
+          close: cumValue,
+          volume: weeklyValue
         }
       })
     } else {

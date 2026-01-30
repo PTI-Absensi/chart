@@ -168,9 +168,11 @@ app.get('/api/procurement/data/:symbol', authMiddleware, async (req, res) => {
   const limit = Number(req.query.limit || 1000)
   const plant = req.query.plant ? String(req.query.plant) : null
   const sumberDana = req.query.sumber_dana ? String(req.query.sumber_dana) : null
+  const kategoriPlant = req.query.kategori_plant ? String(req.query.kategori_plant) : null
   const year = req.query.year ? Number(req.query.year) : null
   const periodType = req.query.period_type ? String(req.query.period_type) : null
   const raw = req.query.raw === 'true' || req.query.raw === '1'
+  const cumulative = req.query.cumulative === 'true' || req.query.cumulative === '1'
 
   const validTimeframes = getProcurementTimeframes()
   if (!validTimeframes.includes(timeframe)) {
@@ -179,10 +181,16 @@ app.get('/api/procurement/data/:symbol', authMiddleware, async (req, res) => {
   if (periodType && !['calendar', 'fiscal'].includes(periodType)) {
     return res.status(400).json({ detail: "Invalid period_type. Use 'calendar' or 'fiscal'." })
   }
+  if (sumberDana && !['eksploitasi', 'investasi'].includes(sumberDana.toLowerCase())) {
+    return res.status(400).json({ detail: "Invalid sumber_dana. Use 'eksploitasi' or 'investasi'." })
+  }
+  if (kategoriPlant && !['pg', 'mkso', 'ho'].includes(kategoriPlant.toLowerCase())) {
+    return res.status(400).json({ detail: "Invalid kategori_plant. Use 'PG', 'MKSO', or 'HO'." })
+  }
 
   try {
-    const data = await fetchTimeSeries(symbol, timeframe, limit, plant, sumberDana, year, periodType, raw)
-    res.json({ status: 'success', symbol, timeframe, raw, count: data.length, data })
+    const data = await fetchTimeSeries(symbol, timeframe, limit, plant, sumberDana, year, periodType, raw, kategoriPlant, cumulative)
+    res.json({ status: 'success', symbol, timeframe, raw, cumulative, count: data.length, data })
   } catch (err) {
     res.status(500).json({ status: 'error', detail: String(err) })
   }

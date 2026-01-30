@@ -1,13 +1,14 @@
 <template>
   <div class="app-shell">
-    <SideNav
-      v-if="showNav"
-      :collapsed="isCollapsed"
+    <!-- SideNav only shows for non-charting pages -->
+    <SideNav 
+      v-if="!isChartingPage" 
+      :collapsed="navCollapsed" 
       :theme="theme"
-      @toggle="toggleNav"
+      @toggle="navCollapsed = !navCollapsed"
       @theme="toggleTheme"
     />
-    <div class="page">
+    <div class="page" :class="{ 'page-fullwidth': isChartingPage }">
       <slot />
     </div>
   </div>
@@ -20,10 +21,18 @@ import SideNav from '../components/SideNav.vue'
 
 type Theme = 'light' | 'dark'
 
-const isCollapsed = ref(false)
-const theme = ref<Theme>('light')
 const route = useRoute()
-const showNav = computed(() => route.path !== '/login')
+const theme = ref<Theme>('dark')
+const navCollapsed = ref(false)
+
+// Check if current route is the charting page
+const isChartingPage = computed(() => route.path === '/')
+
+const toggleTheme = () => {
+  theme.value = theme.value === 'dark' ? 'light' : 'dark'
+  document.body.dataset.theme = theme.value
+  localStorage.setItem('theme', theme.value)
+}
 
 const applyTheme = (value: Theme, persist = true) => {
   document.body.dataset.theme = value
@@ -33,18 +42,15 @@ const applyTheme = (value: Theme, persist = true) => {
   }
 }
 
-const toggleTheme = () => {
-  const next: Theme = theme.value === 'dark' ? 'light' : 'dark'
-  applyTheme(next)
-}
-
-const toggleNav = () => {
-  isCollapsed.value = !isCollapsed.value
-}
-
 onMounted(() => {
   const saved = localStorage.getItem('theme') as Theme | null
   const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
   applyTheme(saved ?? (prefersDark ? 'dark' : 'light'), false)
 })
 </script>
+
+<style scoped>
+.page-fullwidth {
+  padding: 0 !important;
+}
+</style>

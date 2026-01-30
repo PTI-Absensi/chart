@@ -16,7 +16,7 @@ import { authFetch } from '../utils/auth'
 
 // Props
 const props = withDefaults(defineProps<{
-  chartType?: 'line' | 'area' | 'bar' | 'candlestick'
+  chartType?: 'line' | 'area' | 'bar'
   periodType?: 'calendar' | 'fiscal'
   year?: number
   height?: number
@@ -24,6 +24,10 @@ const props = withDefaults(defineProps<{
   normalize?: boolean
   logScale?: boolean
   rawMode?: boolean
+  cumulative?: boolean
+  sumberDana?: string
+  kategoriPlant?: string
+  theme?: 'dark' | 'light'
 }>(), {
   chartType: 'line',
   periodType: 'calendar',
@@ -32,7 +36,11 @@ const props = withDefaults(defineProps<{
   symbols: () => [],
   normalize: false,
   logScale: false,
-  rawMode: false
+  rawMode: false,
+  cumulative: false,
+  sumberDana: '',
+  kategoriPlant: '',
+  theme: 'dark'
 })
 
 // Emits
@@ -53,18 +61,30 @@ const colors = [
 ]
 
 // Computed chart type for ApexCharts
-const apexChartType = computed(() => {
-  return props.chartType === 'candlestick' ? 'candlestick' : props.chartType
+const apexChartType = computed(() => props.chartType)
+
+const themeTokens = computed(() => {
+  const isDark = props.theme === 'dark'
+  return {
+    foreColor: isDark ? '#d2dbd4' : '#1a1d21',
+    text: isDark ? '#d2dbd4' : '#4b5563',
+    grid: isDark ? 'rgba(229, 236, 231, 0.12)' : 'rgba(0, 0, 0, 0.12)',
+    gridSoft: isDark ? 'rgba(229, 236, 231, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+    crosshair: isDark ? '#48c1b4' : '#2563eb',
+    tooltip: isDark ? 'dark' : 'light'
+  }
 })
 
 // Chart options
 const chartOptions = computed(() => {
+  const tokens = themeTokens.value
   const baseOptions: any = {
     chart: {
       id: 'procurement-chart',
       type: apexChartType.value,
+      width: '100%',
       background: 'transparent',
-      foreColor: '#d1d4dc',
+      foreColor: tokens.foreColor,
       fontFamily: "'Inter', sans-serif",
       toolbar: {
         show: true,
@@ -85,11 +105,24 @@ const chartOptions = computed(() => {
         dynamicAnimation: { enabled: true, speed: 350 }
       }
     },
-    theme: { mode: 'dark' },
+    theme: { mode: props.theme },
+    legend: { 
+      show: true,
+      position: 'top',
+      horizontalAlign: 'left',
+      floating: true,
+      offsetX: -25,  // Move right to not cover Y-axis
+      offsetY: -7,
+      labels: { colors: tokens.text },
+      markers: { width: 10, height: 10, radius: 10 },
+      itemMargin: { horizontal: 0, vertical: 4 },  // Vertical spacing
+      onItemClick: { toggleDataSeries: true },
+      onItemHover: { highlightDataSeries: true }
+    },
     colors: colors.slice(0, props.symbols.length || 1),
     stroke: {
       curve: 'smooth',
-      width: props.chartType === 'candlestick' ? 1 : 2
+      width: 2
     },
     fill: {
       type: props.chartType === 'area' ? 'gradient' : 'solid',
@@ -101,32 +134,41 @@ const chartOptions = computed(() => {
       }
     },
     grid: {
-      borderColor: '#1e222d',
+      borderColor: tokens.gridSoft,
       strokeDashArray: 0
     },
     xaxis: {
       type: 'datetime',
       labels: {
-        style: { colors: '#d1d4dc' },
+        style: { colors: tokens.text },
         datetimeUTC: false,
-        format: 'dd MMM',
+        format: 'MMM yyyy',
         datetimeFormatter: {
           year: 'yyyy',
-          month: "MMM 'yy",
-          day: 'dd MMM',
+          month: 'MMM yyyy',
+          day: 'dd MMM yyyy',
           hour: 'HH:mm'
         }
       },
-      axisBorder: { color: '#2a2e39' },
-      axisTicks: { color: '#2a2e39' },
-      tickAmount: 12
+      axisBorder: { color: tokens.grid },
+      axisTicks: { color: tokens.grid },
+      tickAmount: 12,
+      crosshairs: {
+        show: true,
+        position: 'back',
+        stroke: {
+          color: tokens.crosshair,
+          width: 1,
+          dashArray: 3
+        }
+      }
     },
     // Dynamic Y-axes: one per series for proper comparison
     yaxis: props.symbols.length <= 1 
       ? {
           logarithmic: props.logScale,
           labels: {
-            style: { colors: '#d1d4dc' },
+            style: { colors: tokens.text },
             formatter: (val: number) => {
               if (val >= 1000000) return (val / 1000000).toFixed(1) + 'M'
               if (val >= 1000) return (val / 1000).toFixed(1) + 'K'
@@ -154,16 +196,10 @@ const chartOptions = computed(() => {
           }
         })),
     tooltip: {
-      theme: 'dark',
+      theme: tokens.tooltip,
       shared: true,
       intersect: false,
       x: { format: 'dd MMM yyyy' }
-    },
-    legend: {
-      show: props.symbols.length > 1,
-      position: 'top',
-      horizontalAlign: 'left',
-      labels: { colors: '#d1d4dc' }
     },
     dataLabels: { enabled: false },
     plotOptions: {
@@ -188,19 +224,8 @@ const chartSeries = computed(() => {
     return []
   }
 
-  return props.symbols.map((symbol, index) => {
+  return props.symbols.map((symbol) => {
     const data = rawData.value[symbol] || []
-    
-    if (props.chartType === 'candlestick') {
-      return {
-        name: symbol,
-        type: 'candlestick',
-        data: data.map((d: any) => ({
-          x: new Date(d.time * 1000),
-          y: [d.open, d.high, d.low, d.close]
-        }))
-      }
-    }
 
     let values = data.map((d: any) => d.close)
     
@@ -228,10 +253,15 @@ async function fetchSymbolData(symbol: string) {
     const params = new URLSearchParams({
       period_type: props.periodType,
       year: props.year.toString(),
-      raw: props.rawMode ? 'true' : 'false'
+      raw: props.rawMode ? 'true' : 'false',
+      cumulative: props.cumulative ? 'true' : 'false'
     })
+    // Add optional filters
+    if (props.sumberDana) params.set('sumber_dana', props.sumberDana)
+    if (props.kategoriPlant) params.set('kategori_plant', props.kategoriPlant)
+    
     const url = `/api/procurement/data/${symbol}?${params}`
-    console.log('Fetching:', url, 'raw:', props.rawMode)
+    console.log('Fetching:', url)
     const res = await authFetch(url)
     const json = await res.json()
     console.log('Response for', symbol, ':', json)
@@ -272,8 +302,15 @@ watch(() => props.symbols, () => {
   loadData()
 }, { deep: true })
 
-// Watch for period/year/rawMode changes
-watch([() => props.periodType, () => props.year, () => props.rawMode], () => {
+// Watch for period/year/rawMode/filters changes
+watch([
+  () => props.periodType, 
+  () => props.year, 
+  () => props.rawMode,
+  () => props.cumulative,
+  () => props.sumberDana,
+  () => props.kategoriPlant
+], () => {
   // Clear cache and reload
   rawData.value = {}
   loadData()
@@ -336,12 +373,20 @@ function zoomOut() {
   }
 }
 
+// Toggle series visibility by name
+function toggleSeries(seriesName: string) {
+  if (chartRef.value) {
+    chartRef.value.toggleSeries(seriesName)
+  }
+}
+
 // Expose methods
 defineExpose({
   exportPng,
   exportCsv,
   zoomIn,
   zoomOut,
+  toggleSeries,
   refresh: loadData
 })
 

@@ -48,6 +48,16 @@
             <path d="M4 7h16M8 7V5h8v2M7 7l1 12h8l1-12" fill="none" stroke="currentColor" stroke-width="2"/>
           </svg>
         </button>
+        <div class="toolbar-divider"></div>
+        <!-- Color Picker -->
+        <label class="color-picker-wrapper" title="Drawing color">
+          <input 
+            type="color" 
+            v-model="currentColor" 
+            class="color-picker-input"
+          />
+          <span class="color-preview" :style="{ backgroundColor: currentColor }"></span>
+        </label>
       </template>
     </div>
   </div>
@@ -61,10 +71,12 @@ const props = withDefaults(defineProps<{
   width?: number
   height?: number
   showToolbar?: boolean
+  activeTool?: string
 }>(), {
   width: 800,
   height: 450,
-  showToolbar: true
+  showToolbar: true,
+  activeTool: 'select'
 })
 
 // Generate unique canvas ID
@@ -75,20 +87,14 @@ const containerRef = ref<HTMLDivElement | null>(null)
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 let ctx: CanvasRenderingContext2D | null = null
 
-// State
-const activeTool = ref<string>('select')
+// State - use prop if provided, otherwise local state
+const internalActiveTool = ref<string>(props.activeTool)
+const activeTool = computed(() => props.showToolbar ? internalActiveTool.value : props.activeTool)
 const isDrawing = ref(false)
 const startPoint = ref<{ x: number; y: number } | null>(null)
 const drawings = ref<Array<{type: string, points: number[], color: string}>>([])
 const toolbarCollapsed = ref(true) // Start collapsed to not block Y-axis
-
-// Colors for each tool
-const toolColors: Record<string, string> = {
-  hline: '#2962ff',
-  vline: '#26a69a', 
-  trendline: '#ef5350',
-  freedraw: '#ff9800'
-}
+const currentColor = ref('#2962ff') // Default drawing color - user can pick
 
 // Current free draw path
 let currentPath: number[] = []
@@ -176,7 +182,7 @@ function handleMouseMove(e: MouseEvent) {
 
   // Draw preview
   ctx.beginPath()
-  ctx.strokeStyle = toolColors[activeTool.value] || '#ffffff'
+  ctx.strokeStyle = currentColor.value
   ctx.lineWidth = 2
   ctx.setLineDash([5, 5])
 
@@ -205,7 +211,7 @@ function handleMouseUp(e: MouseEvent) {
   if (!isDrawing.value || !startPoint.value || !canvasRef.value) return
 
   const pos = getMousePos(e)
-  const color = toolColors[activeTool.value] || '#ffffff'
+  const color = currentColor.value
 
   if (activeTool.value === 'hline') {
     drawings.value.push({
@@ -268,7 +274,7 @@ function redraw() {
 
 // Set active tool
 function setTool(toolId: string) {
-  activeTool.value = toolId
+  internalActiveTool.value = toolId
   console.log('Tool set to:', toolId)
 }
 
@@ -310,10 +316,12 @@ onUnmounted(() => {
   }
 })
 
-// Expose methods
+// Expose methods and state
 defineExpose({
   clearAll,
-  setTool
+  setTool,
+  drawings,
+  redraw
 })
 </script>
 
@@ -403,5 +411,34 @@ defineExpose({
 
 .toggle-btn:hover {
   opacity: 1;
+}
+
+/* Color Picker */
+.color-picker-wrapper {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+}
+
+.color-picker-input {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.color-preview {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 6px;
+  border: 2px solid var(--stroke, #2a2e39);
+  transition: border-color 0.15s;
+}
+
+.color-picker-wrapper:hover .color-preview {
+  border-color: var(--muted, #787b86);
 }
 </style>
