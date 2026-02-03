@@ -1,214 +1,121 @@
-﻿# Dokumentasi Sistem Chart (Procurement Charting Suite)
+# Dokumentasi Sistem Chart (Procurement Charting Suite)
 
-Dokumen ini adalah dokumentasi tunggal untuk folder `chart/`.
-Mencakup arsitektur, frontend (Vue + Vite), backend (Node.js), API, struktur folder, konfigurasi, dan legacy.
+Dokumen ini adalah dokumentasi utama untuk folder `chart/`. Isinya sudah disesuaikan dengan versi terbaru UI/UX, backend, dan alur data procurement.
 
-## 1. Ringkasan
+## 1) Ringkasan Sistem
 
-Sistem saat ini terdiri dari:
-- Frontend Vue + Vite + Vue Router (SPA) untuk charting tools + DFG + Process Time.
-- Backend Node.js (Express + PostgreSQL) untuk REST API data chart.
-- Legacy disimpan di folder `legacy/` (FastAPI dan HTML statis lama).
+Sistem terdiri dari:
+- Frontend SPA (Vue 3 + Vite) untuk charting procurement, DFG, process time, dashboard, template.
+- Backend Node.js (Express) sebagai REST API.
+- Database PostgreSQL (schema `olahproc`) sebagai sumber data analytics procurement.
+- Legacy disimpan di `chart/legacy/` sebagai referensi.
 
-Fokus aplikasi: charting tools fleksibel untuk data procurement, bukan trading.
-
----
-
-## 2. Arsitektur (ASCII)
-
-```
-+------------------------------------+       HTTP/JSON       +------------------------------------+
-| FRONTEND (Vue + Vite SPA)          | <-------------------> | BACKEND (Node.js + Express)         |
-| - /dashboard (SPA routes)          |                       | - /api/*                            |
-| - /dfg, /process-time              |                       | - /api/procurement/*                |
-+---------------------+--------------+                       +---------------------+--------------+
-                      |                                        | PostgreSQL
-                      | static assets (Vite dev/build)         | Schema: olahproc
-                      v                                        | Tables: fact_value_weekly,
-           Vite dev server / build output                      |         fact_doc_weekly,
-                                                               |         dim_plant, analitic
-```
+Fokus aplikasi: **charting procurement perusahaan**, bukan trading.
 
 ---
 
-## 3. Teknologi
+## 2) Arsitektur (Ringkas)
 
-### Frontend
-- Vue 3 + Vite 7 + Vue Router
-- TradingView Lightweight Charts
-- CSS custom (theme + dark/light mode)
-- Mermaid (DFG preview via CDN)
+```
+---------------------------+     HTTP/JSON     +---------------------------+
+| Frontend (Vue + Vite)    | <---------------> | Backend (Express)          |
+| - / (Charting)           |                   | - /api/procurement/*       |
+| - /dfg                   |                   | - /api/sources, /charts... |
+| - /process-time          |                   | - /api/dfg, /process-time  |
++---------------------------+                   +---------------------------+
+                                       |
+                                       v
+                          PostgreSQL (schema olahproc)
+                          fact_doc_weekly / fact_value_weekly / analitic / dim_plant
+```
 
-### Backend
-- Node.js (Express)
+---
+
+## 2.1) Teknologi Inti
+
+Frontend:
+- Vue 3 + Vite
+- vue-router
+- ApexCharts (via `vue3-apexcharts`) untuk chart utama
+- Canvas overlay untuk drawing (custom component)
+
+Backend:
+- Node.js + Express
 - PostgreSQL (pg)
-- pg-format untuk safe identifier formatting
-- dotenv untuk konfigurasi
+- File storage JSON untuk charts/dashboards/templates/sources
+
+Catatan:
+- `lightweight-charts` masih ada di dependency untuk legacy/eksperimen, tetapi chart procurement utama memakai ApexCharts.
 
 ---
 
-## 4. Struktur Folder (Lengkap)
+## 3) Frontend (Vue + Vite)
 
-```
-chart/
-|-- backend-node/                 # Backend Node.js (baru)
-|   |-- src/
-|   |   |-- index.js               # Express server + routes
-|   |   |-- config.js              # env loader
-|   |   |-- db.js                  # PG Pool
-|   |   |-- mapping.js             # mapping loader
-|   |   `-- services/
-|   |       |-- dataService.js     # /api (symbols, ohlc, price)
-|   |       `-- procurementService.js # /api/procurement
-|   |-- config/
-|   |   `-- data_mapping.json
-|   |-- package.json
-|   `-- .env.example
-|-- frontend/                     # Vue + Vite SPA
-|   |-- src/
-|   |   |-- App.vue
-|   |   |-- main.ts
-|   |   |-- router/index.ts
-|   |   |-- layouts/AppShell.vue
-|   |   |-- components/SideNav.vue
-|   |   |-- pages/
-|   |   |   |-- ChartPage.vue
-|   |   |   |-- DfgPage.vue
-|   |   |   `-- ProcessTimePage.vue
-|   |   |-- legacy/chart-app.ts    # port JS chart lama
-|   |   `-- styles/app.css
-|   |-- index.html
-|   `-- vite.config.ts
-|-- legacy/
-|   |-- backend-python/            # FastAPI lama
-|   `-- web-static/                # HTML/CSS/JS lama
-`-- dokumentasi_chart.md
-```
+### 3.1 Routing (SPA)
+Routes utama (lihat `frontend/src/router/index.ts`):
+- `/` -> Chart Page (Procurement chart)
+- `/sources` -> Data Sources
+- `/builder` -> Chart Builder
+- `/dashboards` -> Dashboard Manager
+- `/templates` -> Templates
+- `/admin` -> Admin (management)
+- `/dfg` -> DFG viewer
+- `/process-time` -> Process time viewer
+- `/login` -> Auth login
+
+### 3.2 Komponen inti Chart
+Komponen utama:
+- `frontend/src/components/ChartApp.vue`
+  - Header dengan filter: period_type (calendar/fiscal), year, sumber_dana, kategori_plant.
+  - Toggle: Raw, Kumulatif.
+  - Chart type: Line, Area, Bar.
+  - Summary bar di bawah chart.
+  - Floating buttons: Log scale, Normalize, Object Tree, Layers.
+  - Side toolbar: drawing tools + theme toggle.
+- `frontend/src/components/ProcurementChart.vue`
+  - Render chart via **ApexCharts** (vue3-apexcharts).
+  - Memuat data dari endpoint `/api/procurement/data/:symbol`.
+  - Chart type: line/area/bar (tanpa candlestick).
+  - Export PNG / CSV.
+- `frontend/src/components/DrawingLayer.vue`
+  - Canvas overlay untuk drawing (hline/vline/trendline/freedraw).
+
+### 3.3 Tema
+Theme light/dark disimpan di `localStorage` dan diaktifkan via `document.body.dataset.theme`.
+CSS variables ada di `frontend/src/styles/app.css`.
 
 ---
 
-## 5. Frontend (Vue + Vite)
+## 4) Backend (Node.js + Express)
 
-### 5.1 Routing
-SPA routes:
-- `/dashboard/` -> Chart page
-- `/dashboard/dfg` -> DFG page
-- `/dashboard/process-time` -> Process Time page
-- `/dashboard/login` -> Login page (JWT)
+Entry point: `backend-node/src/index.js`
 
-### 5.2 Layout Global
-Navbar global via:
-- `frontend/src/layouts/AppShell.vue`
-- `frontend/src/components/SideNav.vue`
-
-### 5.3 Dark/Light Mode
-Theme disimpan di localStorage:
-- `light`
-- `dark`
-
-CSS theme memakai CSS variables di `frontend/src/styles/app.css`.
-
-### 5.4 Animasi & Hover
-Kelas `.animate-in` dipakai di semua page.
-Card di DFG/Process Time menggunakan hover transform + shadow.
-
----
-
-## 6. Backend Node (Express)
-
-### 6.1 Endpoint Inti
+### 4.1 Endpoint Procurement
 ```
-GET  /api/symbols?with_data=true
-GET  /api/timeframes
-GET  /api/ohlc/:symbol?period_type=calendar&year=2025&limit=500&cumulative=false
-GET  /api/price/:symbol?period_type=calendar&year=2025
+GET /api/procurement/symbols
+GET /api/procurement/search?q=...&limit=20
+GET /api/procurement/timeframes
+GET /api/procurement/data/:symbol
+GET /api/procurement/latest/:symbol
+GET /api/procurement/metrics
+GET /api/procurement/plants
 ```
 
-### 6.2 Endpoint Procurement (port dari FastAPI)
-```
-GET  /api/procurement/symbols
-GET  /api/procurement/search?q=...&limit=20
-GET  /api/procurement/timeframes
-GET  /api/procurement/data/:symbol?timeframe=1W&limit=200&plant=...&sumber_dana=...&year=...&period_type=...
-GET  /api/procurement/latest/:symbol
-GET  /api/procurement/metrics
-GET  /api/procurement/plants
-```
+Parameter `GET /api/procurement/data/:symbol`:
+- `timeframe` : 1D | 1W | 1M | 1Y (default 1W)
+- `limit` : default 1000
+- `period_type` : calendar | fiscal
+- `year`
+- `sumber_dana` : eksploitasi | investasi
+- `kategori_plant` : PG | MKSO | HO
+- `raw` : true|false (raw rows)
+- `cumulative` : true|false (kumulatif mingguan)
 
-### 6.3 Endpoint Auth (JWT)
-```
-POST /api/auth/login
-GET  /api/auth/me
-```
+Catatan penting:
+- Jika `raw=true`, mode raw **lebih dulu** dan **mengabaikan** mode kumulatif.
+- `cumulative=true` menghasilkan running total berbasis weekly aggregate.
 
-Jika `AUTH_ENABLED=true` dan file user tersedia, semua endpoint `/api/*` dan
-`/api/procurement/*` memerlukan header:
-```
-Authorization: Bearer <token>
-```
-
-Catatan host:
-- Vite proxy mengarah ke `http://127.0.0.1:8000`.
-- Backend wajib listen ke IPv4 (`0.0.0.0` atau `127.0.0.1`) agar proxy tidak gagal.
-
-### 6.4 Endpoint Data Sources (Stage 1)
-```
-GET    /api/sources
-POST   /api/sources              (multipart file: csv/json, optional name)
-GET    /api/sources/:id/schema
-GET    /api/sources/:id/preview?limit=50
-POST   /api/sources/:id/mapping  (JSON: { dimension, metric, date })
-DELETE /api/sources/:id
-```
-
-### 6.5 Endpoint Chart Builder (Stage 2)
-```
-GET    /api/charts
-POST   /api/charts
-GET    /api/charts/:id
-PUT    /api/charts/:id
-DELETE /api/charts/:id
-```
-
-### 6.6 Endpoint Dashboards (Stage 2)
-```
-GET    /api/dashboards
-POST   /api/dashboards
-GET    /api/dashboards/:id
-PUT    /api/dashboards/:id
-DELETE /api/dashboards/:id
-```
-
-### 6.7 Endpoint Templates & Export (Stage 3)
-```
-GET    /api/templates
-POST   /api/templates
-GET    /api/templates/:id
-GET    /api/exports/chart/:id
-GET    /api/exports/dashboard/:id
-GET    /api/exports/template/:id
-```
-
-### 6.8 Endpoint Permissions (Stage 3)
-```
-GET /api/permissions/roles
-GET /api/permissions/users
-```
-
-### 6.9 Endpoint DFG & Process Time
-```
-GET  /api/dfg/preview?table=...&mode=...&format=...&min_edge=...
-GET  /api/dfg/file?name=...
-POST /api/process-time/parse (multipart file)
-```
-
-### 6.10 Response Format
-Umumnya:
-```
-{ "status": "success", "data": [...] }
-```
-
-OHLC-like:
+Format data time series (OHLC-like):
 ```
 {
   "time": <epoch seconds>,
@@ -220,271 +127,223 @@ OHLC-like:
 }
 ```
 
-### 6.11 Mapping DB (Adapter)
-Mapping file:
+### 4.2 Endpoint DFG & Process Time
 ```
-backend-node/config/data_mapping.json
+GET  /api/dfg/preview?table=...&mode=...&format=...&min_edge=...
+GET  /api/dfg/file?name=...
+POST /api/process-time/parse (multipart file)
 ```
 
-Contoh:
-```json
-{
-  "symbols": {
-    "table": "public.analitic",
-    "columns": {
-      "symbol": "kode_data",
-      "name": "nama_dokumen",
-      "fallback_parts": ["status", "sumber_dana", "kategori_plant"]
-    },
-    "filters": {
-      "with_data": {
-        "table": "public.fact_value_weekly",
-        "column": "kode_data"
-      }
-    }
-  },
-  "series": {
-    "table": "public.fact_value_weekly",
-    "time_column": "week_start",
-    "value_column": "total_nilai",
-    "symbol_column": "kode_data",
-    "period_type_column": "period_type",
-    "year_column": "period_year"
-  }
-}
+### 4.3 Data Sources / Chart / Dashboard / Template
 ```
+GET    /api/sources
+POST   /api/sources          (upload csv/json)
+GET    /api/sources/:id/schema
+GET    /api/sources/:id/preview
+POST   /api/sources/:id/mapping
+DELETE /api/sources/:id
+
+GET    /api/charts
+POST   /api/charts
+GET    /api/charts/:id
+PUT    /api/charts/:id
+DELETE /api/charts/:id
+
+GET    /api/dashboards
+POST   /api/dashboards
+GET    /api/dashboards/:id
+PUT    /api/dashboards/:id
+DELETE /api/dashboards/:id
+
+GET    /api/templates
+POST   /api/templates
+GET    /api/templates/:id
+DELETE /api/templates/:id
+```
+
+Storage saat ini berbasis file JSON:
+- `backend-node/storage/charts.json`
+- `backend-node/storage/dashboards.json`
+- `backend-node/storage/templates.json`
+- `backend-node/storage/sources.json`
+- `backend-node/storage/uploads/*` (file CSV/JSON)
+
+### 4.4 Auth
+Jika auth aktif (`AUTH_ENABLED=true` dan `config/users.json` ada):
+```
+POST /api/auth/login
+GET  /api/auth/me
+```
+Header:
+```
+Authorization: Bearer <token>
+```
+
+### 4.5 Endpoint Lain (Generic / Legacy Support)
+```
+GET /health
+GET /api/symbols
+GET /api/timeframes
+GET /api/ohlc/:symbol
+GET /api/price/:symbol
+GET /api/exports/chart/:id
+GET /api/exports/dashboard/:id
+GET /api/exports/template/:id
+GET /api/permissions/roles
+GET /api/permissions/users
+```
+Endpoint ini dipakai untuk fungsi generik/non-procurement dan export.
 
 ---
 
-## 7. Struktur Data (Olahproc)
+## 5) Struktur Data & Mapping (Procurement)
 
-### 7.1 Tabel Utama
-- `analitic` (metadata series)
+### 5.1 Tabel Utama
+Sumber utama (schema `olahproc`):
+- `analitic`
   - `kode_data`, `nama_dokumen`, `status`, `sumber_dana`, `kategori_plant`, `desc`
 - `fact_doc_weekly`
-  - `period_type`, `period_year`, `week_start`, `week_end`, `doc_type`, `count_doc`, `kode_data`, dll
+  - `period_type`, `period_year`, `period_cal_year`
+  - `week_start`, `week_end`, `week_number`, `label`
+  - `doc_type`, `status`, `sumber_dana`, `kategori_plant`, `tahun_anggaran`
+  - `count_doc`, `kode_data`, `week_seq`
 - `fact_value_weekly`
-  - `period_type`, `period_year`, `week_start`, `week_end`, `total_nilai`, `hps`, `anggaran`, dll
+  - `period_type`, `period_year`, `period_cal_year`
+  - `week_start`, `week_end`, `week_number`, `label`
+  - `sumber_dana`, `kategori_plant`, `tahun_anggaran`
+  - `total_nilai`, `anggaran`, `hps`, `realisasi`, `saving_nilai`, `saving_pct_anggaran`, `saving_pct_hps`
+- `fact_tahap_weekly` (durasi tahap)
 - `dim_plant`
-  - `kode`, `nama`, `kategori`, `regional`
 
-### 7.2 Taxonomy Symbol (Procurement)
-- `DOC_*` -> metric dokumen (fact_doc_weekly)
-- `VAL_*` -> metric nilai (fact_value_weekly)
-- `PLANT_*` -> agregasi per plant
-- `KAT_*` -> agregasi per kategori
+### 5.2 Kode Data (A1/B001/...)
+Mapping detail kode ke definisi analitik ada di:
+`chart/analytic_column_mapping.md`
+
+Contoh:
+- A1 = PR approve eksploitasi PG
+- A2 = PR approve eksploitasi MKSO
+- B001 = PK pengadaan (all plant)
+
+### 5.3 Taxonomy Symbol di Backend
+Di `backend-node/src/services/procurementService.js`:
+- `DOC_*` -> fact_doc_weekly (count_doc)
+- `VAL_*` -> fact_value_weekly (nilai Rp)
+- `PLANT_*` -> agregasi per plant (total_nilai)
+- `KAT_*` -> agregasi per kategori plant
 - `DANA_*` -> agregasi per sumber dana
-- Suffix `_EKS` / `_INV` -> filter sumber dana
+- Kode A/B/C/D/E -> data dari `fact_doc_weekly` (filter `kode_data`)
 
 ---
 
-## 8. Cara Menjalankan (Development)
+## 6) Alur ETL / ELT (Masalah & Checklist)
 
-### 8.1 Backend Node
+Bagian ini menjelaskan **alur ETL** dan masalah umum yang sering muncul di data procurement.
+
+### 6.1 Sumber Data
+Mapping analitik berasal dari:
+- `v_cleansing_pk_vendor` (raw cleansing)
+- Tabel metadata `analitic` (kode_data, nama_dokumen, desc)
+
+### 6.2 Output Wajib (Analytics Tables)
+Minimal output ETL:
+1) `analitic` (metadata kode_data)
+2) `fact_doc_weekly` (count dokumen per minggu)
+3) `fact_value_weekly` (nilai Rp per minggu)
+4) `fact_tahap_weekly` (durasi tahap)
+5) View kumulatif (opsional):
+   - `v_fact_doc_weekly_cum`
+   - `v_fact_value_weekly_cum`
+   - `v_fact_tahap_weekly_cum`
+
+### 6.3 Masalah ETL yang Sering Terjadi
+1) **Data tidak dense**
+   - Minggu tanpa transaksi tidak ada row.
+   - Akibat: chart terlihat loncat.
+   - Solusi: generate kalender minggu dan **zero-fill**.
+
+2) **Period type vs period_year tidak konsisten**
+   - `period_type = 'calendar'` seharusnya memakai `period_cal_year`.
+   - Pastikan `period_year` sudah diisi sesuai mode calendar, atau mapping di API disesuaikan.
+
+3) **Inkonistensi sumber_dana / kategori_plant**
+   - Null/empty menyebabkan filter front-end tidak match.
+   - Wajib normalisasi (eksploitasi/investasi, PG/MKSO/HO).
+
+4) **Duplikasi kode_data**
+   - Jika kode_data mapping di analitic tidak konsisten, hasil agregasi ganda.
+   - Pastikan `kode_data` unik dan stabil.
+
+5) **Status derivatif**
+   - Beberapa status HPS/PP dihitung dari tanggal (lihat `analytic_column_mapping.md`).
+   - Jika tanggal kosong -> status turunannya hilang.
+
+6) **Timezone**
+   - Semua agregasi mingguan menggunakan `week_start`.
+   - Pastikan ETL menyimpan `week_start` konsisten (UTC vs lokal).
+
+### 6.4 Checklist ETL
+Gunakan checklist ini sebelum sistem dipakai:
+- [ ] `analitic` terisi lengkap (`kode_data`, `nama_dokumen`, `desc`).
+- [ ] `fact_doc_weekly` dan `fact_value_weekly` dense (atau dipastikan zero-fill di layer ETL).
+- [ ] `period_type` dan `period_year` sesuai definisi.
+- [ ] Normalisasi `sumber_dana` dan `kategori_plant`.
+- [ ] Minimal range data 1 tahun untuk chart default.
+
+---
+
+## 7) Menjalankan (Development)
+
+### 7.1 Backend
 ```
 cd chart/backend-node
 npm install
 copy .env.example .env
-# isi DB_* sesuai database
 npm run dev
 ```
 
-Tambahan auth:
-```
-AUTH_ENABLED=true
-JWT_SECRET=...
-HOST=0.0.0.0
-```
-
-User default (config/users.json):
-- username: `admin`
-- password: `admin123`
-
-### 8.2 Frontend Vue
+### 7.2 Frontend
 ```
 cd chart/frontend
 npm install
 npm run dev
 ```
 
-URL:
-- `http://localhost:5173/dashboard/`
-- `http://localhost:5173/dashboard/dfg`
-- `http://localhost:5173/dashboard/process-time`
+Frontend akses:
+- `http://localhost:5173/`
 
-### 8.3 Penting: Jalankan 2 Terminal
-Untuk development harus dua terminal:
-1) Terminal A: `chart/backend-node` -> `npm run dev`
-2) Terminal B: `chart/frontend` -> `npm run dev`
-
-Jika salah satu mati, login/HTTP request akan gagal.
-
-### 8.4 Troubleshooting Login (500 / gagal login)
-Checklist cepat:
-- Backend hidup di port 8000 (`http://127.0.0.1:8000/health` -> OK).
-- Vite proxy menunjuk `127.0.0.1:8000` (cek `frontend/vite.config.ts`).
-- User ada di `chart/backend-node/config/users.json`.
-- Jika memakai ENV, set:
-```
-AUTH_ENABLED=true
-JWT_SECRET=your-secret
-HOST=0.0.0.0
-```
+Proxy Vite:
+- `/api` diarahkan ke `http://127.0.0.1:8000` (lihat `frontend/vite.config.ts`).
 
 ---
 
-## 9. Produksi (Opsional)
+## 8) Troubleshooting Cepat
 
-Build frontend:
-```
-cd chart/frontend
-npm run build
-```
+1) Chart kosong:
+   - Cek response `/api/procurement/data/:symbol` (status 200).
+   - Pastikan filter `period_type/year/sumber_dana/kategori_plant` match data.
 
-Output akan di `frontend/dist`.
-Gunakan server statis (Nginx) atau satu service Node/PM2 untuk serving + API.
+2) Data raw + kumulatif:
+   - Jika `raw=true`, mode kumulatif diabaikan.
+
+3) Login gagal:
+   - Auth hanya aktif jika `AUTH_ENABLED=true` dan `config/users.json` ada.
 
 ---
 
-## 10. Legacy
+## 9) Legacy
 
-Disimpan di:
+Folder legacy:
 ```
 chart/legacy/backend-python
 chart/legacy/web-static
 ```
-
-Dipertahankan hanya untuk referensi/rollback.
-
----
-
-## 11. Catatan Penting
-
-- UI menggunakan Lightweight Charts, watermark sudah dimatikan.
-- Multi-series diproses di frontend (Promise.all).
-- DFG / Process Time sekarang memakai API backend untuk preview/parse file.
-- Dark/Light mode sudah dipakai di semua page.
-- Auth JWT tersedia dan dapat diaktifkan dari ENV.
+Digunakan hanya untuk referensi/rollback.
 
 ---
 
-## 12. Arah ETL / ELT (Untuk Client)
+## 10) Catatan Perubahan Utama
 
-Jika client sudah punya database sendiri, aplikasi ini bisa diintegrasikan dengan dua pendekatan:
-
-### 12.1 Direct Read (Tanpa DB Baru)
-- App langsung query read-only ke DB client.
-- Cocok untuk data kecil/sederhana.
-- Risiko: performa dan query berat di DB produksi client.
-
-### 12.2 ETL/ELT ke Analytics DB (Disarankan)
-- Extract: ambil data dari DB client (read-only).
-- Transform: mapping kolom, normalisasi tanggal, agregasi.
-- Load: simpan ke DB analytics (schema charting).
-- Hasil: query cepat, konsisten, aman dari beban DB produksi.
-
-### 12.3 Hybrid
-- Data utama disalin ke analytics DB, sisanya query langsung jika dibutuhkan.
-
-Catatan: roadmap tahap 1 fokus ke “Data Source Manager” agar app bisa menerima
-berbagai sumber data (DB/CSV/JSON), lalu mapping kolom ke standar charting.
-
----
-
-## 13. Perubahan Terbaru (Log)
-
-- Migrasi backend ke Node.js.
-- Port endpoint `/api/procurement/*`.
-- Migrasi frontend ke Vue + Vite + Router.
-- Navbar global (modular).
-- Animasi + hover diterapkan ke semua halaman.
-- Auth JWT + login page.
-- DFG & Process Time pakai API backend.
-- Stage 1: Data Sources (CSV/JSON) + mapping sederhana.
-- Stage 2: Chart Builder + Dashboard layout MVP.
-- Stage 3: Templates + Export JSON + Permissions scaffolding.
-
----
-
-## 14. Roadmap (Menuju Charting Tools Fleksibel ala Looker Studio)
-
-### 14.1 Tahap 1 - Data Source & Field Mapping (Fondasi)
-Target: aplikasi bisa menerima banyak sumber data, bukan hanya DB olahproc.
-
-Checklist:
-- Data source manager (UI):
-  - Tambah sumber: PostgreSQL, CSV upload, JSON upload.
-  - Simpan koneksi (nama, host, db, user).
-  - List & remove source.
-- Data profiling:
-  - Detect tipe data (string, number, date).
-  - Preview sample rows.
-- Field mapping:
-  - Mapping kolom -> field standar (date, metric, dimension).
-  - Rename field + format (currency, percent).
-- API backend:
-  - `/api/sources` CRUD
-  - `/api/sources/:id/schema`
-  - `/api/sources/:id/preview`
-
-### 14.2 Tahap 2 - Chart Builder & Dashboard Layout
-Target: user bisa bikin chart secara visual dan menyimpan dashboard.
-
-Checklist:
-- Chart builder UI:
-  - Drag drop: Dimension, Metric, Filter.
-  - Pilih tipe chart (line, area, bar).
-  - Setting axis (format, label, scale).
-- Multi-series:
-  - Add series, color, label.
-- Dashboard layout:
-  - Grid layout (resize, drag).
-  - Save layout + restore.
-- API backend:
-  - `/api/charts` CRUD (config chart)
-  - `/api/dashboards` CRUD (layout)
-
-### 14.3 Tahap 3 - Template, Export, Permission
-Target: seperti analytics platform, siap multi-user.
-
-Checklist:
-- Template report:
-  - Simpan, duplikasi, share.
-- Export:
-  - PNG, PDF, CSV.
-- Permissions:
-  - Role: admin/editor/viewer.
-  - Dataset access control.
-- Versioning:
-  - Audit log perubahan.
-
----
-
-## 15. Checklist Otak-Atik (Developer Quick Guide)
-
-### 15.1 Area Frontend
-- Layout global + sidebar: `frontend/src/layouts/AppShell.vue`, `frontend/src/components/SideNav.vue`
-- Chart page: `frontend/src/pages/ChartPage.vue`
-- Chart engine: `frontend/src/components/ChartApp.vue`
-- Legacy chart JS: `frontend/src/legacy/chart-app.ts`
-- Theme (dark/light + CSS vars): `frontend/src/styles/app.css`
-- Router: `frontend/src/router/index.ts`
-
-### 15.2 Area Backend
-- Express entry: `backend-node/src/index.js`
-- Config ENV: `backend-node/src/config.js`
-- DB connection: `backend-node/src/db.js`
-- Mapping field: `backend-node/config/data_mapping.json`
-- Procurement series logic: `backend-node/src/services/procurementService.js`
-- Auth JWT: `backend-node/src/auth.js`
-
-### 15.3 Checklist Modifikasi Cepat
-- Ubah tema warna: edit CSS variables di `frontend/src/styles/app.css`
-- Ubah sidebar menu: `frontend/src/components/SideNav.vue`
-- Ubah chart UI: `frontend/src/components/ChartApp.vue`
-- Ubah API endpoint: `backend-node/src/index.js`
-- Ubah query data procurement: `backend-node/src/services/procurementService.js`
-
----
-
-Last updated: 2026-01-28
+- Chart utama kini menggunakan **ApexCharts**, bukan Lightweight Charts.
+- Routing frontend sudah pindah ke `/`, `/sources`, `/builder`, `/dashboards`, `/templates`.
+- UI/UX chart dibuat khusus procurement (bukan trading).
+- Summary bar dan filter tambahan sudah disesuaikan kebutuhan procurement.

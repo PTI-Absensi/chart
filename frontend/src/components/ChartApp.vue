@@ -46,9 +46,17 @@
         <option value="HO">HO</option>
       </select>
       
+      <!-- Max Series Limit -->
+      <select v-model="maxSeries" class="tv-select" title="Maximum series to display">
+        <option :value="3">Max 3</option>
+        <option :value="5">Max 5</option>
+        <option :value="10">Max 10</option>
+      </select>
+      
       <!-- Mode Buttons -->
       <button :class="['tv-btn', { active: rawMode }]" @click="rawMode = !rawMode" title="Raw data">Raw</button>
       <button :class="['tv-btn', { active: cumulative }]" @click="cumulative = !cumulative" title="Kumulatif">Σ</button>
+      <button :class="['tv-btn', { active: singleScale }]" @click="singleScale = !singleScale" title="Single Y scale">1Y</button>
       
       <!-- Chart Type (tanpa candlestick) -->
       <div class="tv-btn-group">
@@ -176,6 +184,7 @@
           :log-scale="logScale"
           :raw-mode="rawMode"
           :cumulative="cumulative"
+          :single-scale="singleScale"
           :sumber-dana="sumberDana"
           :kategori-plant="kategoriPlant"
           :theme="theme"
@@ -450,8 +459,10 @@ const normalize = ref(false)
 const logScale = ref(false)
 const rawMode = ref(false)
 const cumulative = ref(false)
-const sumberDana = ref<string>('')
-const kategoriPlant = ref<string>('')
+const singleScale = ref(false)
+const sumberDana = ref('')
+const kategoriPlant = ref('')
+const maxSeries = ref(5) // Default max 5 series
 const selectedSymbols = ref<string[]>([])
 const hiddenSeries = ref<Set<string>>(new Set())
 
@@ -496,11 +507,14 @@ function toggleSeriesVisibility(symbol: string) {
 
 // Filtered symbols for search
 const filteredSymbols = computed(() => {
-  if (!searchQuery.value) return allSymbols.value.slice(0, 50)
+  if (!searchQuery.value) return allSymbols.value
   const q = searchQuery.value.toLowerCase()
   return allSymbols.value
-    .filter(s => s.symbol.toLowerCase().includes(q) || s.name.toLowerCase().includes(q))
-    .slice(0, 50)
+    .filter(s => 
+      s.symbol.toLowerCase().includes(q) || 
+      s.name.toLowerCase().includes(q) ||
+      (s.description && s.description.toLowerCase().includes(q))
+    )
 })
 
 // Load available symbols
@@ -525,9 +539,12 @@ function toggleSymbol(symbol: string) {
   if (idx >= 0) {
     selectedSymbols.value.splice(idx, 1)
   } else {
-    if (selectedSymbols.value.length < 10) {
-      selectedSymbols.value.push(symbol)
+    // Check max series limit
+    if (selectedSymbols.value.length >= maxSeries.value) {
+      alert(`Maximum ${maxSeries.value} series sudah terpilih. Hapus salah satu series atau ubah max series di dropdown.`)
+      return
     }
+    selectedSymbols.value.push(symbol)
   }
 }
 
@@ -541,6 +558,7 @@ function removeSymbol(symbol: string) {
 
 // Open search modal
 function openSearchModal() {
+  console.log('[DEBUG] openSearchModal called')  // Debug log
   searchModalOpen.value = true
   searchQuery.value = ''
   nextTick(() => {
@@ -627,6 +645,7 @@ function saveState() {
     logScale: logScale.value,
     rawMode: rawMode.value,
     cumulative: cumulative.value,
+    singleScale: singleScale.value,
     sumberDana: sumberDana.value,
     kategoriPlant: kategoriPlant.value
   }
@@ -639,7 +658,8 @@ function restoreState() {
   if (saved) {
     try {
       const state = JSON.parse(saved)
-      if (state.selectedSymbols) selectedSymbols.value = state.selectedSymbols
+      // DO NOT restore selectedSymbols to prevent auto-loading data
+      // if (state.selectedSymbols) selectedSymbols.value = state.selectedSymbols
       if (state.chartType) chartType.value = state.chartType
       if (state.periodType) periodType.value = state.periodType
       if (state.year) year.value = state.year
@@ -647,6 +667,7 @@ function restoreState() {
       if (state.logScale !== undefined) logScale.value = state.logScale
       if (state.rawMode !== undefined) rawMode.value = state.rawMode
       if (state.cumulative !== undefined) cumulative.value = state.cumulative
+      if (state.singleScale !== undefined) singleScale.value = state.singleScale
       if (state.sumberDana !== undefined) sumberDana.value = state.sumberDana
       if (state.kategoriPlant !== undefined) kategoriPlant.value = state.kategoriPlant
     } catch (e) {
@@ -656,7 +677,7 @@ function restoreState() {
 }
 
 // Watch for state changes and save
-watch([selectedSymbols, chartType, periodType, year, normalize, logScale, rawMode, cumulative, sumberDana, kategoriPlant], saveState, { deep: true })
+watch([selectedSymbols, chartType, periodType, year, normalize, logScale, rawMode, cumulative, singleScale, sumberDana, kategoriPlant], saveState, { deep: true })
 
 // Init
 onMounted(() => {
@@ -682,6 +703,8 @@ onUnmounted(() => {
   padding: 0 12px;
   background: var(--surface);
   border-bottom: 1px solid var(--stroke);
+  position: relative;
+  z-index: 1000;  /* Very high z-index to ensure clickability above ALL chart elements */
 }
 
 .tv-header-left,
@@ -942,7 +965,7 @@ onUnmounted(() => {
 /* Drawing Layer Overlay */
 .tv-drawing-overlay {
   position: absolute;
-  top: 0;
+  top: 40px;  /* Start below header (header height is 40px) */
   left: 0;
   right: 0;
   bottom: 0;
@@ -1112,8 +1135,8 @@ onUnmounted(() => {
 .tv-summary-bar {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 6px 12px;
+  gap: 10px;  /* Reduced from 16px */
+  padding: 4px 8px;  /* Reduced from 6px 12px */
   background: var(--surface);
   border-top: 1px solid var(--stroke);
   font-size: 0.75rem;
@@ -1275,8 +1298,8 @@ onUnmounted(() => {
   position: absolute;
   right: 60px;
   bottom: 40px;
-  width: 220px;
-  transform: translateY(calc(-100% - 12px));
+  width: 200px;  /* Reduced from 220px */
+  transform: translateY(calc(-100% - 8px));  /* Reduced from 12px */
   background: color-mix(in srgb, var(--surface) 92%, transparent);
   border: 1px solid var(--stroke);
   border-radius: 8px;

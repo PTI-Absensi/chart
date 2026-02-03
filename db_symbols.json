@@ -1,0 +1,380 @@
+[
+  {
+    "symbol": "A001",
+    "name": "PR",
+    "category": "approve",
+    "description": "PR approve"
+  },
+  {
+    "symbol": "A002",
+    "name": "PR",
+    "category": "submit",
+    "description": "PR submit"
+  },
+  {
+    "symbol": "A1",
+    "name": "PR",
+    "category": "approve",
+    "description": "PR approve eksploitasi PG"
+  },
+  {
+    "symbol": "A2",
+    "name": "PR",
+    "category": "approve",
+    "description": "PR approve eksploitasi MKSO"
+  },
+  {
+    "symbol": "A3",
+    "name": "PR",
+    "category": "approve",
+    "description": "PR approve eksploitasi HO"
+  },
+  {
+    "symbol": "A4",
+    "name": "PR",
+    "category": "approve",
+    "description": "PR approve investasi PG"
+  },
+  {
+    "symbol": "A5",
+    "name": "PR",
+    "category": "approve",
+    "description": "PR approve investasi MKSO"
+  },
+  {
+    "symbol": "A6",
+    "name": "PR",
+    "category": "approve",
+    "description": "PR approve investasi HO"
+  },
+  {
+    "symbol": "B001",
+    "name": "PK",
+    "category": "pengadaan",
+    "description": "PK pengadaan"
+  },
+  {
+    "symbol": "B002",
+    "name": "PK",
+    "category": "assign",
+    "description": "PK assign"
+  },
+  {
+    "symbol": "B003",
+    "name": "PK",
+    "category": "submit",
+    "description": "PK submit"
+  },
+  {
+    "symbol": "B004",
+    "name": "PK",
+    "category": "draft",
+    "description": "PK draft"
+  },
+  {
+    "symbol": "B1",
+    "name": "PK",
+    "category": "pengadaan",
+    "description": "PK pengadaan eksploitasi PG"
+  },
+  {
+    "symbol": "B10",
+    "name": "PK",
+    "category": "assign",
+    "description": "PK assign investasi PG"
+  },
+  {
+    "symbol": "B11",
+    "name": "PK",
+    "category": "submit",
+    "description": "PK submit eksploitasi PG"
+  },
+  {
+    "symbol": "B12",
+    "name": "PK",
+    "category": "submit",
+    "description": "PK submit investasi PG"
+  },
+  {
+    "symbol": "B13",
+    "name": "PK",
+    "category": "draft",
+    "description": "PK draft eksploitasi PG"
+  },
+  {
+    "symbol": "B14",
+    "name": "PK",
+    "category": "draft",
+    "description": "PK draft eksploitasi MKSO"
+  },
+  {
+    "symbol": "B15",
+    "name": "PK",
+    "category": "draft",
+    "description": "PK draft investasi PG"
+  },
+  {
+    "symbol": "B16",
+    "name": "PK",
+    "category": "draft",
+    "description": "PK draft investasi MKSO"
+  },
+  {
+    "symbol": "B2",
+    "name": "PK",
+    "category": "pengadaan",
+    "description": "PK pengadaan eksploitasi MKSO"
+  },
+  {
+    "symbol": "B3",
+    "name": "PK",
+    "category": "pengadaan",
+    "description": "PK pengadaan eksploitasi HO"
+  },
+  {
+    "symbol": "B4",
+    "name": "PK",
+    "category": "pengadaan",
+    "description": "PK pengadaan investasi PG"
+  },
+  {
+    "symbol": "B5",
+    "name": "PK",
+    "category": "pengadaan",
+    "description": "PK pengadaan investasi MKSO"
+  },
+  {
+    "symbol": "B6",
+    "name": "PK",
+    "category": "pengadaan",
+    "description": "PK pengadaan investasi HO"
+  },
+  {
+    "symbol": "B7",
+    "name": "PK",
+    "category": "assign",
+    "description": "PK assign eksploitasi PG"
+  },
+  {
+    "symbol": "B8",
+    "name": "PK",
+    "category": "assign",
+    "description": "PK assign eksploitasi MKSO"
+  },
+  {
+    "symbol": "B9",
+    "name": "PK",
+    "category": "assign",
+    "description": "PK assign eksploitasi HO"
+  },
+  {
+    "symbol": "C001",
+    "name": "HPS",
+    "category": "HPS selesai",
+    "description": "HPS HPS selesai"
+  },
+  {
+    "symbol": "C002",
+    "name": "HPS",
+    "category": "proses HPS",
+    "description": "HPS proses HPS"
+  },
+  {
+    "symbol": "C1",
+    "name": "HPS",
+    "category": "HPS selesai",
+    "description": "HPS HPS selesai eksploitasi PG"
+  },
+  {
+    "symbol": "C10",
+    "name": "HPS",
+    "category": "proses HPS",
+    "description": "HPS proses HPS investasi PG"
+  },
+  {
+    "symbol": "C11",
+    "name": "HPS",
+    "category": "proses HPS",
+    "description": "HPS proses HPS investasi MKSO"
+  },
+  {
+    "symbol": "C12",
+    "name": "HPS",
+    "category": "proses HPS",
+    "description": "HPS proses HPS investasi HO"
+  },
+  {
+    "symbol": "C2",
+    "name": "HPS",
+    "category": "HPS selesai",
+    "description": "HPS HPS selesai eksploitasi MKSO"
+  },
+  {
+    "symbol": "C3",
+    "name": "HPS",
+    "category": "HPS selesai",
+    "description": "HPS HPS selesai eksploitasi HO"
+  },
+  {
+    "symbol": "C4",
+    "name": "HPS",
+    "category": "HPS selesai",
+    "description": "HPS HPS selesai investasi PG"
+  },
+  {
+    "symbol": "C5",
+    "name": "HPS",
+    "category": "HPS selesai",
+    "description": "HPS HPS selesai investasi MKSO"
+  },
+  {
+    "symbol": "C6",
+    "name": "HPS",
+    "category": "HPS selesai",
+    "description": "HPS HPS selesai investasi HO"
+  },
+  {
+    "symbol": "C7",
+    "name": "HPS",
+    "category": "proses HPS",
+    "description": "HPS proses HPS eksploitasi PG"
+  },
+  {
+    "symbol": "C8",
+    "name": "HPS",
+    "category": "proses HPS",
+    "description": "HPS proses HPS eksploitasi MKSO"
+  },
+  {
+    "symbol": "C9",
+    "name": "HPS",
+    "category": "proses HPS",
+    "description": "HPS proses HPS eksploitasi HO"
+  },
+  {
+    "symbol": "D001",
+    "name": "PP",
+    "category": "finish",
+    "description": "PP finish"
+  },
+  {
+    "symbol": "D002",
+    "name": "PP",
+    "category": "laksanakan",
+    "description": "PP laksanakan"
+  },
+  {
+    "symbol": "D003",
+    "name": "PP",
+    "category": "draft",
+    "description": "PP draft"
+  },
+  {
+    "symbol": "D1",
+    "name": "PP",
+    "category": "finish",
+    "description": "PP finish eksploitasi PG"
+  },
+  {
+    "symbol": "D10",
+    "name": "PP",
+    "category": "laksanakan",
+    "description": "PP laksanakan investasi PG"
+  },
+  {
+    "symbol": "D11",
+    "name": "PP",
+    "category": "draft",
+    "description": "PP draft eksploitasi PG"
+  },
+  {
+    "symbol": "D2",
+    "name": "PP",
+    "category": "finish",
+    "description": "PP finish eksploitasi MKSO"
+  },
+  {
+    "symbol": "D3",
+    "name": "PP",
+    "category": "finish",
+    "description": "PP finish eksploitasi HO"
+  },
+  {
+    "symbol": "D4",
+    "name": "PP",
+    "category": "finish",
+    "description": "PP finish investasi PG"
+  },
+  {
+    "symbol": "D5",
+    "name": "PP",
+    "category": "finish",
+    "description": "PP finish investasi MKSO"
+  },
+  {
+    "symbol": "D6",
+    "name": "PP",
+    "category": "finish",
+    "description": "PP finish investasi HO"
+  },
+  {
+    "symbol": "D7",
+    "name": "PP",
+    "category": "laksanakan",
+    "description": "PP laksanakan eksploitasi PG"
+  },
+  {
+    "symbol": "D8",
+    "name": "PP",
+    "category": "laksanakan",
+    "description": "PP laksanakan eksploitasi MKSO"
+  },
+  {
+    "symbol": "D9",
+    "name": "PP",
+    "category": "laksanakan",
+    "description": "PP laksanakan eksploitasi HO"
+  },
+  {
+    "symbol": "E001",
+    "name": "SPPBJ",
+    "category": "approved",
+    "description": "SPPBJ approved"
+  },
+  {
+    "symbol": "E1",
+    "name": "SPPBJ",
+    "category": "approved",
+    "description": "SPPBJ approved eksploitasi PG"
+  },
+  {
+    "symbol": "E2",
+    "name": "SPPBJ",
+    "category": "approved",
+    "description": "SPPBJ approved eksploitasi MKSO"
+  },
+  {
+    "symbol": "E3",
+    "name": "SPPBJ",
+    "category": "approved",
+    "description": "SPPBJ approved eksploitasi HO"
+  },
+  {
+    "symbol": "E4",
+    "name": "SPPBJ",
+    "category": "approved",
+    "description": "SPPBJ approved investasi PG"
+  },
+  {
+    "symbol": "E5",
+    "name": "SPPBJ",
+    "category": "approved",
+    "description": "SPPBJ approved investasi MKSO"
+  },
+  {
+    "symbol": "E6",
+    "name": "SPPBJ",
+    "category": "approved",
+    "description": "SPPBJ approved investasi HO"
+  }
+]

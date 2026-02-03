@@ -1,6 +1,8 @@
 <template>
   <div class="chart-wrapper">
     <apexchart
+      v-if="chartReady"
+      :key="chartKey"
       ref="chartRef"
       :type="apexChartType"
       :height="height"
@@ -11,7 +13,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { authFetch } from '../utils/auth'
 
 // Props
@@ -25,6 +27,7 @@ const props = withDefaults(defineProps<{
   logScale?: boolean
   rawMode?: boolean
   cumulative?: boolean
+  singleScale?: boolean
   sumberDana?: string
   kategoriPlant?: string
   theme?: 'dark' | 'light'
@@ -38,6 +41,7 @@ const props = withDefaults(defineProps<{
   logScale: false,
   rawMode: false,
   cumulative: false,
+  singleScale: false,
   sumberDana: '',
   kategoriPlant: '',
   theme: 'dark'
@@ -51,6 +55,8 @@ const emit = defineEmits<{
 
 // Refs
 const chartRef = ref<any>(null)
+const chartReady = ref(false)
+let isUnmounted = false
 const loading = ref(false)
 const rawData = ref<Record<string, any[]>>({})
 
@@ -62,6 +68,10 @@ const colors = [
 
 // Computed chart type for ApexCharts
 const apexChartType = computed(() => props.chartType)
+const chartKey = computed(() => {
+  const symbolsKey = props.symbols.join('|')
+  return `${props.chartType}-${symbolsKey}-${props.logScale ? 1 : 0}-${props.normalize ? 1 : 0}-${props.theme}`
+})
 
 const themeTokens = computed(() => {
   const isDark = props.theme === 'dark'
@@ -98,7 +108,21 @@ const chartOptions = computed(() => {
           reset: true
         }
       },
-      zoom: { enabled: true },
+      zoom: { 
+        enabled: true,
+        type: 'x',
+        autoScaleYaxis: true
+      },
+      // Add margins for better spacing
+      offsetX: 0,
+      offsetY: 0,
+      // Selection to add right padding by default
+      selection: {
+        enabled: true,
+        xaxis: {
+          // Will be set dynamically to show data + 5% padding on right
+        }
+      },
       animations: {
         enabled: true,
         speed: 400,
@@ -111,11 +135,11 @@ const chartOptions = computed(() => {
       position: 'top',
       horizontalAlign: 'left',
       floating: true,
-      offsetX: -25,  // Move right to not cover Y-axis
-      offsetY: -7,
-      labels: { colors: tokens.text },
-      markers: { width: 10, height: 10, radius: 10 },
-      itemMargin: { horizontal: 0, vertical: 4 },  // Vertical spacing
+      offsetX: 15,
+      offsetY: -5,  // Changed from -7 to prevent header overlap
+      labels: { colors: tokens.text, fontSize: '5px' },
+      markers: { width: 6, height: 6, radius: 3 },  // Smaller markers
+      itemMargin: { horizontal: 8, vertical: 2 },  // Reduced spacing
       onItemClick: { toggleDataSeries: true },
       onItemHover: { highlightDataSeries: true }
     },
@@ -135,14 +159,19 @@ const chartOptions = computed(() => {
     },
     grid: {
       borderColor: tokens.gridSoft,
-      strokeDashArray: 0
+      strokeDashArray: 0,
+      padding: {
+        right: 32,
+        left: 24
+      }
     },
     xaxis: {
       type: 'datetime',
+      max: xAxisMax.value,
       labels: {
         style: { colors: tokens.text },
         datetimeUTC: false,
-        format: 'MMM yyyy',
+        format: 'dd MMM yyyy',
         datetimeFormatter: {
           year: 'yyyy',
           month: 'MMM yyyy',
@@ -163,15 +192,17 @@ const chartOptions = computed(() => {
         }
       }
     },
-    // Dynamic Y-axes: one per series for proper comparison
-    yaxis: props.symbols.length <= 1 
+    // Y-axes: single scale if enabled, otherwise one per series
+    yaxis: props.singleScale || props.symbols.length <= 1
       ? {
           logarithmic: props.logScale,
           labels: {
             style: { colors: tokens.text },
+            maxWidth:60,  // Limit width for cleaner layout
             formatter: (val: number) => {
-              if (val >= 1000000) return (val / 1000000).toFixed(1) + 'M'
-              if (val >= 1000) return (val / 1000).toFixed(1) + 'K'
+              if (val >= 1e9) return (val / 1e9).toFixed(1) + 'B'
+              if (val >= 1e6) return (val / 1e6).toFixed(1) + 'M'
+              if (val >= 1e3) return (val / 1e3).toFixed(0) + 'K'
               return val?.toFixed(0) || '0'
             }
           }
@@ -184,9 +215,11 @@ const chartOptions = computed(() => {
           axisBorder: { show: true, color: colors[index % colors.length] },
           labels: {
             style: { colors: colors[index % colors.length] },
+            maxWidth: 60,  // Limit width
             formatter: (val: number) => {
-              if (val >= 1000000) return (val / 1000000).toFixed(1) + 'M'
-              if (val >= 1000) return (val / 1000).toFixed(1) + 'K'
+              if (val >= 1e9) return (val / 1e9).toFixed(1) + 'B'
+              if (val >= 1e6) return (val / 1e6).toFixed(1) + 'M'
+              if (val >= 1e3) return (val / 1e3).toFixed(0) + 'K'
               return val?.toFixed(0) || '0'
             }
           },
@@ -247,6 +280,23 @@ const chartSeries = computed(() => {
   })
 })
 
+const xAxisMax = computed(() => {
+  if (props.symbols.length === 0) return undefined
+  const times: number[] = []
+  props.symbols.forEach((symbol) => {
+    const data = rawData.value[symbol] || []
+    data.forEach((d: any) => {
+      if (typeof d.time === 'number') times.push(d.time)
+    })
+  })
+  if (times.length === 0) return undefined
+  const minTime = Math.min(...times)
+  const maxTime = Math.max(...times)
+  const range = Math.max(maxTime - minTime, 7 * 24 * 60 * 60)
+  const paddedMax = maxTime + Math.round(range * 0.05)
+  return paddedMax * 1000
+})
+
 // Fetch data for a symbol
 async function fetchSymbolData(symbol: string) {
   try {
@@ -279,12 +329,13 @@ async function fetchSymbolData(symbol: string) {
 
 // Load all symbol data
 async function loadData() {
-  if (props.symbols.length === 0) return
+  if (isUnmounted || !chartReady.value || props.symbols.length === 0) return
 
   loading.value = true
   const newData: Record<string, any[]> = {}
 
   for (const symbol of props.symbols) {
+    if (isUnmounted) return
     if (!rawData.value[symbol]) {
       newData[symbol] = await fetchSymbolData(symbol)
     } else {
@@ -292,6 +343,7 @@ async function loadData() {
     }
   }
 
+  if (isUnmounted) return
   rawData.value = newData
   loading.value = false
   emit('dataLoaded', newData)
@@ -299,7 +351,7 @@ async function loadData() {
 
 // Watch for symbol changes
 watch(() => props.symbols, () => {
-  loadData()
+  if (chartReady.value) loadData()
 }, { deep: true })
 
 // Watch for period/year/rawMode/filters changes
@@ -313,7 +365,7 @@ watch([
 ], () => {
   // Clear cache and reload
   rawData.value = {}
-  loadData()
+  if (chartReady.value) loadData()
 })
 
 // Export chart as PNG
@@ -392,9 +444,15 @@ defineExpose({
 
 // Initial load
 onMounted(() => {
+  chartReady.value = true
   if (props.symbols.length > 0) {
     loadData()
   }
+})
+
+onUnmounted(() => {
+  isUnmounted = true
+  chartReady.value = false
 })
 </script>
 
