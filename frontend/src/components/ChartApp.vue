@@ -56,7 +56,10 @@
       <!-- Mode Buttons -->
       <button :class="['tv-btn', { active: rawMode }]" @click="rawMode = !rawMode" title="Raw data">Raw</button>
       <button :class="['tv-btn', { active: cumulative }]" @click="cumulative = !cumulative" title="Kumulatif">Σ</button>
-      <button :class="['tv-btn', { active: singleScale }]" @click="singleScale = !singleScale" title="Single Y scale">1Y</button>
+      <button :class="['tv-btn', { active: singleScale }]" @click="singleScale = !singleScale" title="Single Y scale">1 Skala</button>
+      <button class="tv-btn" @click="scaleSide = scaleSide === 'left' ? 'right' : 'left'" title="Posisi Skala">
+        {{ scaleSide === 'left' ? 'Skala Kiri' : 'Skala Kanan' }}
+      </button>
       
       <!-- Chart Type (tanpa candlestick) -->
       <div class="tv-btn-group">
@@ -180,11 +183,13 @@
           :period-type="periodType"
           :year="year"
           :symbols="selectedSymbols"
+          :symbol-meta="selectedSymbolMeta"
           :normalize="normalize"
           :log-scale="logScale"
           :raw-mode="rawMode"
           :cumulative="cumulative"
           :single-scale="singleScale"
+          :scale-side="scaleSide"
           :sumber-dana="sumberDana"
           :kategori-plant="kategoriPlant"
           :theme="theme"
@@ -460,6 +465,7 @@ const logScale = ref(false)
 const rawMode = ref(false)
 const cumulative = ref(false)
 const singleScale = ref(false)
+const scaleSide = ref<'left' | 'right'>('left')
 const sumberDana = ref('')
 const kategoriPlant = ref('')
 const maxSeries = ref(5) // Default max 5 series
@@ -479,6 +485,17 @@ const searchQuery = ref('')
 const searchInput = ref<HTMLInputElement | null>(null)
 const allSymbols = ref<SymbolItem[]>([])
 const loadingSymbols = ref(false)
+const selectedSymbolMeta = computed(() => {
+  const meta: Record<string, { name: string; description: string }> = {}
+  const bySymbol = new Map(allSymbols.value.map((s) => [s.symbol, s]))
+  selectedSymbols.value.forEach((symbol) => {
+    const item = bySymbol.get(symbol)
+    if (item) {
+      meta[symbol] = { name: item.name, description: item.description }
+    }
+  })
+  return meta
+})
 
 // Go to page (for navigation menu)
 function goToPage(page: string) {
@@ -636,19 +653,20 @@ const STORAGE_KEY = 'chartApp_state'
 
 // Save state to localStorage
 function saveState() {
-  const state = {
-    selectedSymbols: selectedSymbols.value,
-    chartType: chartType.value,
-    periodType: periodType.value,
-    year: year.value,
-    normalize: normalize.value,
-    logScale: logScale.value,
-    rawMode: rawMode.value,
-    cumulative: cumulative.value,
-    singleScale: singleScale.value,
-    sumberDana: sumberDana.value,
-    kategoriPlant: kategoriPlant.value
-  }
+    const state = {
+      selectedSymbols: selectedSymbols.value,
+      chartType: chartType.value,
+      periodType: periodType.value,
+      year: year.value,
+      normalize: normalize.value,
+      logScale: logScale.value,
+      rawMode: rawMode.value,
+      cumulative: cumulative.value,
+      singleScale: singleScale.value,
+      scaleSide: scaleSide.value,
+      sumberDana: sumberDana.value,
+      kategoriPlant: kategoriPlant.value
+    }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
 }
 
@@ -668,6 +686,7 @@ function restoreState() {
       if (state.rawMode !== undefined) rawMode.value = state.rawMode
       if (state.cumulative !== undefined) cumulative.value = state.cumulative
       if (state.singleScale !== undefined) singleScale.value = state.singleScale
+      if (state.scaleSide === 'left' || state.scaleSide === 'right') scaleSide.value = state.scaleSide
       if (state.sumberDana !== undefined) sumberDana.value = state.sumberDana
       if (state.kategoriPlant !== undefined) kategoriPlant.value = state.kategoriPlant
     } catch (e) {
@@ -677,7 +696,7 @@ function restoreState() {
 }
 
 // Watch for state changes and save
-watch([selectedSymbols, chartType, periodType, year, normalize, logScale, rawMode, cumulative, singleScale, sumberDana, kategoriPlant], saveState, { deep: true })
+watch([selectedSymbols, chartType, periodType, year, normalize, logScale, rawMode, cumulative, singleScale, scaleSide, sumberDana, kategoriPlant], saveState, { deep: true })
 
 // Init
 onMounted(() => {
@@ -1099,8 +1118,8 @@ onUnmounted(() => {
 /* Floating Buttons (bottom-right) */
 .tv-float-btns {
   position: absolute;
-  bottom: 40px;
-  right: 60px;
+  bottom: 88px;
+  right: 12px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -1308,7 +1327,7 @@ onUnmounted(() => {
 }
 
 .tv-layers-panel {
-  right: 60px;
+  right: 85px;
 }
 
 .tv-layers-panel.is-shifted {

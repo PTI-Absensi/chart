@@ -28,6 +28,8 @@ const props = withDefaults(defineProps<{
   rawMode?: boolean
   cumulative?: boolean
   singleScale?: boolean
+  scaleSide?: 'left' | 'right'
+  symbolMeta?: Record<string, { name?: string; description?: string }>
   sumberDana?: string
   kategoriPlant?: string
   theme?: 'dark' | 'light'
@@ -42,6 +44,8 @@ const props = withDefaults(defineProps<{
   rawMode: false,
   cumulative: false,
   singleScale: false,
+  scaleSide: 'left',
+  symbolMeta: () => ({}),
   sumberDana: '',
   kategoriPlant: '',
   theme: 'dark'
@@ -88,6 +92,13 @@ const themeTokens = computed(() => {
 // Chart options
 const chartOptions = computed(() => {
   const tokens = themeTokens.value
+  const hasRightAxis = props.singleScale
+    ? props.scaleSide === 'right'
+    : props.symbols.some((_, index) => index % 2 === 1)
+  const hasLeftAxis = props.singleScale
+    ? props.scaleSide === 'left'
+    : props.symbols.length > 0
+
   const baseOptions: any = {
     chart: {
       id: 'procurement-chart',
@@ -111,7 +122,7 @@ const chartOptions = computed(() => {
       zoom: { 
         enabled: true,
         type: 'x',
-        autoScaleYaxis: true
+        autoScaleYaxis: false
       },
       // Add margins for better spacing
       offsetX: 0,
@@ -135,11 +146,17 @@ const chartOptions = computed(() => {
       position: 'top',
       horizontalAlign: 'left',
       floating: true,
-      offsetX: 15,
-      offsetY: -5,  // Changed from -7 to prevent header overlap
-      labels: { colors: tokens.text, fontSize: '5px' },
-      markers: { width: 6, height: 6, radius: 3 },  // Smaller markers
-      itemMargin: { horizontal: 8, vertical: 2 },  // Reduced spacing
+      offsetX: -30,
+      offsetY: -5,
+      labels: { colors: tokens.foreColor, fontSize: '9px' },
+      markers: { width: 8, height: 8, radius: 4 },
+      itemMargin: { horizontal: 6, vertical: 4 },
+      formatter: (seriesName: string) => {
+        const meta = props.symbolMeta?.[seriesName]
+        const desc = meta?.description || meta?.name
+        if (!desc) return seriesName
+        return `${seriesName}<br><span class="legend-desc">${desc}</span>`
+      },
       onItemClick: { toggleDataSeries: true },
       onItemHover: { highlightDataSeries: true }
     },
@@ -159,15 +176,24 @@ const chartOptions = computed(() => {
     },
     grid: {
       borderColor: tokens.gridSoft,
-      strokeDashArray: 0,
+      strokeDashArray: 4,
+      xaxis: {
+        lines: { show: true }
+      },
+      yaxis: {
+        lines: { show: true }
+      },
       padding: {
-        right: 32,
-        left: 24
+        right: hasRightAxis ? 18 : 0,
+        left: hasLeftAxis ? 18 : 0,
+        top: props.singleScale ? 18 : 0,
+        bottom: 0
       }
     },
     xaxis: {
       type: 'datetime',
-      max: xAxisMax.value,
+      min: xAxisBounds.value.min,
+      max: xAxisBounds.value.max,
       labels: {
         style: { colors: tokens.text },
         datetimeUTC: false,
@@ -188,34 +214,44 @@ const chartOptions = computed(() => {
         stroke: {
           color: tokens.crosshair,
           width: 1,
-          dashArray: 3
+          dashArray: 4
         }
       }
     },
     // Y-axes: single scale if enabled, otherwise one per series
     yaxis: props.singleScale || props.symbols.length <= 1
       ? {
+          opposite: props.scaleSide === 'right',
           logarithmic: props.logScale,
+          min: yAxisBounds.value.min,
+          max: yAxisBounds.value.max,
+          axisBorder: { show: true, offsetX: 0 },
+          axisTicks: { show: true, offsetX: 0 },
           labels: {
             style: { colors: tokens.text },
             maxWidth:60,  // Limit width for cleaner layout
+            offsetX: props.scaleSide === 'right' ? 0 : -12,
             formatter: (val: number) => {
               if (val >= 1e9) return (val / 1e9).toFixed(1) + 'B'
               if (val >= 1e6) return (val / 1e6).toFixed(1) + 'M'
               if (val >= 1e3) return (val / 1e3).toFixed(0) + 'K'
               return val?.toFixed(0) || '0'
             }
-          }
+          },
+          tooltip: { enabled: true }
         }
       : props.symbols.map((symbol, index) => ({
           seriesName: symbol,
           opposite: index % 2 === 1, // Alternate left/right
           logarithmic: props.logScale,
-          axisTicks: { show: true },
-          axisBorder: { show: true, color: colors[index % colors.length] },
+          min: yAxisBoundsBySymbol.value[symbol]?.min,
+          max: yAxisBoundsBySymbol.value[symbol]?.max,
+          axisTicks: { show: true, offsetX: 0 },
+          axisBorder: { show: true, color: colors[index % colors.length], offsetX: 0 },
           labels: {
             style: { colors: colors[index % colors.length] },
             maxWidth: 60,  // Limit width
+            offsetX: index % 2 === 1 ? 0 : -12,
             formatter: (val: number) => {
               if (val >= 1e9) return (val / 1e9).toFixed(1) + 'B'
               if (val >= 1e6) return (val / 1e6).toFixed(1) + 'M'
@@ -226,7 +262,8 @@ const chartOptions = computed(() => {
           title: {
             text: symbol,
             style: { color: colors[index % colors.length] }
-          }
+          },
+          tooltip: { enabled: true }
         })),
     tooltip: {
       theme: tokens.tooltip,
@@ -280,8 +317,8 @@ const chartSeries = computed(() => {
   })
 })
 
-const xAxisMax = computed(() => {
-  if (props.symbols.length === 0) return undefined
+const xAxisBounds = computed(() => {
+  if (props.symbols.length === 0) return { min: undefined, max: undefined }
   const times: number[] = []
   props.symbols.forEach((symbol) => {
     const data = rawData.value[symbol] || []
@@ -289,12 +326,59 @@ const xAxisMax = computed(() => {
       if (typeof d.time === 'number') times.push(d.time)
     })
   })
-  if (times.length === 0) return undefined
+  if (times.length === 0) return { min: undefined, max: undefined }
   const minTime = Math.min(...times)
   const maxTime = Math.max(...times)
   const range = Math.max(maxTime - minTime, 7 * 24 * 60 * 60)
   const paddedMax = maxTime + Math.round(range * 0.05)
-  return paddedMax * 1000
+  return { min: minTime * 1000, max: paddedMax * 1000 }
+})
+
+const yAxisBounds = computed(() => {
+  if (props.symbols.length === 0) return { min: undefined, max: undefined }
+  const values: number[] = []
+  props.symbols.forEach((symbol) => {
+    const data = rawData.value[symbol] || []
+    data.forEach((d: any) => {
+      if (typeof d.close === 'number') values.push(d.close)
+    })
+  })
+  if (values.length === 0) return { min: undefined, max: undefined }
+  let minVal = Math.min(...values)
+  let maxVal = Math.max(...values)
+  if (props.logScale) {
+    minVal = Math.max(minVal, 1)
+  }
+  const range = Math.max(maxVal - minVal, 1)
+  const pad = range * 0.05
+  const paddedMin = minVal >= 0 ? Math.max(0, minVal - pad) : minVal - pad
+  return { min: paddedMin, max: maxVal + pad }
+})
+
+const yAxisBoundsBySymbol = computed(() => {
+  const bounds: Record<string, { min?: number; max?: number }> = {}
+  props.symbols.forEach((symbol) => {
+    const data = rawData.value[symbol] || []
+    if (data.length === 0) {
+      bounds[symbol] = { min: undefined, max: undefined }
+      return
+    }
+    const values = data.map((d: any) => d.close).filter((v: any) => typeof v === 'number')
+    if (values.length === 0) {
+      bounds[symbol] = { min: undefined, max: undefined }
+      return
+    }
+    let minVal = Math.min(...values)
+    let maxVal = Math.max(...values)
+    if (props.logScale) {
+      minVal = Math.max(minVal, 1)
+    }
+    const range = Math.max(maxVal - minVal, 1)
+    const pad = range * 0.05
+    const paddedMin = minVal >= 0 ? Math.max(0, minVal - pad) : minVal - pad
+    bounds[symbol] = { min: paddedMin, max: maxVal + pad }
+  })
+  return bounds
 })
 
 // Fetch data for a symbol
@@ -460,5 +544,40 @@ onUnmounted(() => {
 .chart-wrapper {
   width: 100%;
   min-height: 300px;
+}
+
+:deep(.apexcharts-legend-series) {
+  align-items: center;
+  overflow: visible;
+  padding: 2px 0;
+  min-height: 18px;
+}
+
+:deep(.apexcharts-legend) {
+  overflow: visible;
+  padding-left: 6px;
+}
+
+:deep(.apexcharts-legend-marker) {
+  margin-left: 2px;
+  margin-right: 6px;
+  overflow: visible;
+}
+
+:deep(.apexcharts-legend-text) {
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+:deep(.apexcharts-legend-text .legend-desc) {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+:deep(.apexcharts-yaxis),
+:deep(.apexcharts-yaxis-texts-g) {
+  overflow: visible;
 }
 </style>
