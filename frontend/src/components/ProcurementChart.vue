@@ -23,7 +23,7 @@ const props = withDefaults(defineProps<{
   year?: number
   height?: number
   symbols?: string[]
-  hiddenSeries?: Set<string>
+  hiddenSeries?: string[]
   normalize?: boolean
   logScale?: boolean
   rawMode?: boolean
@@ -40,7 +40,7 @@ const props = withDefaults(defineProps<{
   year: 2025,
   height: 450,
   symbols: () => [],
-  hiddenSeries: () => new Set(),
+  hiddenSeries: () => [],
   normalize: false,
   logScale: false,
   rawMode: false,
@@ -72,6 +72,14 @@ const colors = [
   '#00bcd4', '#8bc34a', '#e91e63', '#3f51b5', '#009688'
 ]
 
+function toRgba(hex: string, alpha: number) {
+  const cleanHex = hex.replace('#', '')
+  const r = parseInt(cleanHex.substring(0, 2), 16)
+  const g = parseInt(cleanHex.substring(2, 4), 16)
+  const b = parseInt(cleanHex.substring(4, 6), 16)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
 // Computed chart type for ApexCharts
 const apexChartType = computed(() => props.chartType)
 const chartKey = computed(() => {
@@ -100,6 +108,11 @@ const chartOptions = computed(() => {
   const hasLeftAxis = props.singleScale
     ? props.scaleSide === 'left'
     : props.symbols.length > 0
+
+  const seriesColors = props.symbols.map((symbol, idx) => {
+    const base = colors[idx % colors.length]
+    return props.hiddenSeries?.includes(symbol) ? toRgba(base, 0.35) : base
+  })
 
   const baseOptions: any = {
     chart: {
@@ -162,7 +175,7 @@ const chartOptions = computed(() => {
       onItemClick: { toggleDataSeries: true },
       onItemHover: { highlightDataSeries: true }
     },
-    colors: colors.slice(0, props.symbols.length || 1),
+    colors: seriesColors,
     stroke: {
       curve: 'smooth',
       width: 2
@@ -296,10 +309,7 @@ const chartSeries = computed(() => {
     return []
   }
 
-  // Filter out hidden symbols
-  const visibleSymbols = props.symbols.filter(s => !props.hiddenSeries.has(s))
-
-  return visibleSymbols.map((symbol) => {
+    return props.symbols.map((symbol) => {
     const data = rawData.value[symbol] || []
 
     let values = data.map((d: any) => d.close)
