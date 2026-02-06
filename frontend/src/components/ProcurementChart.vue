@@ -113,11 +113,6 @@ const chartOptions = computed(() => {
     ? props.scaleSide === 'left'
     : props.symbols.length > 0
 
-  const seriesColors = props.symbols.map((symbol, idx) => {
-    const base = colors[idx % colors.length]
-    return props.hiddenSeries?.includes(symbol) ? toRgba(base, 0.35) : base
-  })
-
   const baseOptions: any = {
     chart: {
       id: 'procurement-chart',
@@ -312,7 +307,10 @@ const chartSeries = computed(() => {
     return []
   }
 
-    return props.symbols.map((symbol) => {
+  // Filter out hidden symbols
+  const visibleSymbols = props.symbols.filter(s => !props.hiddenSeries.has(s))
+
+  return visibleSymbols.map((symbol) => {
     const data = rawData.value[symbol] || []
 
     let values = data.map((d: any) => d.close)
