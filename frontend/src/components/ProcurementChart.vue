@@ -24,6 +24,7 @@ const props = withDefaults(defineProps<{
   height?: number
   symbols?: string[]
   hiddenSeries?: Set<string>
+  colorOverrides?: Record<string, string>
   normalize?: boolean
   logScale?: boolean
   rawMode?: boolean
@@ -41,6 +42,7 @@ const props = withDefaults(defineProps<{
   height: 450,
   symbols: () => [],
   hiddenSeries: () => new Set(),
+  colorOverrides: () => ({}),
   normalize: false,
   logScale: false,
   rawMode: false,
@@ -71,6 +73,10 @@ const colors = [
   '#2962ff', '#26a69a', '#ef5350', '#ab47bc', '#ff9800',
   '#00bcd4', '#8bc34a', '#e91e63', '#3f51b5', '#009688'
 ]
+
+function resolveColor(symbol: string, index: number): string {
+  return props.colorOverrides?.[symbol] || colors[index % colors.length]
+}
 
 // Computed chart type for ApexCharts
 const apexChartType = computed(() => props.chartType)
@@ -162,7 +168,7 @@ const chartOptions = computed(() => {
       onItemClick: { toggleDataSeries: true },
       onItemHover: { highlightDataSeries: true }
     },
-    colors: colors.slice(0, props.symbols.length || 1),
+    colors: props.symbols.map((symbol, index) => resolveColor(symbol, index)),
     stroke: {
       curve: 'smooth',
       width: 2
@@ -249,9 +255,9 @@ const chartOptions = computed(() => {
           min: yAxisBoundsBySymbol.value[symbol]?.min,
           max: yAxisBoundsBySymbol.value[symbol]?.max,
           axisTicks: { show: true, offsetX: 0 },
-          axisBorder: { show: true, color: colors[index % colors.length], offsetX: 0 },
+          axisBorder: { show: true, color: resolveColor(symbol, index), offsetX: 0 },
           labels: {
-            style: { colors: colors[index % colors.length] },
+            style: { colors: resolveColor(symbol, index) },
             maxWidth: 60,  // Limit width
             offsetX: index % 2 === 1 ? 0 : -12,
             formatter: (val: number) => {
@@ -263,7 +269,7 @@ const chartOptions = computed(() => {
           },
           title: {
             text: symbol,
-            style: { color: colors[index % colors.length] }
+            style: { color: resolveColor(symbol, index) }
           },
           tooltip: { enabled: true }
         })),
