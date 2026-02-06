@@ -23,7 +23,8 @@ const props = withDefaults(defineProps<{
   year?: number
   height?: number
   symbols?: string[]
-  hiddenSeries?: string[]
+  hiddenSeries?: Set<string>
+  colorOverrides?: Record<string, string>
   normalize?: boolean
   logScale?: boolean
   rawMode?: boolean
@@ -40,7 +41,8 @@ const props = withDefaults(defineProps<{
   year: 2025,
   height: 450,
   symbols: () => [],
-  hiddenSeries: () => [],
+  hiddenSeries: () => new Set(),
+  colorOverrides: () => ({}),
   normalize: false,
   logScale: false,
   rawMode: false,
@@ -72,12 +74,8 @@ const colors = [
   '#00bcd4', '#8bc34a', '#e91e63', '#3f51b5', '#009688'
 ]
 
-function toRgba(hex: string, alpha: number) {
-  const cleanHex = hex.replace('#', '')
-  const r = parseInt(cleanHex.substring(0, 2), 16)
-  const g = parseInt(cleanHex.substring(2, 4), 16)
-  const b = parseInt(cleanHex.substring(4, 6), 16)
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+function resolveColor(symbol: string, index: number): string {
+  return props.colorOverrides?.[symbol] || colors[index % colors.length]
 }
 
 // Computed chart type for ApexCharts
@@ -97,6 +95,12 @@ const themeTokens = computed(() => {
     crosshair: isDark ? '#48c1b4' : '#2563eb',
     tooltip: isDark ? 'dark' : 'light'
   }
+})
+
+const dateFormatterId = new Intl.DateTimeFormat('id-ID', {
+  day: '2-digit',
+  month: 'short',
+  year: 'numeric'
 })
 
 // Chart options
@@ -175,7 +179,7 @@ const chartOptions = computed(() => {
       onItemClick: { toggleDataSeries: true },
       onItemHover: { highlightDataSeries: true }
     },
-    colors: seriesColors,
+    colors: props.symbols.map((symbol, index) => resolveColor(symbol, index)),
     stroke: {
       curve: 'smooth',
       width: 2
@@ -212,12 +216,9 @@ const chartOptions = computed(() => {
       labels: {
         style: { colors: tokens.text },
         datetimeUTC: false,
-        format: 'dd MMM yyyy',
-        datetimeFormatter: {
-          year: 'yyyy',
-          month: 'MMM yyyy',
-          day: 'dd MMM yyyy',
-          hour: 'HH:mm'
+        formatter: (val: string, timestamp?: number) => {
+          const ts = typeof timestamp === 'number' ? timestamp : Number(val)
+          return Number.isFinite(ts) ? dateFormatterId.format(new Date(ts)) : val
         }
       },
       axisBorder: { color: tokens.grid },
@@ -262,9 +263,9 @@ const chartOptions = computed(() => {
           min: yAxisBoundsBySymbol.value[symbol]?.min,
           max: yAxisBoundsBySymbol.value[symbol]?.max,
           axisTicks: { show: true, offsetX: 0 },
-          axisBorder: { show: true, color: colors[index % colors.length], offsetX: 0 },
+          axisBorder: { show: true, color: resolveColor(symbol, index), offsetX: 0 },
           labels: {
-            style: { colors: colors[index % colors.length] },
+            style: { colors: resolveColor(symbol, index) },
             maxWidth: 60,  // Limit width
             offsetX: index % 2 === 1 ? 0 : -12,
             formatter: (val: number) => {
@@ -276,7 +277,7 @@ const chartOptions = computed(() => {
           },
           title: {
             text: symbol,
-            style: { color: colors[index % colors.length] }
+            style: { color: resolveColor(symbol, index) }
           },
           tooltip: { enabled: true }
         })),
@@ -284,7 +285,9 @@ const chartOptions = computed(() => {
       theme: tokens.tooltip,
       shared: true,
       intersect: false,
-      x: { format: 'dd MMM yyyy' }
+      x: {
+        formatter: (val: number) => dateFormatterId.format(new Date(val))
+      }
     },
     dataLabels: { enabled: false },
     plotOptions: {
