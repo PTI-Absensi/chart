@@ -326,14 +326,16 @@
     </div>
   </main>
 
-  <!-- Search Modal -->
+  <!-- Search Modal with TradingView-style Filters -->
   <div class="search-modal" :class="{ 'is-open': searchModalOpen }" :aria-hidden="!searchModalOpen">
     <div class="search-modal-backdrop" @click="closeSearchModal"></div>
     <div class="search-modal-panel" role="dialog" aria-modal="true" aria-label="Kode Data Search">
       <div class="search-modal-header">
-        <div class="search-modal-title">Kode Data Search</div>
+        <div class="search-modal-title">Symbol Search</div>
         <button type="button" class="search-modal-close" @click="closeSearchModal" aria-label="Close">×</button>
       </div>
+      
+      <!-- Search Input -->
       <div class="search-modal-input">
         <input 
           ref="searchInput"
@@ -344,21 +346,73 @@
           @input="filterSymbols"
         />
       </div>
+      
+      <!-- Category Filter Tabs -->
+      <div class="search-filter-tabs">
+        <button 
+          v-for="tab in filterTabs" 
+          :key="tab.value"
+          :class="['filter-tab', { active: activeFilterTab === tab.value }]"
+          @click="activeFilterTab = tab.value"
+        >
+          <span v-html="tab.icon"></span>
+          {{ tab.label }}
+        </button>
+      </div>
+      
+      <!-- Search Results -->
       <div class="search-dropdown search-results">
         <div v-if="loadingSymbols" class="search-loading">Loading...</div>
         <div v-else-if="filteredSymbols.length === 0" class="search-empty">Tidak ada hasil.</div>
-          <button 
+        
+        <!-- Symbol Items with Scale Options -->
+        <div 
           v-for="sym in filteredSymbols" 
           :key="sym.symbol"
-          type="button"
-          class="search-item"
-          :class="{ 'is-selected': selectedSymbols.includes(sym.symbol) }"
-          @click="toggleSymbol(sym.symbol)"
+          class="search-item-wrapper"
+          :class="{ 'show-scale-options': hoveredSymbol === sym.symbol }"
+          @mouseenter="hoveredSymbol = sym.symbol"
+          @mouseleave="hoveredSymbol = null"
         >
-          <span class="search-item-code">{{ sym.symbol }}</span>
-          <span class="search-item-name">{{ sym.name }}</span>
-          <span v-if="sym.description && sym.description !== sym.name" class="search-item-desc">{{ sym.description }}</span>
-        </button>
+          <button 
+            type="button"
+            class="search-item"
+            :class="{ 
+              'is-selected': selectedSymbols.includes(sym.symbol),
+              'is-nilai': sym.symbolType === 'nilai',
+              'is-dokumen': sym.symbolType === 'dokumen'
+            }"
+            @click="selectSymbolWithScale(sym, 'same')"
+          >
+            <!-- Type Icon -->
+            <span class="search-item-icon" :class="sym.symbolType">
+              <svg v-if="sym.symbolType === 'nilai'" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 2v20M6 6l6-4 6 4M6 18l6 4 6-4" stroke="currentColor" stroke-width="2"/></svg>
+              <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 2h9l5 5v15H6z" stroke="currentColor" stroke-width="2"/><path d="M14 2v5h5" stroke="currentColor" stroke-width="2"/><path d="M8 10h8M8 14h6" stroke="currentColor" stroke-width="2"/></svg>
+            </span>
+            <span class="search-item-code">{{ sym.symbol }}</span>
+            <span class="search-item-name">{{ sym.name }}</span>
+            <span class="search-item-unit">{{ sym.unit }}</span>
+          </button>
+          
+          <!-- Scale Options (shown on hover) -->
+          <div class="scale-options" v-if="hoveredSymbol === sym.symbol && !selectedSymbols.includes(sym.symbol)">
+            <button 
+              class="scale-btn" 
+              title="Same % scale (normalized)"
+              @click.stop="selectSymbolWithScale(sym, 'percent')"
+            >Same %</button>
+            <button 
+              class="scale-btn" 
+              title="New price scale (separate Y-axis)"
+              @click.stop="selectSymbolWithScale(sym, 'scale')"
+            >New scale</button>
+            <button 
+              class="scale-btn" 
+              title="New pane (separate chart)"
+              @click.stop="selectSymbolWithScale(sym, 'pane')"
+            >New pane</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -377,6 +431,10 @@ interface SymbolItem {
   category: string
   description: string
   unit: string
+  symbolType?: 'dokumen' | 'nilai' | 'filter'  // NEW: type differentiation
+  baseSymbol?: string  // NEW: reference to original symbol for -N variants
+  sumber_dana?: string
+  kategori_plant?: string
 }
 
 interface SummarySeries {
@@ -524,15 +582,72 @@ function toggleSeriesVisibility(symbol: string) {
 
 // Filtered symbols for search
 const filteredSymbols = computed(() => {
-  if (!searchQuery.value) return allSymbols.value
-  const q = searchQuery.value.toLowerCase()
-  return allSymbols.value
-    .filter(s => 
+  let symbols = allSymbols.value
+  
+  // Filter by active tab
+  if (activeFilterTab.value !== 'all') {
+    symbols = symbols.filter(s => s.symbolType === activeFilterTab.value)
+  }
+  
+  // Filter by search query
+  if (searchQuery.value) {
+    const q = searchQuery.value.toLowerCase()
+    symbols = symbols.filter(s => 
       s.symbol.toLowerCase().includes(q) || 
       s.name.toLowerCase().includes(q) ||
       (s.description && s.description.toLowerCase().includes(q))
     )
+  }
+  
+  return symbols
 })
+
+// TradingView-style filter tabs
+type FilterTabValue = 'all' | 'dokumen' | 'nilai'
+const filterTabs: { value: FilterTabValue; label: string; icon: string }[] = [
+  { value: 'all', label: 'All', icon: '' },
+  { value: 'dokumen', label: 'Dokumen', icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 2h9l5 5v15H6z" stroke="currentColor" stroke-width="2"/><path d="M14 2v5h5" stroke="currentColor" stroke-width="2"/></svg>' },
+  { value: 'nilai', label: 'Nilai', icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2v20M6 6l6-4 6 4M6 18l6 4 6-4" stroke="currentColor" stroke-width="2"/></svg>' }
+]
+
+const activeFilterTab = ref<FilterTabValue>('all')
+const hoveredSymbol = ref<string | null>(null)
+
+// Track scale mode per series: 'same' | 'percent' | 'scale' | 'pane'
+type ScaleMode = 'same' | 'percent' | 'scale' | 'pane'
+const seriesScales = ref<Record<string, ScaleMode>>({})
+
+// Select symbol with scale option
+function selectSymbolWithScale(sym: SymbolItem, scaleMode: ScaleMode) {
+  // Check max series limit
+  if (selectedSymbols.value.length >= maxSeries.value) {
+    alert(`Maximum ${maxSeries.value} series sudah terpilih. Hapus salah satu series atau ubah max series di dropdown.`)
+    return
+  }
+  
+  // Add symbol if not already selected
+  if (!selectedSymbols.value.includes(sym.symbol)) {
+    selectedSymbols.value.push(sym.symbol)
+    seriesScales.value[sym.symbol] = scaleMode
+    
+    // Apply scale mode effects
+    if (scaleMode === 'percent') {
+      // TODO: Enable normalize mode for this series
+      console.log(`Added ${sym.symbol} with Same % scale (normalized)`)
+    } else if (scaleMode === 'scale') {
+      // TODO: Add separate Y-axis for this series
+      console.log(`Added ${sym.symbol} with New price scale`)
+    } else if (scaleMode === 'pane') {
+      // TODO: Create new pane for this series
+      console.log(`Added ${sym.symbol} with New pane`)
+    }
+  }
+  
+  // Close modal
+  searchQuery.value = ''
+  closeSearchModal()
+  hoveredSymbol.value = null
+}
 
 // Load available symbols
 async function loadSymbols() {
@@ -1252,11 +1367,57 @@ onUnmounted(() => {
   display: flex;
 }
 
+.search-item:hover {
+  background: var(--surface-alt);
+}
+
+.search-item.is-selected {
+  background: rgba(41, 98, 255, 0.1);
+}
+
+/* Filter Tabs - TradingView style */
+.search-filter-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--stroke);
+  flex-wrap: wrap;
+}
+
+.filter-tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid var(--stroke);
+  border-radius: 16px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.filter-tab:hover {
+  background: var(--surface-alt);
+  color: var(--ink);
+}
+
+.filter-tab.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+/* Search Item Wrapper for hover scale options */
+.search-item-wrapper {
+  position: relative;
+}
+
 .search-item {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
+  align-items: center;
+  gap: 8px;
   width: 100%;
   padding: 10px 12px;
   background: transparent;
@@ -1267,26 +1428,65 @@ onUnmounted(() => {
   cursor: pointer;
 }
 
-.search-item:hover {
-  background: var(--surface-alt);
+.search-item-icon {
+  font-size: 1rem;
+  opacity: 0.7;
 }
 
-.search-item.is-selected {
-  background: rgba(41, 98, 255, 0.1);
+.search-item-icon.nilai {
+  color: #26a69a;
+}
+
+.search-item-icon.dokumen {
+  color: #2962ff;
 }
 
 .search-item-code {
   font-weight: 600;
+  min-width: 80px;
 }
 
 .search-item-name {
+  flex: 1;
   font-size: 0.85rem;
   color: var(--muted);
 }
 
-.search-item-desc {
-  font-size: 0.78rem;
+.search-item-unit {
+  font-size: 0.75rem;
+  padding: 2px 6px;
+  background: var(--surface-alt);
+  border-radius: 4px;
   color: var(--muted);
+}
+
+/* Scale Options - shown on hover */
+.scale-options {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  gap: 4px;
+  z-index: 10;
+}
+
+.scale-btn {
+  padding: 4px 8px;
+  background: var(--surface);
+  border: 1px solid var(--stroke);
+  border-radius: 4px;
+  color: var(--ink);
+  font-size: 0.72rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+
+.scale-btn:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
 }
 
 .search-loading,

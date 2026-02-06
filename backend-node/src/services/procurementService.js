@@ -246,23 +246,65 @@ export async function getAllSymbols() {
   `
   try {
     const result = await query(sql)
-    return result.rows.map(row => ({
-      symbol: row.symbol,
-      name: row.name,
-      category: row.category,
-      description: row.description,
-      unit: 'Dokumen',
-      sumber_dana: row.sumber_dana,
-      kategori_plant: row.kategori_plant
-    }))
+    const symbols = []
+
+    // Process each row and create both dokumen and nilai variants
+    result.rows.forEach(row => {
+      // Dokumen variant (original symbol)
+      symbols.push({
+        symbol: row.symbol,
+        name: row.name,
+        category: row.category,
+        description: row.description,
+        unit: 'Dokumen',
+        symbolType: 'dokumen',  // NEW: type field
+        sumber_dana: row.sumber_dana,
+        kategori_plant: row.kategori_plant
+      })
+
+      // Nilai variant (with -N suffix)
+      symbols.push({
+        symbol: `${row.symbol}-N`,
+        name: `${row.name} (Nilai)`,
+        category: row.category,
+        description: `${row.description} - Nilai Rupiah`,
+        unit: 'Rp',
+        symbolType: 'nilai',  // NEW: type field
+        sumber_dana: row.sumber_dana,
+        kategori_plant: row.kategori_plant,
+        baseSymbol: row.symbol  // Reference to original symbol
+      })
+    })
+
+    // Also add pre-defined METRICS with their types
+    Object.entries(METRICS).forEach(([symbol, metric]) => {
+      const isNilai = metric.unit === 'Rp'
+      symbols.push({
+        symbol,
+        name: metric.name,
+        category: metric.category,
+        description: metric.description,
+        unit: metric.unit,
+        symbolType: isNilai ? 'nilai' : 'dokumen',
+        sumber_dana: '',
+        kategori_plant: ''
+      })
+    })
+
+    return symbols
   } catch (err) {
     console.error('Error fetching symbols from analitic:', err)
     // Fallback to hardcoded if table doesn't exist
     const symbols = []
-    symbols.push(...getMetricSymbols())
-    symbols.push(...(await getKategoriSymbols()))
-    symbols.push(...(await getPlants()))
-    symbols.push(...getSumberDanaSymbols())
+    getMetricSymbols().forEach(m => {
+      const isNilai = m.unit === 'Rp'
+      symbols.push({ ...m, symbolType: isNilai ? 'nilai' : 'dokumen' })
+    })
+    const kategori = await getKategoriSymbols()
+    kategori.forEach(k => symbols.push({ ...k, symbolType: 'nilai' }))
+    const plants = await getPlants()
+    plants.forEach(p => symbols.push({ ...p, symbolType: 'dokumen' }))
+    getSumberDanaSymbols().forEach(s => symbols.push({ ...s, symbolType: 'filter' }))
     return symbols
   }
 }
@@ -416,6 +458,13 @@ export async function fetchTimeSeries(symbol, timeframe = '1W', limit = 500, pla
     )
   }
 
+  // Handle -N suffix for nilai (rupiah) data
+  // A1-N -> query A1 but get nilai instead of count
+  if (symbol.endsWith('-N')) {
+    const baseSymbol = symbol.slice(0, -2)  // Remove -N suffix
+    return fetchByKodeDataNilai(baseSymbol, timeframe, limit, year, periodType, raw, sumberDana, kategoriPlant, cumulative)
+  }
+
   // Default: query by kode_data from fact_doc_weekly
   // This handles A1, A2, B001, C001, D001, E001, etc.
   return fetchByKodeData(symbol, timeframe, limit, year, periodType, raw, sumberDana, kategoriPlant, cumulative)
@@ -563,6 +612,144 @@ async function fetchByKodeData(kodeData, timeframe = '1W', limit = 500, year = n
     }
   } catch (err) {
     console.error('Error fetching by kode_data:', kodeData, err)
+    return []
+  }
+}
+
+// Fetch time series NILAI (rupiah) data by kode_data
+// This is used for symbols ending with -N suffix
+// Strategy: Look up sumber_dana and kategori_plant from analitic table,
+// then query fact_value_weekly with those filters
+async function fetchByKodeDataNilai(kodeData, timeframe = '1W', limit = 500, year = null, periodType = null, raw = false, sumberDana = null, kategoriPlant = null, cumulative = false) {
+  // First, lookup the sumber_dana and kategori_plant from analitic table
+  const lookupSql = `
+    SELECT sumber_dana, kategori_plant 
+    FROM analitic 
+    WHERE LOWER(kode_data) = LOWER($1)
+    LIMIT 1
+  `
+
+  try {
+    const lookupResult = await query(lookupSql, [kodeData])
+
+    if (!lookupResult.rows.length) {
+      console.warn('No analitic entry found for kode_data:', kodeData)
+      return []
+    }
+
+    const analitic = lookupResult.rows[0]
+    const sd = analitic.sumber_dana || sumberDana
+    const kp = analitic.kategori_plant || kategoriPlant
+
+    // Build where clauses for fact_value_weekly
+    const whereClauses = []
+    const params = []
+
+    if (sd) {
+      whereClauses.push('LOWER(sumber_dana) = LOWER($' + (params.length + 1) + ')')
+      params.push(sd)
+    }
+    if (kp) {
+      whereClauses.push('LOWER(kategori_plant) = LOWER($' + (params.length + 1) + ')')
+      params.push(kp)
+    }
+    if (year) {
+      whereClauses.push('period_year = $' + (params.length + 1))
+      params.push(year)
+    }
+    if (periodType) {
+      whereClauses.push('period_type = $' + (params.length + 1))
+      params.push(periodType)
+    }
+
+    // If no filters at all, we can't query - return empty
+    if (whereClauses.length === 0) {
+      console.warn('No filters available to query fact_value_weekly for:', kodeData)
+      return []
+    }
+
+    const whereSql = 'WHERE ' + whereClauses.join(' AND ')
+
+    let timeTrunc = 'week'
+    if (timeframe === '1D') timeTrunc = 'day'
+    if (timeframe === '1M') timeTrunc = 'month'
+    if (timeframe === '1Y') timeTrunc = year ? 'month' : 'year'
+
+    let sql
+    if (cumulative) {
+      // Cumulative mode with running total for nilai
+      sql = `
+      WITH weekly_data AS (
+        SELECT
+          DATE_TRUNC('${timeTrunc}', week_start) as period,
+          SUM(total_nilai) as weekly_value
+        FROM fact_value_weekly
+        ${whereSql}
+        GROUP BY DATE_TRUNC('${timeTrunc}', week_start)
+      )
+      SELECT
+        period,
+        weekly_value,
+        SUM(weekly_value) OVER (ORDER BY period) as cum_value
+      FROM weekly_data
+      ORDER BY period DESC
+      LIMIT $${params.length + 1}
+    `
+    } else {
+      // Aggregated mode for nilai (default)
+      sql = `
+      SELECT
+        DATE_TRUNC('${timeTrunc}', week_start) as period,
+        SUM(total_nilai) as total_value,
+        MIN(total_nilai) as min_value,
+        MAX(total_nilai) as max_value,
+        AVG(total_nilai) as avg_value
+      FROM fact_value_weekly
+      ${whereSql}
+      GROUP BY DATE_TRUNC('${timeTrunc}', week_start)
+      ORDER BY period DESC
+      LIMIT $${params.length + 1}
+    `
+    }
+    params.push(limit)
+
+    const result = await query(sql, params)
+    const rows = result.rows || []
+    if (!rows.length) return []
+
+    if (cumulative) {
+      return rows.reverse().map((row) => {
+        const cumValue = Number(row.cum_value || 0)
+        const weeklyValue = Number(row.weekly_value || 0)
+        const timestamp = row.period ? Math.floor(new Date(row.period).getTime() / 1000) : 0
+        return {
+          time: timestamp,
+          open: cumValue - weeklyValue,
+          high: cumValue,
+          low: cumValue - weeklyValue,
+          close: cumValue,
+          volume: weeklyValue
+        }
+      })
+    } else {
+      return rows.reverse().map((row) => {
+        const value = Number(row.total_value || 0)
+        const minVal = Number(row.min_value || value)
+        const maxVal = Number(row.max_value || value)
+        const avgVal = Number(row.avg_value || value)
+        const timestamp = row.period ? Math.floor(new Date(row.period).getTime() / 1000) : 0
+        return {
+          time: timestamp,
+          open: minVal,
+          high: maxVal,
+          low: minVal,
+          close: avgVal,
+          volume: value
+        }
+      })
+    }
+  } catch (err) {
+    console.error('Error fetching nilai by kode_data:', kodeData, err)
     return []
   }
 }
