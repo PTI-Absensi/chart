@@ -906,11 +906,17 @@ function onChartError(msg: string) {
 }
 
 // Format number
+const currencyShortId = new Intl.NumberFormat('id-ID', {
+  style: 'currency',
+  currency: 'IDR',
+  notation: 'compact',
+  compactDisplay: 'short',
+  maximumFractionDigits: 1
+})
+
 function formatNumber(val: number | undefined): string {
-  if (val === undefined || val === null) return '--'
-  if (val >= 1000000) return (val / 1000000).toFixed(1) + 'M'
-  if (val >= 1000) return (val / 1000).toFixed(1) + 'K'
-  return val.toFixed(0)
+  if (val === undefined || val === null || Number.isNaN(val)) return '--'
+  return currencyShortId.format(val)
 }
 
 // Handle resize
