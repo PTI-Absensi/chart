@@ -224,18 +224,49 @@
               v-for="(symbol, idx) in selectedSymbols" 
               :key="symbol" 
               class="tv-legend-row"
-              :class="{ 'is-hidden': hiddenSeries.has(symbol) }"
+              :class="{ 'tv-legend-row--hidden': hiddenSeries.has(symbol) }"
             >
-              <button 
+              <span 
                 class="tv-legend-color-dot" 
-                :style="{ backgroundColor: hiddenSeries.has(symbol) ? 'transparent' : colors[idx % colors.length], borderColor: colors[idx % colors.length] }"
-                @click="toggleSeriesVisibility(symbol)"
-                :title="hiddenSeries.has(symbol) ? 'Show series' : 'Hide series'"
-              ></button>
+                :style="{ backgroundColor: colors[idx % colors.length], borderColor: colors[idx % colors.length] }"
+              ></span>
               <span class="tv-legend-symbol">{{ symbol }}</span>
               <span class="tv-legend-value" v-if="getSymbolValue(symbol)">
                 {{ formatNumber(getSymbolValue(symbol)) }}
               </span>
+              <div class="tv-legend-actions">
+                <button
+                  class="tv-legend-action"
+                  :class="{ 'is-active': !hiddenSeries.has(symbol) }"
+                  type="button"
+                  @click.stop="toggleSeriesVisibility(symbol)"
+                  :title="hiddenSeries.has(symbol) ? 'Show series' : 'Hide series'"
+                >
+                  <svg v-if="hiddenSeries.has(symbol)" width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <path d="M3 3l18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    <path d="M10.58 10.58A2 2 0 0 0 12 14a2 2 0 0 0 1.42-.58" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    <path d="M9.88 5.08A10.94 10.94 0 0 1 12 5c6.5 0 10 7 10 7a18.53 18.53 0 0 1-3.3 4.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    <path d="M6.1 6.1C3.7 7.9 2 10 2 10s3.5 7 10 7c1.2 0 2.3-.2 3.3-.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  </svg>
+                  <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" stroke="currentColor" stroke-width="2"/>
+                    <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                </button>
+                <button
+                  class="tv-legend-action is-trash"
+                  type="button"
+                  @click.stop="removeSymbol(symbol)"
+                  title="Remove series"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <path d="M3 6h18" stroke="currentColor" stroke-width="2"/>
+                    <path d="M8 6V4h8v2" stroke="currentColor" stroke-width="2"/>
+                    <path d="M6 6l1 14h10l1-14" stroke="currentColor" stroke-width="2"/>
+                    <path d="M10 10v8M14 10v8" stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                </button>
+              </div>
             </div>
             <div class="tv-legend-empty" v-if="!selectedSymbols.length">
               No series selected
@@ -731,6 +762,11 @@ function removeSymbol(symbol: string) {
   const idx = selectedSymbols.value.indexOf(symbol)
   if (idx >= 0) {
     selectedSymbols.value.splice(idx, 1)
+  }
+  if (hiddenSeries.value.has(symbol)) {
+    const newSet = new Set(hiddenSeries.value)
+    newSet.delete(symbol)
+    hiddenSeries.value = newSet
   }
 }
 
@@ -1239,7 +1275,7 @@ onUnmounted(() => {
   transition: opacity 0.15s;
 }
 
-.tv-legend-row.is-hidden {
+.tv-legend-row--hidden {
   opacity: 0.4;
 }
 
@@ -1249,14 +1285,14 @@ onUnmounted(() => {
   border-radius: 50%;
   flex-shrink: 0;
   border: 2px solid;
-  cursor: pointer;
   padding: 0;
   background: none;
-  transition: all 0.15s;
+  cursor: default;
+  transition: opacity 0.15s;
 }
 
 .tv-legend-color-dot:hover {
-  transform: scale(1.2);
+  opacity: 0.9;
 }
 
 .tv-legend-symbol {
@@ -1267,6 +1303,36 @@ onUnmounted(() => {
 .tv-legend-value {
   color: var(--muted);
   font-size: 0.72rem;
+}
+
+.tv-legend-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.tv-legend-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.tv-legend-action:hover {
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.tv-legend-action.is-trash:hover {
+  color: #e05656;
 }
 
 .tv-legend-empty {
