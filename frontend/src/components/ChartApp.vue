@@ -225,9 +225,9 @@
               v-for="(symbol, idx) in selectedSymbols" 
               :key="symbol" 
               class="tv-legend-row"
-              :class="{ 'is-hidden': isSeriesHidden(symbol) }"
+              :class="{ 'tv-legend-row--hidden': hiddenSeries.has(symbol) }"
             >
-              <button 
+              <span 
                 class="tv-legend-color-dot" 
                 :style="{ backgroundColor: getLegendColor(symbol, idx), borderColor: getLegendColor(symbol, idx) }"
               ></span>
@@ -683,13 +683,13 @@ const summaryData = ref<SummaryData | null>(null)
 
 // Toggle series visibility
 function toggleSeriesVisibility(symbol: string) {
-  const idx = hiddenSeries.value.indexOf(symbol)
-  if (idx >= 0) {
-    // Remove from hidden (show it)
-    hiddenSeries.value.splice(idx, 1)
+  // Create new Set to trigger Vue reactivity
+  const newSet = new Set(hiddenSeries.value)
+  
+  if (newSet.has(symbol)) {
+    newSet.delete(symbol)
   } else {
-    // Add to hidden (hide it)
-    hiddenSeries.value.push(symbol)
+    newSet.add(symbol)
   }
   
   // Reassign to trigger reactivity
@@ -1349,8 +1349,8 @@ onUnmounted(() => {
   position: relative;
 }
 
-.tv-legend-row.is-hidden {
-  opacity: 0.6;
+.tv-legend-row--hidden {
+  opacity: 0.4;
 }
 
 .tv-legend-color-dot {
@@ -1360,14 +1360,13 @@ onUnmounted(() => {
   flex-shrink: 0;
   border: 2px solid;
   padding: 0;
-  background: transparent;
-  cursor: pointer;
-  transition: opacity 0.15s, transform 0.15s;
+  background: none;
+  cursor: default;
+  transition: opacity 0.15s;
 }
 
 .tv-legend-color-dot:hover {
   opacity: 0.9;
-  transform: scale(1.1);
 }
 
 .tv-legend-symbol {
