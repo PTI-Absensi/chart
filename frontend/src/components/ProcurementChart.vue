@@ -97,6 +97,12 @@ const themeTokens = computed(() => {
   }
 })
 
+const dateFormatterId = new Intl.DateTimeFormat('id-ID', {
+  day: '2-digit',
+  month: 'short',
+  year: 'numeric'
+})
+
 // Chart options
 const chartOptions = computed(() => {
   const tokens = themeTokens.value
@@ -205,12 +211,9 @@ const chartOptions = computed(() => {
       labels: {
         style: { colors: tokens.text },
         datetimeUTC: false,
-        format: 'dd MMM yyyy',
-        datetimeFormatter: {
-          year: 'yyyy',
-          month: 'MMM yyyy',
-          day: 'dd MMM yyyy',
-          hour: 'HH:mm'
+        formatter: (val: string, timestamp?: number) => {
+          const ts = typeof timestamp === 'number' ? timestamp : Number(val)
+          return Number.isFinite(ts) ? dateFormatterId.format(new Date(ts)) : val
         }
       },
       axisBorder: { color: tokens.grid },
@@ -277,7 +280,9 @@ const chartOptions = computed(() => {
       theme: tokens.tooltip,
       shared: true,
       intersect: false,
-      x: { format: 'dd MMM yyyy' }
+      x: {
+        formatter: (val: number) => dateFormatterId.format(new Date(val))
+      }
     },
     dataLabels: { enabled: false },
     plotOptions: {
