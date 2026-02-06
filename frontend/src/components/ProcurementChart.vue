@@ -97,6 +97,19 @@ const themeTokens = computed(() => {
   }
 })
 
+const currencyShortId = new Intl.NumberFormat('id-ID', {
+  style: 'currency',
+  currency: 'IDR',
+  notation: 'compact',
+  compactDisplay: 'short',
+  maximumFractionDigits: 1
+})
+
+function formatCurrencyShort(val: number): string {
+  if (!Number.isFinite(val)) return 'Rp 0'
+  return currencyShortId.format(val)
+}
+
 const dateFormatterId = new Intl.DateTimeFormat('id-ID', {
   day: '2-digit',
   month: 'short',
@@ -112,6 +125,9 @@ const chartOptions = computed(() => {
   const hasLeftAxis = props.singleScale
     ? props.scaleSide === 'left'
     : props.symbols.length > 0
+  const leftPad = props.singleScale && props.scaleSide === 'right'
+    ? 18
+    : (hasLeftAxis ? 18 : 0)
 
   const baseOptions: any = {
     chart: {
@@ -199,7 +215,7 @@ const chartOptions = computed(() => {
       },
       padding: {
         right: hasRightAxis ? 18 : 0,
-        left: hasLeftAxis ? 18 : 0,
+        left: leftPad,
         top: props.singleScale ? 18 : 0,
         bottom: 0
       }
@@ -242,12 +258,7 @@ const chartOptions = computed(() => {
             style: { colors: tokens.text },
             maxWidth:60,  // Limit width for cleaner layout
             offsetX: props.scaleSide === 'right' ? 0 : -12,
-            formatter: (val: number) => {
-              if (val >= 1e9) return (val / 1e9).toFixed(1) + 'B'
-              if (val >= 1e6) return (val / 1e6).toFixed(1) + 'M'
-              if (val >= 1e3) return (val / 1e3).toFixed(0) + 'K'
-              return val?.toFixed(0) || '0'
-            }
+            formatter: (val: number) => formatCurrencyShort(val)
           },
           tooltip: { enabled: true }
         }
@@ -263,12 +274,7 @@ const chartOptions = computed(() => {
             style: { colors: resolveColor(symbol, index) },
             maxWidth: 60,  // Limit width
             offsetX: index % 2 === 1 ? 0 : -12,
-            formatter: (val: number) => {
-              if (val >= 1e9) return (val / 1e9).toFixed(1) + 'B'
-              if (val >= 1e6) return (val / 1e6).toFixed(1) + 'M'
-              if (val >= 1e3) return (val / 1e3).toFixed(0) + 'K'
-              return val?.toFixed(0) || '0'
-            }
+            formatter: (val: number) => formatCurrencyShort(val)
           },
           title: {
             text: symbol,
