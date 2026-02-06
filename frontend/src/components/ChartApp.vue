@@ -184,6 +184,7 @@
           :year="year"
           :symbols="selectedSymbols"
           :symbol-meta="selectedSymbolMeta"
+          :hidden-series="hiddenSeries"
           :normalize="normalize"
           :log-scale="logScale"
           :raw-mode="rawMode"
@@ -206,6 +207,41 @@
           class="tv-drawing-overlay"
           :class="{ 'is-drawing': activeDrawingTool !== 'select' }"
         />
+        
+        <!-- Collapsible Legend Overlay (TradingView style) -->
+        <div class="tv-legend-overlay" :class="{ 'is-collapsed': legendCollapsed }">
+          <button class="tv-legend-toggle" @click="legendCollapsed = !legendCollapsed" title="Toggle Legend">
+            <svg 
+              width="16" height="16" viewBox="0 0 24 24" fill="none"
+              :class="{ 'chevron-rotated': !legendCollapsed }"
+            >
+              <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          
+          <div class="tv-legend-content" v-show="!legendCollapsed">
+            <div 
+              v-for="(symbol, idx) in selectedSymbols" 
+              :key="symbol" 
+              class="tv-legend-row"
+              :class="{ 'is-hidden': hiddenSeries.has(symbol) }"
+            >
+              <button 
+                class="tv-legend-color-dot" 
+                :style="{ backgroundColor: hiddenSeries.has(symbol) ? 'transparent' : colors[idx % colors.length], borderColor: colors[idx % colors.length] }"
+                @click="toggleSeriesVisibility(symbol)"
+                :title="hiddenSeries.has(symbol) ? 'Show series' : 'Hide series'"
+              ></button>
+              <span class="tv-legend-symbol">{{ symbol }}</span>
+              <span class="tv-legend-value" v-if="getSymbolValue(symbol)">
+                {{ formatNumber(getSymbolValue(symbol)) }}
+              </span>
+            </div>
+            <div class="tv-legend-empty" v-if="!selectedSymbols.length">
+              No series selected
+            </div>
+          </div>
+        </div>
       </div>
       
       <!-- Bottom-right floating buttons -->
@@ -505,6 +541,14 @@ const drawingRef = ref<InstanceType<typeof DrawingLayer> | null>(null)
 // Panel visibility state
 const showObjectTree = ref(false)
 const showLayersPanel = ref(false)
+const legendCollapsed = ref(false)
+
+// Get symbol value from summary data
+function getSymbolValue(symbol: string): number | undefined {
+  if (!summaryData.value?.series) return undefined
+  const series = summaryData.value.series.find(s => s.symbol === symbol)
+  return series?.latest
+}
 
 // Delete drawing by index
 function deleteDrawing(idx: number) {
@@ -568,16 +612,18 @@ const summaryData = ref<SummaryData | null>(null)
 
 // Toggle series visibility
 function toggleSeriesVisibility(symbol: string) {
-  if (hiddenSeries.value.has(symbol)) {
-    hiddenSeries.value.delete(symbol)
+  // Create new Set to trigger Vue reactivity
+  const newSet = new Set(hiddenSeries.value)
+  
+  if (newSet.has(symbol)) {
+    newSet.delete(symbol)
   } else {
-    hiddenSeries.value.add(symbol)
+    newSet.add(symbol)
   }
   
-  // Toggle series visibility on ApexCharts
-  if (chartRef.value) {
-    chartRef.value.toggleSeries(symbol)
-  }
+  // Reassign to trigger reactivity
+  // ProcurementChart will filter based on hiddenSeries prop
+  hiddenSeries.value = newSet
 }
 
 // Filtered symbols for search
@@ -1129,23 +1175,109 @@ onUnmounted(() => {
   width: auto !important;
 }
 
-.tv-chart-canvas :deep(.apexcharts-legend-series) {
-  cursor: pointer !important;
-  padding: 2px 4px !important;
-  border-radius: 4px !important;
-  transition: background 0.15s !important;
-  display: flex !important;
-  align-items: center !important;
-  gap: 6px !important;
+/* Collapsible Legend Overlay */
+.tv-legend-overlay {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 25;
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  background: var(--glass);
+  backdrop-filter: blur(8px);
+  border-radius: 6px;
+  padding: 6px 8px;
+  transition: all 0.2s ease;
+  max-width: 280px;
 }
 
-.tv-chart-canvas :deep(.apexcharts-legend-series:hover) {
-  background: rgba(255,255,255,0.15) !important;
+.tv-legend-overlay.is-collapsed {
+  padding: 6px;
+  background: transparent;
+  backdrop-filter: none;
 }
 
-/* Hidden series style - faded */
-.tv-chart-canvas :deep(.apexcharts-legend-series.apexcharts-inactive-legend) {
-  opacity: 0.4 !important;
+.tv-legend-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+
+.tv-legend-toggle:hover {
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.tv-legend-toggle svg {
+  transition: transform 0.2s ease;
+}
+
+.tv-legend-toggle svg.chevron-rotated {
+  transform: rotate(90deg);
+}
+
+.tv-legend-content {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.tv-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+
+.tv-legend-row.is-hidden {
+  opacity: 0.4;
+}
+
+.tv-legend-color-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 2px solid;
+  cursor: pointer;
+  padding: 0;
+  background: none;
+  transition: all 0.15s;
+}
+
+.tv-legend-color-dot:hover {
+  transform: scale(1.2);
+}
+
+.tv-legend-symbol {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.tv-legend-value {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.tv-legend-empty {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-style: italic;
+}
+
+/* Hide ApexCharts built-in legend - using our custom chevron legend instead */
+.tv-chart-canvas :deep(.apexcharts-legend) {
+  display: none !important;
 }
 
 /* Legend Overlay */

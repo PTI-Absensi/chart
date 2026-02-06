@@ -23,6 +23,7 @@ const props = withDefaults(defineProps<{
   year?: number
   height?: number
   symbols?: string[]
+  hiddenSeries?: Set<string>
   normalize?: boolean
   logScale?: boolean
   rawMode?: boolean
@@ -39,6 +40,7 @@ const props = withDefaults(defineProps<{
   year: 2025,
   height: 450,
   symbols: () => [],
+  hiddenSeries: () => new Set(),
   normalize: false,
   logScale: false,
   rawMode: false,
@@ -294,7 +296,10 @@ const chartSeries = computed(() => {
     return []
   }
 
-  return props.symbols.map((symbol) => {
+  // Filter out hidden symbols
+  const visibleSymbols = props.symbols.filter(s => !props.hiddenSeries.has(s))
+
+  return visibleSymbols.map((symbol) => {
     const data = rawData.value[symbol] || []
 
     let values = data.map((d: any) => d.close)
