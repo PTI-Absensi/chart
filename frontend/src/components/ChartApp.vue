@@ -231,6 +231,7 @@
                 :style="{ backgroundColor: colors[idx % colors.length], borderColor: colors[idx % colors.length], opacity: isSeriesHidden(symbol) ? 0.35 : 1 }"
                 @click="toggleSeriesVisibility(symbol)"
                 :title="isSeriesHidden(symbol) ? 'Show series' : 'Hide series'"
+                type="button"
               ></button>
               <span class="tv-legend-symbol">{{ symbol }}</span>
               <span class="tv-legend-value" v-if="getSymbolValue(symbol)">
@@ -732,6 +733,11 @@ function removeSymbol(symbol: string) {
   const idx = selectedSymbols.value.indexOf(symbol)
   if (idx >= 0) {
     selectedSymbols.value.splice(idx, 1)
+  }
+  if (hiddenSeries.value.has(symbol)) {
+    const newSet = new Set(hiddenSeries.value)
+    newSet.delete(symbol)
+    hiddenSeries.value = newSet
   }
 }
 
@@ -1250,14 +1256,15 @@ onUnmounted(() => {
   border-radius: 50%;
   flex-shrink: 0;
   border: 2px solid;
-  cursor: pointer;
   padding: 0;
-  background: none;
-  transition: all 0.15s;
+  background: transparent;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.15s;
 }
 
 .tv-legend-color-dot:hover {
-  transform: scale(1.2);
+  opacity: 0.9;
+  transform: scale(1.1);
 }
 
 .tv-legend-symbol {
@@ -1268,6 +1275,36 @@ onUnmounted(() => {
 .tv-legend-value {
   color: var(--muted);
   font-size: 0.72rem;
+}
+
+.tv-legend-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.tv-legend-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.tv-legend-action:hover {
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.tv-legend-action.is-trash:hover {
+  color: #e05656;
 }
 
 .tv-legend-empty {
