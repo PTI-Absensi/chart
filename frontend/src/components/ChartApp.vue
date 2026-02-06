@@ -10,12 +10,7 @@
         <span class="tv-title">Procurement</span>
       </div>
       
-      <!-- Symbol Search -->
-      <div class="tv-symbol-search" @click="openSearchModal">
-        <span class="tv-symbol-name">{{ selectedSymbols.length > 0 ? selectedSymbols[0] : 'Kode Data' }}</span>
-        <span v-if="selectedSymbols.length > 1" class="tv-symbol-more">+{{ selectedSymbols.length - 1 }}</span>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2"/></svg>
-      </div>
+      <!-- New Tab (moved to legend group) -->
     </div>
     
     <div class="tv-header-center">
@@ -177,6 +172,28 @@
     <div class="tv-chart-area">
       <!-- Chart Canvas with Drawing Overlay -->
       <div class="tv-chart-canvas">
+        <div v-if="!categoryTabs.length" class="tv-empty-tabs">
+          <div class="tv-empty-tabs-visual">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+              <rect x="3" y="4" width="18" height="14" rx="2" stroke="currentColor" stroke-width="2"/>
+              <path d="M7 8h10M7 12h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <path d="M12 18v3M9 21h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div class="tv-empty-tabs-text">No tab activated. Create a new one.</div>
+          <div class="tv-empty-tabs-actions">
+            <button
+              class="tv-add-tab-btn"
+              type="button"
+              @click="newTabMenuOpen = true; newTabMenuMode = 'category'; newTabMenuOnlyCategories = true"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+              Add New Tab
+            </button>
+          </div>
+        </div>
         <ProcurementChart
           ref="chartRef"
           :chart-type="chartType"
@@ -209,104 +226,151 @@
           :class="{ 'is-drawing': activeDrawingTool !== 'select' }"
         />
         
-        <!-- Collapsible Legend Overlay (TradingView style) -->
-        <div class="tv-legend-overlay" :class="{ 'is-collapsed': legendCollapsed }">
-          <button class="tv-legend-toggle" @click="legendCollapsed = !legendCollapsed" title="Toggle Legend">
-            <svg 
-              width="16" height="16" viewBox="0 0 24 24" fill="none"
-              :class="{ 'chevron-rotated': !legendCollapsed }"
-            >
-              <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
-          
-          <div class="tv-legend-content" v-show="!legendCollapsed">
-            <div 
-              v-for="(symbol, idx) in selectedSymbols" 
-              :key="symbol" 
-              class="tv-legend-row"
-              :class="{ 'tv-legend-row--hidden': hiddenSeries.has(symbol) }"
-            >
-              <span 
-                class="tv-legend-color-dot" 
-                :style="{ backgroundColor: getLegendColor(symbol, idx), borderColor: getLegendColor(symbol, idx) }"
-              ></span>
-              <span class="tv-legend-symbol">{{ getLegendName(symbol) }}</span>
-              <span class="tv-legend-value" v-if="getSymbolValue(symbol)">
-                {{ formatNumber(getSymbolValue(symbol)) }}
-              </span>
-              <div class="tv-legend-actions">
-                <button
-                  class="tv-legend-action"
-                  :class="{ 'is-active': !hiddenSeries.has(symbol) }"
-                  type="button"
-                  @click.stop="toggleSeriesVisibility(symbol)"
-                  :title="hiddenSeries.has(symbol) ? 'Show series' : 'Hide series'"
-                >
-                  <svg v-if="hiddenSeries.has(symbol)" width="14" height="14" viewBox="0 0 24 24" fill="none">
-                    <path d="M3 3l18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                    <path d="M10.58 10.58A2 2 0 0 0 12 14a2 2 0 0 0 1.42-.58" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                    <path d="M9.88 5.08A10.94 10.94 0 0 1 12 5c6.5 0 10 7 10 7a18.53 18.53 0 0 1-3.3 4.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                    <path d="M6.1 6.1C3.7 7.9 2 10 2 10s3.5 7 10 7c1.2 0 2.3-.2 3.3-.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                  </svg>
-                  <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none">
-                    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" stroke="currentColor" stroke-width="2"/>
-                    <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
-                  </svg>
-                </button>
-                <button
-                  class="tv-legend-action is-trash"
-                  type="button"
-                  @click.stop="removeSymbol(symbol)"
-                  title="Remove series"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                    <path d="M3 6h18" stroke="currentColor" stroke-width="2"/>
-                    <path d="M8 6V4h8v2" stroke="currentColor" stroke-width="2"/>
-                    <path d="M6 6l1 14h10l1-14" stroke="currentColor" stroke-width="2"/>
-                    <path d="M10 10v8M14 10v8" stroke="currentColor" stroke-width="2"/>
-                  </svg>
-                </button>
-                <button
-                  class="tv-legend-action is-cog"
-                  type="button"
-                  @click.stop="toggleLegendSettings(symbol)"
-                  title="Legend settings"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                    <path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" stroke="currentColor" stroke-width="2"/>
-                    <path d="M19.4 15a7.8 7.8 0 0 0 .1-1 7.8 7.8 0 0 0-.1-1l2-1.6-2-3.4-2.4 1a7.6 7.6 0 0 0-1.7-1l-.3-2.6H9l-.3 2.6a7.6 7.6 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.8 7.8 0 0 0-.1 1 7.8 7.8 0 0 0 .1 1l-2 1.6 2 3.4 2.4-1a7.6 7.6 0 0 0 1.7 1l.3 2.6h6l.3-2.6a7.6 7.6 0 0 0 1.7-1l2.4 1 2-3.4-2-1.6z" stroke="currentColor" stroke-width="2"/>
-                  </svg>
-                </button>
-              </div>
-              <div
-                v-if="activeLegendSettings === symbol"
-                class="tv-legend-settings"
-                @click.stop
+        <!-- Collapsible Legend + Tabs Group -->
+        <div class="tv-legend-group">
+          <div class="tv-legend-overlay" :class="{ 'is-collapsed': legendCollapsed }">
+            <button class="tv-legend-toggle" @click="legendCollapsed = !legendCollapsed" title="Toggle Legend">
+              <svg 
+                width="16" height="16" viewBox="0 0 24 24" fill="none"
+                :class="{ 'chevron-rotated': !legendCollapsed }"
               >
-                <div class="tv-legend-settings-row">
-                  <label class="tv-legend-settings-label">Name</label>
-                  <input
-                    class="tv-legend-settings-input"
-                    type="text"
-                    :value="legendNames[symbol] ?? symbol"
-                    @input="updateLegendName(symbol, ($event.target as HTMLInputElement).value)"
-                    placeholder="Legend name"
-                  />
+                <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            
+            <div class="tv-legend-content" v-show="!legendCollapsed">
+              <div 
+                v-for="(symbol, idx) in selectedSymbols" 
+                :key="symbol" 
+                class="tv-legend-row"
+                :class="{ 'tv-legend-row--hidden': hiddenSeries.has(symbol) }"
+              >
+                <span 
+                  class="tv-legend-color-dot" 
+                  :style="{ backgroundColor: getLegendColor(symbol, idx), borderColor: getLegendColor(symbol, idx) }"
+                ></span>
+                <span class="tv-legend-symbol">{{ getLegendName(symbol) }}</span>
+                <span class="tv-legend-value" v-if="getSymbolValue(symbol)">
+                  {{ formatNumber(getSymbolValue(symbol)) }}
+                </span>
+                <div class="tv-legend-actions">
+                  <button
+                    class="tv-legend-action"
+                    :class="{ 'is-active': !hiddenSeries.has(symbol) }"
+                    type="button"
+                    @click.stop="toggleSeriesVisibility(symbol)"
+                    :title="hiddenSeries.has(symbol) ? 'Show series' : 'Hide series'"
+                  >
+                    <svg v-if="hiddenSeries.has(symbol)" width="14" height="14" viewBox="0 0 24 24" fill="none">
+                      <path d="M3 3l18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                      <path d="M10.58 10.58A2 2 0 0 0 12 14a2 2 0 0 0 1.42-.58" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                      <path d="M9.88 5.08A10.94 10.94 0 0 1 12 5c6.5 0 10 7 10 7a18.53 18.53 0 0 1-3.3 4.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                      <path d="M6.1 6.1C3.7 7.9 2 10 2 10s3.5 7 10 7c1.2 0 2.3-.2 3.3-.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                    <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none">
+                      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" stroke="currentColor" stroke-width="2"/>
+                      <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                  </button>
+                  <button
+                    class="tv-legend-action is-trash"
+                    type="button"
+                    @click.stop="removeSymbol(symbol)"
+                    title="Remove series"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                      <path d="M3 6h18" stroke="currentColor" stroke-width="2"/>
+                      <path d="M8 6V4h8v2" stroke="currentColor" stroke-width="2"/>
+                      <path d="M6 6l1 14h10l1-14" stroke="currentColor" stroke-width="2"/>
+                      <path d="M10 10v8M14 10v8" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                  </button>
+                  <button
+                    class="tv-legend-action is-cog"
+                    type="button"
+                    @click.stop="toggleLegendSettings(symbol)"
+                    title="Legend settings"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                      <path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" stroke="currentColor" stroke-width="2"/>
+                      <path d="M19.4 15a7.8 7.8 0 0 0 .1-1 7.8 7.8 0 0 0-.1-1l2-1.6-2-3.4-2.4 1a7.6 7.6 0 0 0-1.7-1l-.3-2.6H9l-.3 2.6a7.6 7.6 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.8 7.8 0 0 0-.1 1 7.8 7.8 0 0 0 .1 1l-2 1.6 2 3.4 2.4-1a7.6 7.6 0 0 0 1.7 1l.3 2.6h6l.3-2.6a7.6 7.6 0 0 0 1.7-1l2.4 1 2-3.4-2-1.6z" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                  </button>
                 </div>
-                <div class="tv-legend-settings-row">
-                  <label class="tv-legend-settings-label">Color</label>
-                  <input
-                    class="tv-legend-settings-color"
-                    type="color"
-                    :value="legendColors[symbol] ?? getLegendColor(symbol, idx)"
-                    @input="updateLegendColor(symbol, ($event.target as HTMLInputElement).value)"
-                  />
+                <div
+                  v-if="activeLegendSettings === symbol"
+                  class="tv-legend-settings"
+                  @click.stop
+                >
+                  <div class="tv-legend-settings-row">
+                    <label class="tv-legend-settings-label">Name</label>
+                    <input
+                      class="tv-legend-settings-input"
+                      type="text"
+                      :value="legendNames[symbol] ?? symbol"
+                      @input="updateLegendName(symbol, ($event.target as HTMLInputElement).value)"
+                      placeholder="Legend name"
+                    />
+                  </div>
+                  <div class="tv-legend-settings-row">
+                    <label class="tv-legend-settings-label">Color</label>
+                    <input
+                      class="tv-legend-settings-color"
+                      type="color"
+                      :value="legendColors[symbol] ?? getLegendColor(symbol, idx)"
+                      @input="updateLegendColor(symbol, ($event.target as HTMLInputElement).value)"
+                    />
+                  </div>
                 </div>
+              </div>
+              <div class="tv-legend-empty" v-if="!selectedSymbols.length">
+                No series selected
               </div>
             </div>
-            <div class="tv-legend-empty" v-if="!selectedSymbols.length">
-              No series selected
+          </div>
+          <div class="tv-category-bar" v-show="!legendCollapsed">
+            <button class="tv-new-tab-btn is-tab" type="button" @click="newTabMenuOpen = !newTabMenuOpen; newTabMenuMode = 'root'; newTabMenuOnlyCategories = false" title="New Tab">
+              <span class="tv-new-tab-plus">+</span>
+              <span class="tv-new-tab-balloon">New</span>
+            </button>
+            <div class="tv-category-tabs">
+              <button
+                v-for="tab in categoryTabs"
+                :key="tab.id"
+                :class="['tv-category-tab', { active: activeCategoryTabId === tab.id }]"
+                @click="activeCategoryTabId = tab.id"
+              >
+                {{ tab.label }}
+              </button>
+            </div>
+            <div v-if="newTabMenuOpen" class="tv-new-tab-menu" @click.stop>
+              <template v-if="!newTabMenuOnlyCategories">
+                <button
+                  class="tv-new-tab-option"
+                  type="button"
+                  @click="newTabMenuMode = 'category'"
+                >
+                  Add New Tab
+                </button>
+                <button
+                  class="tv-new-tab-option"
+                  type="button"
+                  @click="openSearchModal(); newTabMenuOpen = false; newTabMenuOnlyCategories = false"
+                >
+                  Insert Data
+                </button>
+              </template>
+              <div v-if="newTabMenuMode === 'category'" class="tv-new-tab-submenu">
+                <button
+                  v-for="opt in categoryOptions"
+                  :key="opt.value"
+                  class="tv-new-tab-option"
+                  type="button"
+                  @click="addCategoryTab(opt.value, false)"
+                >
+                  {{ opt.label }}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -451,16 +515,15 @@
         />
       </div>
       
-      <!-- Category Filter Tabs -->
+      <!-- Category Filter Tabs (Search only) -->
       <div class="search-filter-tabs">
-        <button 
-          v-for="tab in filterTabs" 
-          :key="tab.value"
-          :class="['filter-tab', { active: activeFilterTab === tab.value }]"
-          @click="activeFilterTab = tab.value"
+        <button
+          v-for="opt in categoryOptions"
+          :key="opt.value"
+          :class="['filter-tab', { active: activeSearchCategory === opt.value }]"
+          @click="activeSearchCategory = opt.value"
         >
-          <span v-html="tab.icon"></span>
-          {{ tab.label }}
+          {{ opt.label }}
         </button>
       </div>
       
@@ -640,10 +703,16 @@ const sumberDana = ref('')
 const kategoriPlant = ref('')
 const maxSeries = ref(5) // Default max 5 series
 const selectedSymbols = ref<string[]>([])
+const selectedSymbolsByTab = ref<Record<string, string[]>>({})
+const switchingTab = ref(false)
 const hiddenSeries = ref<Set<string>>(new Set())
 const legendColors = ref<Record<string, string>>({})
 const legendNames = ref<Record<string, string>>({})
 const activeLegendSettings = ref<string | null>(null)
+
+const hiddenSeriesByTab = ref<Record<string, string[]>>({})
+const legendColorsByTab = ref<Record<string, Record<string, string>>>({})
+const legendNamesByTab = ref<Record<string, Record<string, string>>>({})
 
 // Navigation menu state
 const navMenuOpen = ref(false)
@@ -720,34 +789,135 @@ function toggleLegendSettings(symbol: string) {
 // Filtered symbols for search
 const filteredSymbols = computed(() => {
   let symbols = allSymbols.value
-  
-  // Filter by active tab
-  if (activeFilterTab.value !== 'all') {
-    symbols = symbols.filter(s => s.symbolType === activeFilterTab.value)
+
+  // Filter by search category
+  if (activeSearchCategory.value !== 'all') {
+    symbols = symbols.filter(s => s.symbolType === activeSearchCategory.value)
   }
-  
+
   // Filter by search query
   if (searchQuery.value) {
     const q = searchQuery.value.toLowerCase()
-    symbols = symbols.filter(s => 
-      s.symbol.toLowerCase().includes(q) || 
+    symbols = symbols.filter(s =>
+      s.symbol.toLowerCase().includes(q) ||
       s.name.toLowerCase().includes(q) ||
       (s.description && s.description.toLowerCase().includes(q))
     )
   }
-  
+
   return symbols
 })
 
-// TradingView-style filter tabs
-type FilterTabValue = 'all' | 'dokumen' | 'nilai'
-const filterTabs: { value: FilterTabValue; label: string; icon: string }[] = [
-  { value: 'all', label: 'All', icon: '' },
-  { value: 'dokumen', label: 'Dokumen', icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 2h9l5 5v15H6z" stroke="currentColor" stroke-width="2"/><path d="M14 2v5h5" stroke="currentColor" stroke-width="2"/></svg>' },
-  { value: 'nilai', label: 'Nilai', icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2v20M6 6l6-4 6 4M6 18l6 4 6-4" stroke="currentColor" stroke-width="2"/></svg>' }
+type CategoryValue = 'all' | 'dokumen' | 'nilai'
+type CategoryTab = { id: string; label: string; category: CategoryValue }
+
+const categoryOptions: { value: CategoryValue; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'dokumen', label: 'Dokumen' },
+  { value: 'nilai', label: 'Nilai' }
 ]
 
-const activeFilterTab = ref<FilterTabValue>('all')
+const categoryTabs = ref<CategoryTab[]>([])
+const activeCategoryTabId = ref<string | null>(null)
+const newTabMenuOpen = ref(false)
+const newTabMenuMode = ref<'root' | 'category'>('root')
+const newTabMenuOnlyCategories = ref(false)
+const activeSearchCategory = ref<CategoryValue>('all')
+
+watch(activeCategoryTabId, (next, prev) => {
+  switchingTab.value = true
+  if (prev) {
+    selectedSymbolsByTab.value = {
+      ...selectedSymbolsByTab.value,
+      [prev]: [...selectedSymbols.value]
+    }
+    hiddenSeriesByTab.value = {
+      ...hiddenSeriesByTab.value,
+      [prev]: Array.from(hiddenSeries.value)
+    }
+    legendColorsByTab.value = {
+      ...legendColorsByTab.value,
+      [prev]: { ...legendColors.value }
+    }
+    legendNamesByTab.value = {
+      ...legendNamesByTab.value,
+      [prev]: { ...legendNames.value }
+    }
+  }
+  if (next) {
+    selectedSymbols.value = [...(selectedSymbolsByTab.value[next] || [])]
+    hiddenSeries.value = new Set(hiddenSeriesByTab.value[next] || [])
+    legendColors.value = { ...(legendColorsByTab.value[next] || {}) }
+    legendNames.value = { ...(legendNamesByTab.value[next] || {}) }
+    activeLegendSettings.value = null
+  } else {
+    selectedSymbols.value = []
+    hiddenSeries.value = new Set()
+    legendColors.value = {}
+    legendNames.value = {}
+    activeLegendSettings.value = null
+  }
+  switchingTab.value = false
+})
+
+watch(selectedSymbols, (val) => {
+  if (switchingTab.value) return
+  const activeId = activeCategoryTabId.value
+  if (!activeId) return
+  selectedSymbolsByTab.value = {
+    ...selectedSymbolsByTab.value,
+    [activeId]: [...val]
+  }
+}, { deep: true })
+
+watch(hiddenSeries, (val) => {
+  if (switchingTab.value) return
+  const activeId = activeCategoryTabId.value
+  if (!activeId) return
+  hiddenSeriesByTab.value = {
+    ...hiddenSeriesByTab.value,
+    [activeId]: Array.from(val)
+  }
+}, { deep: true })
+
+watch(legendColors, (val) => {
+  if (switchingTab.value) return
+  const activeId = activeCategoryTabId.value
+  if (!activeId) return
+  legendColorsByTab.value = {
+    ...legendColorsByTab.value,
+    [activeId]: { ...val }
+  }
+}, { deep: true })
+
+watch(legendNames, (val) => {
+  if (switchingTab.value) return
+  const activeId = activeCategoryTabId.value
+  if (!activeId) return
+  legendNamesByTab.value = {
+    ...legendNamesByTab.value,
+    [activeId]: { ...val }
+  }
+}, { deep: true })
+
+function addCategoryTab(category: CategoryValue, openSearch = false) {
+  const baseLabel = categoryOptions.find(o => o.value === category)?.label || category
+  const nextIndex = categoryTabs.value.filter(t => t.category === category).length + 1
+  const label = category === 'all' && nextIndex === 1 ? baseLabel : `${baseLabel} ${nextIndex}`
+  const id = `tab-${category}-${Date.now()}`
+  categoryTabs.value = [...categoryTabs.value, { id, label, category }]
+  selectedSymbolsByTab.value = { ...selectedSymbolsByTab.value, [id]: [] }
+  hiddenSeriesByTab.value = { ...hiddenSeriesByTab.value, [id]: [] }
+  legendColorsByTab.value = { ...legendColorsByTab.value, [id]: {} }
+  legendNamesByTab.value = { ...legendNamesByTab.value, [id]: {} }
+  activeCategoryTabId.value = id
+  newTabMenuOpen.value = false
+  newTabMenuMode.value = 'root'
+  newTabMenuOnlyCategories.value = false
+  if (openSearch) {
+    openSearchModal()
+  }
+}
 const hoveredSymbol = ref<string | null>(null)
 
 // Track scale mode per series: 'same' | 'percent' | 'scale' | 'pane'
@@ -760,6 +930,12 @@ function selectSymbolWithScale(sym: SymbolItem, scaleMode: ScaleMode) {
   if (selectedSymbols.value.length >= maxSeries.value) {
     alert(`Maximum ${maxSeries.value} series sudah terpilih. Hapus salah satu series atau ubah max series di dropdown.`)
     return
+  }
+
+  // If no tabs yet, create one based on symbol type
+  if (!categoryTabs.value.length) {
+    const category = (sym.symbolType as CategoryValue) || 'all'
+    addCategoryTab(category, false)
   }
   
   // Add symbol if not already selected
@@ -848,6 +1024,7 @@ function openSearchModal() {
   console.log('[DEBUG] openSearchModal called')  // Debug log
   searchModalOpen.value = true
   searchQuery.value = ''
+  activeSearchCategory.value = 'all'
   nextTick(() => {
     searchInput.value?.focus()
   })
@@ -856,6 +1033,9 @@ function openSearchModal() {
 // Close search modal
 function closeSearchModal() {
   searchModalOpen.value = false
+  newTabMenuOpen.value = false
+  newTabMenuMode.value = 'root'
+  newTabMenuOnlyCategories.value = false
 }
 
 // Filter symbols (no-op, computed handles it)
@@ -1035,6 +1215,133 @@ onUnmounted(() => {
 
 .tv-symbol-search:hover {
   background: var(--hover);
+}
+
+.tv-new-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid var(--stroke);
+  border-radius: 4px;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 0.85rem;
+  flex: 0 0 auto;
+}
+
+.tv-new-tab-btn.is-tab {
+  border-radius: 999px;
+  font-size: 0.78rem;
+  padding: 4px 8px;
+}
+
+.tv-new-tab-plus {
+  font-weight: 700;
+  line-height: 1;
+}
+
+.tv-new-tab-balloon {
+  font-size: 0.65rem;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  line-height: 1;
+}
+
+.tv-new-tab-btn:hover {
+  background: var(--hover);
+}
+
+.tv-new-tab-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  background: var(--surface);
+  border: 1px solid var(--stroke);
+  border-radius: 6px;
+  padding: 6px;
+  min-width: 140px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 30;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.tv-new-tab-submenu {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--stroke);
+  margin-top: 4px;
+}
+
+.tv-new-tab-option {
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 6px 8px;
+  border-radius: 4px;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 0.78rem;
+}
+
+.tv-new-tab-option:hover {
+  background: var(--surface-2);
+}
+
+.tv-category-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  position: relative;
+}
+
+.tv-category-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  overflow-x: auto;
+  min-width: 0;
+  flex: 1 1 auto;
+  padding-bottom: 2px;
+}
+
+.tv-category-tabs::-webkit-scrollbar {
+  height: 4px;
+}
+
+.tv-category-tabs::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+}
+
+.tv-category-tab {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  border: 1px solid var(--stroke);
+  background: transparent;
+  color: var(--muted);
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tv-category-tab.active {
+  color: var(--ink);
+  border-color: var(--accent);
+  background: rgba(41, 98, 255, 0.12);
 }
 
 .tv-symbol-name {
@@ -1248,6 +1555,52 @@ onUnmounted(() => {
   height: 100%;
 }
 
+.tv-empty-tabs {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--muted);
+  z-index: 5;
+  pointer-events: none;
+  text-align: center;
+}
+
+.tv-empty-tabs-visual {
+  color: var(--muted);
+  opacity: 0.7;
+}
+
+.tv-empty-tabs-text {
+  font-size: 0.9rem;
+}
+
+.tv-empty-tabs-actions {
+  position: relative;
+  pointer-events: auto;
+}
+
+.tv-add-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: #1e6bff;
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(30, 107, 255, 0.35);
+}
+
+.tv-add-tab-btn:hover {
+  background: #1557d6;
+}
+
 .tv-chart-canvas :deep(.chart-wrapper) {
   width: 100% !important;
   height: 100% !important;
@@ -1290,12 +1643,19 @@ onUnmounted(() => {
   width: auto !important;
 }
 
-/* Collapsible Legend Overlay */
-.tv-legend-overlay {
+/* Collapsible Legend + Tabs Group */
+.tv-legend-group {
   position: absolute;
   top: 8px;
   left: 8px;
   z-index: 25;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+}
+
+.tv-legend-overlay {
   display: flex;
   align-items: flex-start;
   gap: 4px;
@@ -1345,6 +1705,9 @@ onUnmounted(() => {
   gap: 3px;
 }
 
+.tv-legend-overlay.is-collapsed .tv-category-tabs {
+  display: none;
+}
 .tv-legend-row {
   display: flex;
   align-items: center;
@@ -1709,6 +2072,56 @@ onUnmounted(() => {
   padding: 8px 12px;
   border-bottom: 1px solid var(--stroke);
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.category-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.category-tabs-actions {
+  margin-left: auto;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.new-tab-btn {
+  white-space: nowrap;
+}
+
+.new-tab-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--stroke);
+  border-radius: 6px;
+  padding: 6px;
+  min-width: 140px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 5;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.new-tab-option {
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 6px 8px;
+  border-radius: 4px;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 0.78rem;
+}
+
+.new-tab-option:hover {
+  background: var(--surface-2);
 }
 
 .filter-tab {
