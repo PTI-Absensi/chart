@@ -224,13 +224,13 @@
               v-for="(symbol, idx) in selectedSymbols" 
               :key="symbol" 
               class="tv-legend-row"
-              :class="{ 'is-hidden': hiddenSeries.has(symbol) }"
+              :class="{ 'is-hidden': isSeriesHidden(symbol) }"
             >
               <button 
                 class="tv-legend-color-dot" 
-                :style="{ backgroundColor: hiddenSeries.has(symbol) ? 'transparent' : colors[idx % colors.length], borderColor: colors[idx % colors.length] }"
+                :style="{ backgroundColor: colors[idx % colors.length], borderColor: colors[idx % colors.length], opacity: isSeriesHidden(symbol) ? 0.35 : 1 }"
                 @click="toggleSeriesVisibility(symbol)"
-                :title="hiddenSeries.has(symbol) ? 'Show series' : 'Hide series'"
+                :title="isSeriesHidden(symbol) ? 'Show series' : 'Hide series'"
               ></button>
               <span class="tv-legend-symbol">{{ symbol }}</span>
               <span class="tv-legend-value" v-if="getSymbolValue(symbol)">
@@ -572,7 +572,7 @@ const sumberDana = ref('')
 const kategoriPlant = ref('')
 const maxSeries = ref(5) // Default max 5 series
 const selectedSymbols = ref<string[]>([])
-const hiddenSeries = ref<Set<string>>(new Set())
+const hiddenSeries = ref<string[]>([])
 
 // Navigation menu state
 const navMenuOpen = ref(false)
@@ -612,18 +612,19 @@ const summaryData = ref<SummaryData | null>(null)
 
 // Toggle series visibility
 function toggleSeriesVisibility(symbol: string) {
-  // Create new Set to trigger Vue reactivity
-  const newSet = new Set(hiddenSeries.value)
-  
-  if (newSet.has(symbol)) {
-    newSet.delete(symbol)
+  const idx = hiddenSeries.value.indexOf(symbol)
+  if (idx >= 0) {
+    // Remove from hidden (show it)
+    hiddenSeries.value.splice(idx, 1)
   } else {
-    newSet.add(symbol)
+    // Add to hidden (hide it)
+    hiddenSeries.value.push(symbol)
   }
-  
-  // Reassign to trigger reactivity
-  // ProcurementChart will filter based on hiddenSeries prop
-  hiddenSeries.value = newSet
+}
+
+// Check if a series is hidden
+function isSeriesHidden(symbol: string): boolean {
+  return hiddenSeries.value.includes(symbol)
 }
 
 // Filtered symbols for search
@@ -1240,7 +1241,7 @@ onUnmounted(() => {
 }
 
 .tv-legend-row.is-hidden {
-  opacity: 0.4;
+  opacity: 0.6;
 }
 
 .tv-legend-color-dot {
