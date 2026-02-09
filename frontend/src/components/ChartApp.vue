@@ -65,6 +65,18 @@
     </div>
     
     <div class="tv-header-right">
+      <button class="tv-btn icon" title="Undo (Ctrl/Cmd+Z)" @click="drawingRef?.undo?.()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+          <path d="M3 12a9 9 0 1 0 3-6.7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M3 5v4h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <button class="tv-btn icon" title="Redo (Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z)" @click="drawingRef?.redo?.()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+          <path d="M21 12a9 9 0 1 1-3-6.7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M21 5v4h-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
       <button class="tv-btn icon" title="Zoom In" @click="chartRef?.zoomIn()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M11 8v6M8 11h6M20 20l-4-4" stroke="currentColor" stroke-width="2"/></svg>
       </button>
@@ -171,7 +183,7 @@
     <!-- Chart Area -->
     <div class="tv-chart-area">
       <!-- Chart Canvas with Drawing Overlay -->
-      <div class="tv-chart-canvas">
+      <div class="tv-chart-canvas" :class="{ 'is-empty': !categoryTabs.length }">
         <div v-if="!categoryTabs.length" class="tv-empty-tabs">
           <div class="tv-empty-tabs-visual">
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
@@ -181,17 +193,30 @@
             </svg>
           </div>
           <div class="tv-empty-tabs-text">No tab activated. Create a new one.</div>
-          <div class="tv-empty-tabs-actions">
+          <div class="tv-empty-tabs-actions" ref="emptyTabAreaRef">
             <button
               class="tv-add-tab-btn"
               type="button"
-              @click="newTabMenuOpen = true; newTabMenuMode = 'category'; newTabMenuOnlyCategories = true"
+              @click="openEmptyTabMenu"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                 <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
               </svg>
               Add New Tab
             </button>
+            <div v-if="newTabMenuOpen && newTabMenuFromEmpty" class="tv-new-tab-menu is-center" @click.stop>
+              <div class="tv-new-tab-submenu">
+                <button
+                  v-for="opt in categoryOptions"
+                  :key="opt.value"
+                  class="tv-new-tab-option"
+                  type="button"
+                  @click="addCategoryTab(opt.value, false)"
+                >
+                  {{ opt.label }}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
         <div
@@ -342,7 +367,7 @@
               </div>
             </div>
           </div>
-          <div class="tv-category-bar">
+          <div class="tv-category-bar" ref="newTabAreaRef" @click.stop>
             <button class="tv-new-tab-btn is-tab" type="button" @click="newTabMenuOpen = !newTabMenuOpen; newTabMenuMode = 'root'; newTabMenuOnlyCategories = false" title="New Tab">
               <span class="tv-new-tab-plus">+</span>
               <span class="tv-new-tab-balloon">New</span>
@@ -368,7 +393,7 @@
                 />
               </div>
             </div>
-            <div v-if="newTabMenuOpen" class="tv-new-tab-menu" @click.stop>
+            <div v-if="newTabMenuOpen && !newTabMenuFromEmpty" class="tv-new-tab-menu" @click.stop>
               <template v-if="!newTabMenuOnlyCategories">
                 <button
                   class="tv-new-tab-option"
@@ -707,6 +732,7 @@ function getSymbolValue(symbol: string): number | undefined {
 // Delete drawing by index
 function deleteDrawing(idx: number) {
   if (drawingRef.value?.drawings) {
+    drawingRef.value.pushHistory?.()
     drawingRef.value.drawings.splice(idx, 1)
     drawingRef.value.redraw?.()
   }
@@ -850,9 +876,12 @@ const activeCategoryTabId = ref<string | null>(null)
 const newTabMenuOpen = ref(false)
 const newTabMenuMode = ref<'root' | 'category'>('root')
 const newTabMenuOnlyCategories = ref(false)
+const newTabMenuFromEmpty = ref(false)
 const activeSearchCategory = ref<CategoryValue>('all')
 const editingTabId = ref<string | null>(null)
 const editingTabLabel = ref('')
+const newTabAreaRef = ref<HTMLElement | null>(null)
+const emptyTabAreaRef = ref<HTMLElement | null>(null)
 
 watch(activeCategoryTabId, (next, prev) => {
   switchingTab.value = true
@@ -944,6 +973,8 @@ function addCategoryTab(category: CategoryValue, openSearch = false) {
   newTabMenuOpen.value = false
   newTabMenuMode.value = 'root'
   newTabMenuOnlyCategories.value = false
+  newTabMenuFromEmpty.value = false
+  newTabMenuFromEmpty.value = false
   if (openSearch) {
     openSearchModal()
   }
@@ -1094,6 +1125,29 @@ function closeSearchModal() {
   newTabMenuOpen.value = false
   newTabMenuMode.value = 'root'
   newTabMenuOnlyCategories.value = false
+  newTabMenuFromEmpty.value = false
+}
+
+function closeNewTabMenu() {
+  newTabMenuOpen.value = false
+  newTabMenuMode.value = 'root'
+  newTabMenuOnlyCategories.value = false
+  newTabMenuFromEmpty.value = false
+}
+
+function openEmptyTabMenu() {
+  newTabMenuOpen.value = true
+  newTabMenuMode.value = 'category'
+  newTabMenuOnlyCategories.value = true
+  newTabMenuFromEmpty.value = true
+}
+
+function handleDocumentClick(event: MouseEvent) {
+  if (!newTabMenuOpen.value) return
+  const target = event.target as Node
+  if (newTabAreaRef.value && newTabAreaRef.value.contains(target)) return
+  if (emptyTabAreaRef.value && emptyTabAreaRef.value.contains(target)) return
+  closeNewTabMenu()
 }
 
 // Filter symbols (no-op, computed handles it)
@@ -1210,6 +1264,36 @@ function onChartWheel(event: WheelEvent) {
   }
 }
 
+function handleGlobalShortcuts(event: KeyboardEvent) {
+  const target = event.target as HTMLElement | null
+  const isEditable =
+    target &&
+    (target.tagName === 'INPUT' ||
+      target.tagName === 'TEXTAREA' ||
+      target.isContentEditable)
+  if (isEditable) return
+
+  const isMac = navigator.platform.toLowerCase().includes('mac')
+  const modKey = isMac ? event.metaKey : event.ctrlKey
+  if (!modKey) return
+
+  const key = event.key.toLowerCase()
+  if (key === 'z' && event.shiftKey) {
+    event.preventDefault()
+    drawingRef.value?.redo?.()
+    return
+  }
+  if (key === 'z') {
+    event.preventDefault()
+    drawingRef.value?.undo?.()
+    return
+  }
+  if (key === 'y') {
+    event.preventDefault()
+    drawingRef.value?.redo?.()
+  }
+}
+
 // ===== PERSIST STATE TO LOCALSTORAGE =====
 const STORAGE_KEY = 'chartApp_state'
 
@@ -1266,6 +1350,8 @@ onMounted(() => {
   loadSymbols()
   nextTick(updateChartViewport)
   window.addEventListener('resize', handleResize)
+  window.addEventListener('keydown', handleGlobalShortcuts)
+  document.addEventListener('click', handleDocumentClick)
   if (chartScrollRef.value) {
     chartResizeObserver = new ResizeObserver(updateChartViewport)
     chartResizeObserver.observe(chartScrollRef.value)
@@ -1274,6 +1360,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
+  window.removeEventListener('keydown', handleGlobalShortcuts)
+  document.removeEventListener('click', handleDocumentClick)
   if (chartResizeObserver && chartScrollRef.value) {
     chartResizeObserver.unobserve(chartScrollRef.value)
     chartResizeObserver = null
@@ -1386,6 +1474,12 @@ onUnmounted(() => {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
 }
 
+.tv-new-tab-menu.is-center {
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
 .tv-new-tab-submenu {
   display: flex;
   flex-direction: column;
@@ -1416,6 +1510,8 @@ onUnmounted(() => {
   gap: 8px;
   width: 100%;
   position: relative;
+  z-index: 41;
+  pointer-events: auto;
 }
 
 .tv-category-tabs {
@@ -1688,6 +1784,10 @@ onUnmounted(() => {
   min-height: 0;
 }
 
+.tv-chart-canvas.is-empty :deep(.drawing-layer) {
+  pointer-events: none;
+}
+
 .tv-chart-scroll {
   position: relative;
   width: 100%;
@@ -1727,25 +1827,29 @@ onUnmounted(() => {
 
 .tv-empty-tabs {
   position: absolute;
-  inset: 0;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 10px;
   color: var(--muted);
-  z-index: 5;
-  pointer-events: none;
+  z-index: 30;
+  pointer-events: auto;
   text-align: center;
 }
 
 .tv-empty-tabs-visual {
   color: var(--muted);
   opacity: 0.7;
+  pointer-events: none;
 }
 
 .tv-empty-tabs-text {
   font-size: 0.9rem;
+  pointer-events: none;
 }
 
 .tv-empty-tabs-actions {
@@ -1818,7 +1922,7 @@ onUnmounted(() => {
   position: absolute;
   top: 8px;
   left: 8px;
-  z-index: 25;
+  z-index: 40;
   display: flex;
   align-items: flex-start;
   gap: 8px;
