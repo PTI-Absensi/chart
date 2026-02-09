@@ -137,6 +137,29 @@
         </svg>
       </button>
       
+      <div class="tv-sidebar-divider"></div>
+      
+      <button class="tv-sidebar-btn" :class="{ active: logScale }" @click="logScale = !logScale" title="Log Scale">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 19h16M6 16c2-3 4-4 6-4s4 1 6 4" stroke="currentColor" stroke-width="2"/></svg>
+      </button>
+      <button class="tv-sidebar-btn" :class="{ active: normalize }" @click="normalize = !normalize" title="Normalize">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 17h16M7 4v16" stroke="currentColor" stroke-width="2"/></svg>
+      </button>
+      <div class="tv-sidebar-divider"></div>
+      <button class="tv-sidebar-btn" :class="{ active: showObjectTree }" @click="showObjectTree = !showObjectTree" title="Object Tree">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path d="M3 3h18v18H3z" stroke="currentColor" stroke-width="2"/>
+          <path d="M7 12h10M7 8h6M7 16h8" stroke="currentColor" stroke-width="2"/>
+        </svg>
+      </button>
+      <button class="tv-sidebar-btn" :class="{ active: showLayersPanel }" @click="showLayersPanel = !showLayersPanel" title="Layers">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="currentColor" stroke-width="2"/>
+          <path d="M2 17l10 5 10-5" stroke="currentColor" stroke-width="2"/>
+          <path d="M2 12l10 5 10-5" stroke="currentColor" stroke-width="2"/>
+        </svg>
+      </button>
+      
       <!-- Navigation Popup -->
       <div v-if="navMenuOpen" class="tv-nav-popup">
         <div class="tv-nav-header">
@@ -253,17 +276,18 @@
                 @error="onChartError"
               />
               <!-- Drawing Layer Overlay (canvas only, no toolbar) -->
-              <DrawingLayer 
-                ref="drawingRef" 
-                :height="chartHeight" 
-                :show-toolbar="false"
-                :active-tool="activeDrawingTool"
-                class="tv-drawing-overlay"
-                :class="{ 'is-drawing': activeDrawingTool !== 'select' }"
-              />
-            </div>
+            <DrawingLayer 
+              ref="drawingRef" 
+              :height="chartHeight" 
+              :show-toolbar="false"
+              :active-tool="activeDrawingTool"
+              class="tv-drawing-overlay"
+              :class="{ 'is-interactive': drawingOverlayInteractive, 'is-drawing-tool': activeDrawingTool !== 'select' }"
+              @selection="onDrawingSelection"
+            />
           </div>
         </div>
+      </div>
         
         <!-- Collapsible Legend + Tabs Group -->
         <div class="tv-legend-group">
@@ -517,28 +541,41 @@
       </div>
     </div>
     
-    <!-- Right Sidebar: Log/Normalize + Panels -->
-    <aside class="tv-sidebar tv-sidebar-right">
-      <button class="tv-sidebar-btn" :class="{ active: logScale }" @click="logScale = !logScale" title="Log Scale">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 19h16M6 16c2-3 4-4 6-4s4 1 6 4" stroke="currentColor" stroke-width="2"/></svg>
-      </button>
-      <button class="tv-sidebar-btn" :class="{ active: normalize }" @click="normalize = !normalize" title="Normalize">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 17h16M7 4v16" stroke="currentColor" stroke-width="2"/></svg>
+    <!-- Right Sidebar: Drawing Properties (only when selected) -->
+    <aside class="tv-sidebar tv-sidebar-right tv-drawing-sidebar" v-if="selectedDrawing">
+      <div class="tv-drawing-prop">
+        <div class="tv-drawing-label">Line</div>
+        <input
+          class="tv-drawing-input"
+          type="text"
+          v-model="selectedDrawingName"
+          @keydown.enter.prevent="commitSelectedDrawingName"
+          @blur="commitSelectedDrawingName"
+          :placeholder="selectedDrawing.type"
+        />
+      </div>
+      <button class="tv-drawing-trash" type="button" title="Delete drawing" @click="deleteSelectedDrawing">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <path d="M3 6h18" stroke="currentColor" stroke-width="2"/>
+          <path d="M8 6V4h8v2" stroke="currentColor" stroke-width="2"/>
+          <path d="M6 6l1 14h10l1-14" stroke="currentColor" stroke-width="2"/>
+          <path d="M10 10v8M14 10v8" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        Delete
       </button>
       <div class="tv-sidebar-divider"></div>
-      <button class="tv-sidebar-btn" :class="{ active: showObjectTree }" @click="showObjectTree = !showObjectTree" title="Object Tree">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-          <path d="M3 3h18v18H3z" stroke="currentColor" stroke-width="2"/>
-          <path d="M7 12h10M7 8h6M7 16h8" stroke="currentColor" stroke-width="2"/>
-        </svg>
-      </button>
-      <button class="tv-sidebar-btn" :class="{ active: showLayersPanel }" @click="showLayersPanel = !showLayersPanel" title="Layers">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-          <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="currentColor" stroke-width="2"/>
-          <path d="M2 17l10 5 10-5" stroke="currentColor" stroke-width="2"/>
-          <path d="M2 12l10 5 10-5" stroke="currentColor" stroke-width="2"/>
-        </svg>
-      </button>
+      <div class="tv-drawing-prop">
+        <div class="tv-drawing-label">Color</div>
+        <label class="tv-drawing-color-picker">
+          <input
+            type="color"
+            class="tv-drawing-color-input"
+            :value="selectedDrawing.color"
+            @input="updateSelectedDrawingColor(($event.target as HTMLInputElement).value)"
+          />
+          <span class="tv-drawing-color" :style="{ backgroundColor: selectedDrawing.color }"></span>
+        </label>
+      </div>
     </aside>
   </main>
 
@@ -716,6 +753,13 @@ function clearDrawings() {
 // Chart ref
 const chartRef = ref<InstanceType<typeof ProcurementChart> | null>(null)
 const drawingRef = ref<InstanceType<typeof DrawingLayer> | null>(null)
+const selectedDrawing = ref<{ type: string; points: number[]; color: string; name?: string } | null>(null)
+const selectedDrawingIndex = ref<number | null>(null)
+const selectedDrawingName = ref('')
+const drawingOverlayInteractive = computed(() => {
+  if (activeDrawingTool.value !== 'select') return true
+  return (drawingRef.value?.drawings?.length || 0) > 0
+})
 
 // Panel visibility state
 const showObjectTree = ref(false)
@@ -735,7 +779,57 @@ function deleteDrawing(idx: number) {
     drawingRef.value.pushHistory?.()
     drawingRef.value.drawings.splice(idx, 1)
     drawingRef.value.redraw?.()
+    if (selectedDrawingIndex.value !== null) {
+      if (!drawingRef.value.drawings.length) {
+        selectedDrawing.value = null
+        selectedDrawingIndex.value = null
+        selectedDrawingName.value = ''
+      } else if (idx === selectedDrawingIndex.value) {
+        selectedDrawing.value = null
+        selectedDrawingIndex.value = null
+        selectedDrawingName.value = ''
+      } else if (idx < selectedDrawingIndex.value) {
+        selectedDrawingIndex.value -= 1
+      }
+    }
   }
+}
+
+function onDrawingSelection(payload: { drawing: { type: string; points: number[]; color: string; name?: string }; index: number } | null) {
+  selectedDrawing.value = payload?.drawing || null
+  selectedDrawingIndex.value = payload?.index ?? null
+  selectedDrawingName.value = payload?.drawing?.name || ''
+}
+
+function commitSelectedDrawingName() {
+  if (!drawingRef.value || !selectedDrawing.value) return
+  const drawings = drawingRef.value.drawings
+  if (selectedDrawingIndex.value === null) return
+  const matchIndex = selectedDrawingIndex.value
+  const nextName = selectedDrawingName.value.trim()
+  drawingRef.value.pushHistory?.()
+  drawings[matchIndex].name = nextName || undefined
+  selectedDrawing.value = { ...drawings[matchIndex] }
+  drawingRef.value.redraw?.()
+}
+
+function updateSelectedDrawingColor(nextColor: string) {
+  if (!drawingRef.value || !selectedDrawing.value) return
+  if (selectedDrawingIndex.value === null) return
+  const drawings = drawingRef.value.drawings
+  const matchIndex = selectedDrawingIndex.value
+  drawingRef.value.pushHistory?.()
+  drawings[matchIndex].color = nextColor
+  selectedDrawing.value = { ...drawings[matchIndex] }
+  drawingRef.value.redraw?.()
+}
+
+function deleteSelectedDrawing() {
+  if (selectedDrawingIndex.value === null) return
+  deleteDrawing(selectedDrawingIndex.value)
+  selectedDrawing.value = null
+  selectedDrawingIndex.value = null
+  selectedDrawingName.value = ''
 }
 
 // Chart state
@@ -1227,6 +1321,8 @@ function onChartPointerDown(event: PointerEvent) {
   if (!chartScrollRef.value) return
   if (activeDrawingTool.value !== 'select') return
   if (event.button !== 0) return
+  const target = event.target as HTMLElement | null
+  if (target?.closest('.drawing-layer')) return
   isPanning.value = true
   chartScrollRef.value.setPointerCapture(event.pointerId)
   panStart.value = {
@@ -1669,6 +1765,93 @@ onUnmounted(() => {
   border-left: 1px solid var(--stroke);
 }
 
+.tv-drawing-sidebar {
+  gap: 8px;
+  padding: 8px 6px;
+  width: 180px;
+}
+
+.tv-drawing-prop {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 4px;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.tv-drawing-label {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+
+.tv-drawing-value {
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 0.78rem;
+  text-transform: capitalize;
+}
+
+.tv-drawing-input {
+  background: transparent;
+  border: 1px solid var(--stroke);
+  border-radius: 6px;
+  padding: 6px 8px;
+  color: var(--ink);
+  font-size: 0.78rem;
+  outline: none;
+}
+
+.tv-drawing-input:focus {
+  border-color: var(--accent);
+}
+
+.tv-drawing-color {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid var(--stroke);
+}
+
+.tv-drawing-trash {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 6px 0;
+  padding: 6px 8px;
+  border: 1px solid var(--stroke);
+  background: transparent;
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+
+.tv-drawing-trash:hover {
+  color: #ef5350;
+  border-color: rgba(239, 83, 80, 0.4);
+  background: rgba(239, 83, 80, 0.1);
+}
+
+.tv-drawing-color-picker {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.tv-drawing-color-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
 /* Sidebar Buttons */
 .tv-sidebar-btn {
   width: 40px;
@@ -1884,6 +2067,16 @@ onUnmounted(() => {
   width: 100% !important;
 }
 
+/* Hide axes when there are no tabs */
+.tv-chart-canvas.is-empty :deep(.apexcharts-xaxis),
+.tv-chart-canvas.is-empty :deep(.apexcharts-yaxis),
+.tv-chart-canvas.is-empty :deep(.apexcharts-xaxis-texts-g),
+.tv-chart-canvas.is-empty :deep(.apexcharts-yaxis-texts-g),
+.tv-chart-canvas.is-empty :deep(.apexcharts-xaxis-tick),
+.tv-chart-canvas.is-empty :deep(.apexcharts-yaxis-tick) {
+  display: none !important;
+}
+
 /* Drawing Layer Overlay */
 .tv-drawing-overlay {
   position: absolute;
@@ -1896,9 +2089,16 @@ onUnmounted(() => {
 }
 
 /* Only enable pointer events on canvas when drawing tool is active (not select) */
-.tv-drawing-overlay.is-drawing :deep(canvas) {
+.tv-drawing-overlay.is-interactive :deep(canvas) {
   pointer-events: auto;
+}
+
+.tv-drawing-overlay.is-drawing-tool :deep(canvas) {
   cursor: crosshair;
+}
+
+.tv-drawing-overlay.is-interactive:not(.is-drawing-tool) :deep(canvas) {
+  cursor: pointer;
 }
 
 .tv-drawing-overlay :deep(.drawing-toolbar) {
