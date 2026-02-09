@@ -538,6 +538,37 @@ function toggleSeries(seriesName: string) {
   }
 }
 
+function panByPixels(deltaPx: number) {
+  if (!chartRef.value) return
+  const globals = chartRef.value.w?.globals
+  if (!globals) return
+  const minX = globals.minX
+  const maxX = globals.maxX
+  const gridWidth = globals.gridWidth || 0
+  if (!minX || !maxX || gridWidth <= 0) return
+  const range = maxX - minX
+  if (range <= 0) return
+  const dataMin = xAxisBounds.value.min ?? minX
+  const dataMax = xAxisBounds.value.max ?? maxX
+  const deltaMs = (deltaPx / gridWidth) * range
+  let nextMin = minX - deltaMs
+  let nextMax = maxX - deltaMs
+  if (dataMin !== undefined && dataMax !== undefined) {
+    const clampedMin = Math.max(dataMin, nextMin)
+    const clampedMax = Math.min(dataMax, nextMax)
+    const clampedRange = clampedMax - clampedMin
+    if (clampedRange <= 0) return
+    nextMin = clampedMin
+    nextMax = clampedMax
+  }
+  chartRef.value.updateOptions(
+    { xaxis: { min: nextMin, max: nextMax } },
+    false,
+    false,
+    false
+  )
+}
+
 // Expose methods
 defineExpose({
   exportPng,
@@ -545,6 +576,7 @@ defineExpose({
   zoomIn,
   zoomOut,
   toggleSeries,
+  panByPixels,
   refresh: loadData
 })
 
