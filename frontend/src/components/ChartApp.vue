@@ -194,37 +194,51 @@
             </button>
           </div>
         </div>
-        <ProcurementChart
-          ref="chartRef"
-          :chart-type="chartType"
-          :period-type="periodType"
-          :year="year"
-          :symbols="selectedSymbols"
-          :symbol-meta="selectedSymbolMeta"
-          :hidden-series="hiddenSeries"
-          :color-overrides="legendColors"
-          :normalize="normalize"
-          :log-scale="logScale"
-          :raw-mode="rawMode"
-          :cumulative="cumulative"
-          :single-scale="singleScale"
-          :scale-side="scaleSide"
-          :sumber-dana="sumberDana"
-          :kategori-plant="kategoriPlant"
-          :theme="theme"
-          :height="chartHeight"
-          @data-loaded="onDataLoaded"
-          @error="onChartError"
-        />
-        <!-- Drawing Layer Overlay (canvas only, no toolbar) -->
-        <DrawingLayer 
-          ref="drawingRef" 
-          :height="chartHeight" 
-          :show-toolbar="false"
-          :active-tool="activeDrawingTool"
-          class="tv-drawing-overlay"
-          :class="{ 'is-drawing': activeDrawingTool !== 'select' }"
-        />
+        <div
+          class="tv-chart-scroll"
+          ref="chartScrollRef"
+          @pointerdown="onChartPointerDown"
+          @pointermove="onChartPointerMove"
+          @pointerup="onChartPointerUp"
+          @pointerleave="onChartPointerUp"
+          @wheel.stop.prevent="onChartWheel"
+        >
+          <div class="tv-chart-scroll-inner">
+            <div class="tv-chart-frame" :style="{ height: chartHeight + 'px' }">
+              <ProcurementChart
+                ref="chartRef"
+                :chart-type="chartType"
+                :period-type="periodType"
+                :year="year"
+                :symbols="selectedSymbols"
+                :symbol-meta="selectedSymbolMeta"
+                :hidden-series="hiddenSeries"
+                :color-overrides="legendColors"
+                :normalize="normalize"
+                :log-scale="logScale"
+                :raw-mode="rawMode"
+                :cumulative="cumulative"
+                :single-scale="singleScale"
+                :scale-side="scaleSide"
+                :sumber-dana="sumberDana"
+                :kategori-plant="kategoriPlant"
+                :theme="theme"
+                :height="chartHeight"
+                @data-loaded="onDataLoaded"
+                @error="onChartError"
+              />
+              <!-- Drawing Layer Overlay (canvas only, no toolbar) -->
+              <DrawingLayer 
+                ref="drawingRef" 
+                :height="chartHeight" 
+                :show-toolbar="false"
+                :active-tool="activeDrawingTool"
+                class="tv-drawing-overlay"
+                :class="{ 'is-drawing': activeDrawingTool !== 'select' }"
+              />
+            </div>
+          </div>
+        </div>
         
         <!-- Collapsible Legend + Tabs Group -->
         <div class="tv-legend-group">
@@ -328,20 +342,31 @@
               </div>
             </div>
           </div>
-          <div class="tv-category-bar" v-show="!legendCollapsed">
+          <div class="tv-category-bar">
             <button class="tv-new-tab-btn is-tab" type="button" @click="newTabMenuOpen = !newTabMenuOpen; newTabMenuMode = 'root'; newTabMenuOnlyCategories = false" title="New Tab">
               <span class="tv-new-tab-plus">+</span>
               <span class="tv-new-tab-balloon">New</span>
             </button>
             <div class="tv-category-tabs">
-              <button
+              <div
                 v-for="tab in categoryTabs"
                 :key="tab.id"
                 :class="['tv-category-tab', { active: activeCategoryTabId === tab.id }]"
                 @click="activeCategoryTabId = tab.id"
+                @dblclick.stop="startRenameTab(tab)"
               >
-                {{ tab.label }}
-              </button>
+                <span v-if="editingTabId !== tab.id">{{ tab.label }}</span>
+                <input
+                  v-else
+                  v-model="editingTabLabel"
+                  class="tv-category-tab-input"
+                  type="text"
+                  @click.stop
+                  @keydown.enter.prevent="commitRenameTab(tab)"
+                  @keydown.esc.prevent="cancelRenameTab"
+                  @blur="commitRenameTab(tab)"
+                />
+              </div>
             </div>
             <div v-if="newTabMenuOpen" class="tv-new-tab-menu" @click.stop>
               <template v-if="!newTabMenuOnlyCategories">
@@ -376,32 +401,6 @@
         </div>
       </div>
       
-      <!-- Bottom-right floating buttons -->
-      <div class="tv-float-btns">
-        <button class="tv-float-btn" :class="{ active: logScale }" @click="logScale = !logScale" title="Log Scale">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 19h16M6 16c2-3 4-4 6-4s4 1 6 4" stroke="currentColor" stroke-width="2"/></svg>
-        </button>
-        <button class="tv-float-btn" :class="{ active: normalize }" @click="normalize = !normalize" title="Normalize">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 17h16M7 4v16" stroke="currentColor" stroke-width="2"/></svg>
-        </button>
-        <div class="tv-float-divider"></div>
-        <!-- Object Tree Button -->
-        <button class="tv-float-btn" :class="{ active: showObjectTree }" @click="showObjectTree = !showObjectTree" title="Object Tree">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <path d="M3 3h18v18H3z" stroke="currentColor" stroke-width="2"/>
-            <path d="M7 12h10M7 8h6M7 16h8" stroke="currentColor" stroke-width="2"/>
-          </svg>
-        </button>
-        <!-- Layers Button -->
-        <button class="tv-float-btn" :class="{ active: showLayersPanel }" @click="showLayersPanel = !showLayersPanel" title="Layers">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="currentColor" stroke-width="2"/>
-            <path d="M2 17l10 5 10-5" stroke="currentColor" stroke-width="2"/>
-            <path d="M2 12l10 5 10-5" stroke="currentColor" stroke-width="2"/>
-          </svg>
-        </button>
-      </div>
-
       <!-- Object Tree Panel -->
       <div class="tv-panel tv-object-tree" v-if="showObjectTree">
         <div class="tv-panel-header">
@@ -492,6 +491,30 @@
         </template>
       </div>
     </div>
+    
+    <!-- Right Sidebar: Log/Normalize + Panels -->
+    <aside class="tv-sidebar tv-sidebar-right">
+      <button class="tv-sidebar-btn" :class="{ active: logScale }" @click="logScale = !logScale" title="Log Scale">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 19h16M6 16c2-3 4-4 6-4s4 1 6 4" stroke="currentColor" stroke-width="2"/></svg>
+      </button>
+      <button class="tv-sidebar-btn" :class="{ active: normalize }" @click="normalize = !normalize" title="Normalize">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 17h16M7 4v16" stroke="currentColor" stroke-width="2"/></svg>
+      </button>
+      <div class="tv-sidebar-divider"></div>
+      <button class="tv-sidebar-btn" :class="{ active: showObjectTree }" @click="showObjectTree = !showObjectTree" title="Object Tree">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path d="M3 3h18v18H3z" stroke="currentColor" stroke-width="2"/>
+          <path d="M7 12h10M7 8h6M7 16h8" stroke="currentColor" stroke-width="2"/>
+        </svg>
+      </button>
+      <button class="tv-sidebar-btn" :class="{ active: showLayersPanel }" @click="showLayersPanel = !showLayersPanel" title="Layers">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="currentColor" stroke-width="2"/>
+          <path d="M2 17l10 5 10-5" stroke="currentColor" stroke-width="2"/>
+          <path d="M2 12l10 5 10-5" stroke="currentColor" stroke-width="2"/>
+        </svg>
+      </button>
+    </aside>
   </main>
 
   <!-- Search Modal with TradingView-style Filters -->
@@ -717,9 +740,14 @@ const legendNamesByTab = ref<Record<string, Record<string, string>>>({})
 // Navigation menu state
 const navMenuOpen = ref(false)
 
-// Dynamic chart height - calculate based on viewport
+// Dynamic chart height - based on chart viewport (adds padding for axis labels)
 const windowHeight = ref(window.innerHeight)
-const chartHeight = computed(() => windowHeight.value - 80) // header(40) + summary(40)
+const chartScrollRef = ref<HTMLElement | null>(null)
+let chartResizeObserver: ResizeObserver | null = null
+const chartViewportHeight = ref(0)
+const chartHeight = computed(() => Math.max(0, chartViewportHeight.value))
+const isPanning = ref(false)
+const panStart = ref({ x: 0, y: 0, left: 0, top: 0 })
 
 // Search modal state
 const searchModalOpen = ref(false)
@@ -823,6 +851,8 @@ const newTabMenuOpen = ref(false)
 const newTabMenuMode = ref<'root' | 'category'>('root')
 const newTabMenuOnlyCategories = ref(false)
 const activeSearchCategory = ref<CategoryValue>('all')
+const editingTabId = ref<string | null>(null)
+const editingTabLabel = ref('')
 
 watch(activeCategoryTabId, (next, prev) => {
   switchingTab.value = true
@@ -917,6 +947,34 @@ function addCategoryTab(category: CategoryValue, openSearch = false) {
   if (openSearch) {
     openSearchModal()
   }
+}
+
+function startRenameTab(tab: CategoryTab) {
+  editingTabId.value = tab.id
+  editingTabLabel.value = tab.label
+  nextTick(() => {
+    const inputs = document.querySelectorAll<HTMLInputElement>('.tv-category-tab-input')
+    const input = Array.from(inputs).find((el) => el.value === tab.label)
+    input?.focus()
+    input?.select()
+  })
+}
+
+function commitRenameTab(tab: CategoryTab) {
+  if (editingTabId.value !== tab.id) return
+  const nextLabel = editingTabLabel.value.trim()
+  if (nextLabel) {
+    categoryTabs.value = categoryTabs.value.map((t) =>
+      t.id === tab.id ? { ...t, label: nextLabel } : t
+    )
+  }
+  editingTabId.value = null
+  editingTabLabel.value = ''
+}
+
+function cancelRenameTab() {
+  editingTabId.value = null
+  editingTabLabel.value = ''
 }
 const hoveredSymbol = ref<string | null>(null)
 
@@ -1100,8 +1158,56 @@ function formatNumber(val: number | undefined): string {
 }
 
 // Handle resize
+function updateChartViewport() {
+  if (chartScrollRef.value) {
+    chartViewportHeight.value = chartScrollRef.value.clientHeight
+  }
+}
+
 function handleResize() {
   windowHeight.value = window.innerHeight
+  updateChartViewport()
+}
+
+function onChartPointerDown(event: PointerEvent) {
+  if (!chartScrollRef.value) return
+  if (activeDrawingTool.value !== 'select') return
+  if (event.button !== 0) return
+  isPanning.value = true
+  chartScrollRef.value.setPointerCapture(event.pointerId)
+  panStart.value = {
+    x: event.clientX,
+    y: event.clientY,
+    left: 0,
+    top: 0
+  }
+}
+
+function onChartPointerMove(event: PointerEvent) {
+  if (!isPanning.value) return
+  const dx = event.clientX - panStart.value.x
+  chartRef.value?.panByPixels?.(dx)
+}
+
+function onChartPointerUp(event: PointerEvent) {
+  if (!chartScrollRef.value) return
+  if (!isPanning.value) return
+  isPanning.value = false
+  chartScrollRef.value.releasePointerCapture(event.pointerId)
+}
+
+function onChartWheel(event: WheelEvent) {
+  if (event.shiftKey && event.deltaY !== 0) {
+    chartRef.value?.panByPixels?.(event.deltaY)
+    return
+  }
+  if (event.deltaX !== 0) {
+    chartRef.value?.panByPixels?.(event.deltaX)
+    return
+  }
+  if (event.deltaY !== 0) {
+    chartRef.value?.panByPixels?.(event.deltaY)
+  }
 }
 
 // ===== PERSIST STATE TO LOCALSTORAGE =====
@@ -1158,11 +1264,20 @@ watch([selectedSymbols, chartType, periodType, year, normalize, logScale, rawMod
 onMounted(() => {
   restoreState() // Restore saved state first
   loadSymbols()
+  nextTick(updateChartViewport)
   window.addEventListener('resize', handleResize)
+  if (chartScrollRef.value) {
+    chartResizeObserver = new ResizeObserver(updateChartViewport)
+    chartResizeObserver.observe(chartScrollRef.value)
+  }
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
+  if (chartResizeObserver && chartScrollRef.value) {
+    chartResizeObserver.unobserve(chartScrollRef.value)
+    chartResizeObserver = null
+  }
 })
 </script>
 
@@ -1344,6 +1459,16 @@ onUnmounted(() => {
   background: rgba(41, 98, 255, 0.12);
 }
 
+.tv-category-tab-input {
+  width: 120px;
+  max-width: 160px;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: inherit;
+  font-size: 0.78rem;
+}
+
 .tv-symbol-name {
   font-weight: 600;
 }
@@ -1441,6 +1566,11 @@ onUnmounted(() => {
   position: relative;
   padding: 4px 0;
   gap: 2px;
+}
+
+.tv-sidebar-right {
+  border-right: none;
+  border-left: 1px solid var(--stroke);
 }
 
 /* Sidebar Buttons */
@@ -1546,10 +1676,50 @@ onUnmounted(() => {
   flex-direction: column;
   background: var(--bg);
   overflow: hidden;
+  min-height: 0;
 }
 
 .tv-chart-canvas {
   flex: 1;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.tv-chart-scroll {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  max-width: 100%;
+  max-height: 100%;
+  overscroll-behavior: contain;
+  cursor: grab;
+  scrollbar-width: none;
+}
+
+.tv-chart-scroll:active {
+  cursor: grabbing;
+}
+
+.tv-chart-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.tv-chart-scroll-inner {
+  position: relative;
+  min-width: 100%;
+  min-height: 100%;
+  padding: 0;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+}
+
+.tv-chart-frame {
   position: relative;
   width: 100%;
   height: 100%;
@@ -1652,7 +1822,8 @@ onUnmounted(() => {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  width: 100%;
+  width: fit-content;
+  max-width: calc(100% - 16px);
 }
 
 .tv-legend-overlay {
@@ -1665,6 +1836,7 @@ onUnmounted(() => {
   padding: 6px 8px;
   transition: all 0.2s ease;
   max-width: 280px;
+  pointer-events: auto;
 }
 
 .tv-legend-overlay.is-collapsed {
@@ -1703,17 +1875,16 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 3px;
+  min-width: 0;
 }
 
-.tv-legend-overlay.is-collapsed .tv-category-tabs {
-  display: none;
-}
 .tv-legend-row {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: 0.78rem;
   white-space: nowrap;
+  flex-wrap: nowrap;
   transition: opacity 0.15s;
   position: relative;
 }
@@ -1741,11 +1912,19 @@ onUnmounted(() => {
 .tv-legend-symbol {
   color: var(--ink);
   font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .tv-legend-value {
   color: var(--muted);
   font-size: 0.72rem;
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 
 .tv-legend-actions {
@@ -1753,6 +1932,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 4px;
   margin-left: auto;
+  flex: 0 0 auto;
 }
 
 .tv-legend-action {
@@ -1831,6 +2011,7 @@ onUnmounted(() => {
   color: var(--muted);
   font-size: 0.75rem;
   font-style: italic;
+  white-space: nowrap;
 }
 
 /* Hide ApexCharts built-in legend - using our custom chevron legend instead */
@@ -1918,41 +2099,6 @@ onUnmounted(() => {
 
 .tv-legend-btn:hover {
   color: #fff;
-}
-
-/* Floating Buttons (bottom-right) */
-.tv-float-btns {
-  position: absolute;
-  bottom: 88px;
-  right: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  z-index: 10;
-}
-
-.tv-float-btn {
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--surface);
-  border: 1px solid var(--stroke);
-  border-radius: 4px;
-  color: var(--muted);
-  cursor: pointer;
-}
-
-.tv-float-btn:hover {
-  background: var(--hover);
-  color: var(--ink);
-}
-
-.tv-float-btn.active {
-  background: rgba(41, 98, 255, 0.15);
-  color: var(--accent);
-  border-color: var(--accent);
 }
 
 /* Summary Bar (bottom) */
@@ -2244,14 +2390,6 @@ onUnmounted(() => {
   color: #ef5350;
 }
 
-/* ===== Floating Button Divider ===== */
-.tv-float-divider {
-  width: 1px;
-  height: 16px;
-  background: rgba(255,255,255,0.2);
-  margin: 0 4px;
-}
-
 /* ===== Object Tree & Layers Panels ===== */
 .tv-panel {
   position: absolute;
@@ -2267,11 +2405,11 @@ onUnmounted(() => {
 }
 
 .tv-layers-panel {
-  right: 85px;
+  right: 60px;
 }
 
 .tv-layers-panel.is-shifted {
-  right: 288px;
+  right: 280px;
 }
 
 .tv-panel-header {
