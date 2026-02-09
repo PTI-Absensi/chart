@@ -263,14 +263,16 @@
                 :hidden-series="hiddenSeries"
                 :color-overrides="legendColors"
                 :normalize="normalize"
-                :log-scale="logScale"
-                :raw-mode="rawMode"
-                :cumulative="cumulative"
-                :single-scale="singleScale"
-                :scale-side="scaleSide"
-                :sumber-dana="sumberDana"
-                :kategori-plant="kategoriPlant"
-                :theme="theme"
+          :log-scale="logScale"
+          :raw-mode="rawMode"
+          :cumulative="cumulative"
+          :single-scale="singleScale"
+          :scale-side="scaleSide"
+          :y-axis-override="activeYAxisOverride"
+          :y-axis-by-symbol-override="activeYAxisBySymbolOverride"
+          :sumber-dana="sumberDana"
+          :kategori-plant="kategoriPlant"
+          :theme="theme"
                 :height="chartHeight"
                 @data-loaded="onDataLoaded"
                 @error="onChartError"
@@ -404,6 +406,7 @@
                 @click="activeCategoryTabId = tab.id"
                 @dblclick.stop="startRenameTab(tab)"
               >
+                <span class="tv-category-indicator" :class="{ 'is-active': activeCategoryTabId === tab.id }"></span>
                 <span v-if="editingTabId !== tab.id">{{ tab.label }}</span>
                 <input
                   v-else
@@ -415,6 +418,34 @@
                   @keydown.esc.prevent="cancelRenameTab"
                   @blur="commitRenameTab(tab)"
                 />
+                <button class="tv-category-cog" type="button" title="Tab settings" @click.stop="toggleTabSettings(tab)">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" stroke="currentColor" stroke-width="2"/>
+                    <path d="M19.4 15a7.8 7.8 0 0 0 .1-1 7.8 7.8 0 0 0-.1-1l2-1.6-2-3.4-2.4 1a7.6 7.6 0 0 0-1.7-1l-.3-2.6H9l-.3 2.6a7.6 7.6 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.8 7.8 0 0 0-.1 1 7.8 7.8 0 0 0 .1 1l-2 1.6 2 3.4 2.4-1a7.6 7.6 0 0 0 1.7 1l.3 2.6h6l.3-2.6a7.6 7.6 0 0 0 1.7-1l2.4 1 2-3.4-2-1.6z" stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                </button>
+                <button class="tv-category-close" type="button" title="Close tab" @click.stop="closeCategoryTab(tab.id)">
+                  ×
+                </button>
+                <div
+                  v-if="activeTabSettingsId === tab.id"
+                  class="tv-tab-settings"
+                  @click.stop
+                >
+                  <div class="tv-tab-settings-row">
+                    <label class="tv-tab-settings-label">Name</label>
+                    <input
+                      class="tv-tab-settings-input"
+                      type="text"
+                      v-model="tabSettingsName"
+                      @keydown.enter.prevent="commitTabSettingsName(tab)"
+                      @keydown.esc.prevent="closeTabSettings"
+                    />
+                  </div>
+                  <button class="tv-tab-settings-save" type="button" @click="commitTabSettingsName(tab)">
+                    Save
+                  </button>
+                </div>
               </div>
             </div>
             <div v-if="newTabMenuOpen && !newTabMenuFromEmpty" class="tv-new-tab-menu" @click.stop>
@@ -541,42 +572,71 @@
       </div>
     </div>
     
-    <!-- Right Sidebar: Drawing Properties (only when selected) -->
-    <aside class="tv-sidebar tv-sidebar-right tv-drawing-sidebar" v-if="selectedDrawing">
-      <div class="tv-drawing-prop">
-        <div class="tv-drawing-label">Line</div>
-        <input
-          class="tv-drawing-input"
-          type="text"
-          v-model="selectedDrawingName"
-          @keydown.enter.prevent="commitSelectedDrawingName"
-          @blur="commitSelectedDrawingName"
-          :placeholder="selectedDrawing.type"
-        />
-      </div>
-      <button class="tv-drawing-trash" type="button" title="Delete drawing" @click="deleteSelectedDrawing">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-          <path d="M3 6h18" stroke="currentColor" stroke-width="2"/>
-          <path d="M8 6V4h8v2" stroke="currentColor" stroke-width="2"/>
-          <path d="M6 6l1 14h10l1-14" stroke="currentColor" stroke-width="2"/>
-          <path d="M10 10v8M14 10v8" stroke="currentColor" stroke-width="2"/>
-        </svg>
-        Delete
-      </button>
-      <div class="tv-sidebar-divider"></div>
-      <div class="tv-drawing-prop">
-        <div class="tv-drawing-label">Color</div>
-        <label class="tv-drawing-color-picker">
+    <div class="tv-right-stack">
+      <!-- Right Sidebar: Drawing Properties (only when selected) -->
+      <aside class="tv-sidebar tv-drawing-sidebar" v-if="selectedDrawing">
+        <button class="tv-drawing-close" type="button" title="Close properties" @click="clearSelectedDrawing">
+          ×
+        </button>
+        <div class="tv-drawing-prop">
+          <div class="tv-drawing-label">Line</div>
           <input
-            type="color"
-            class="tv-drawing-color-input"
-            :value="selectedDrawing.color"
-            @input="updateSelectedDrawingColor(($event.target as HTMLInputElement).value)"
+            class="tv-drawing-input"
+            type="text"
+            v-model="selectedDrawingName"
+            @keydown.enter.prevent="commitSelectedDrawingName"
+            @blur="commitSelectedDrawingName"
+            :placeholder="selectedDrawing.type"
           />
-          <span class="tv-drawing-color" :style="{ backgroundColor: selectedDrawing.color }"></span>
-        </label>
-      </div>
-    </aside>
+        </div>
+        <button class="tv-drawing-trash" type="button" title="Delete drawing" @click="deleteSelectedDrawing">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path d="M3 6h18" stroke="currentColor" stroke-width="2"/>
+            <path d="M8 6V4h8v2" stroke="currentColor" stroke-width="2"/>
+            <path d="M6 6l1 14h10l1-14" stroke="currentColor" stroke-width="2"/>
+            <path d="M10 10v8M14 10v8" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          Delete
+        </button>
+        <div class="tv-sidebar-divider"></div>
+        <div class="tv-drawing-prop">
+          <div class="tv-drawing-label">Color</div>
+          <label class="tv-drawing-color-picker">
+            <input
+              type="color"
+              class="tv-drawing-color-input"
+              :value="selectedDrawing.color"
+              @input="updateSelectedDrawingColor(($event.target as HTMLInputElement).value)"
+            />
+            <span class="tv-drawing-color" :style="{ backgroundColor: selectedDrawing.color }"></span>
+          </label>
+        </div>
+      </aside>
+
+      <!-- Right Navbar -->
+      <aside class="tv-sidebar tv-sidebar-right">
+        <button class="tv-sidebar-btn" :class="{ active: logScale }" @click="logScale = !logScale" title="Log Scale">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 19h16M6 16c2-3 4-4 6-4s4 1 6 4" stroke="currentColor" stroke-width="2"/></svg>
+        </button>
+        <button class="tv-sidebar-btn" :class="{ active: normalize }" @click="normalize = !normalize" title="Normalize">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 17h16M7 4v16" stroke="currentColor" stroke-width="2"/></svg>
+        </button>
+        <div class="tv-sidebar-divider"></div>
+        <button class="tv-sidebar-btn" :class="{ active: showObjectTree }" @click="showObjectTree = !showObjectTree" title="Object Tree">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M3 3h18v18H3z" stroke="currentColor" stroke-width="2"/>
+            <path d="M7 12h10M7 8h6M7 16h8" stroke="currentColor" stroke-width="2"/>
+          </svg>
+        </button>
+        <button class="tv-sidebar-btn" :class="{ active: showLayersPanel }" @click="showLayersPanel = !showLayersPanel" title="Layers">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="currentColor" stroke-width="2"/>
+            <path d="M2 17l10 5 10-5" stroke="currentColor" stroke-width="2"/>
+            <path d="M2 12l10 5 10-5" stroke="currentColor" stroke-width="2"/>
+          </svg>
+        </button>
+      </aside>
+    </div>
   </main>
 
   <!-- Search Modal with TradingView-style Filters -->
@@ -824,9 +884,29 @@ function updateSelectedDrawingColor(nextColor: string) {
   drawingRef.value.redraw?.()
 }
 
+function clearYAxisOverrides(tabId?: string) {
+  if (!tabId) {
+    yAxisOverrideByTab.value = {}
+    yAxisBySymbolOverrideByTab.value = {}
+    return
+  }
+  const next = { ...yAxisOverrideByTab.value }
+  const nextBySymbol = { ...yAxisBySymbolOverrideByTab.value }
+  delete next[tabId]
+  delete nextBySymbol[tabId]
+  yAxisOverrideByTab.value = next
+  yAxisBySymbolOverrideByTab.value = nextBySymbol
+}
+
 function deleteSelectedDrawing() {
   if (selectedDrawingIndex.value === null) return
   deleteDrawing(selectedDrawingIndex.value)
+  selectedDrawing.value = null
+  selectedDrawingIndex.value = null
+  selectedDrawingName.value = ''
+}
+
+function clearSelectedDrawing() {
   selectedDrawing.value = null
   selectedDrawingIndex.value = null
   selectedDrawingName.value = ''
@@ -856,6 +936,17 @@ const activeLegendSettings = ref<string | null>(null)
 const hiddenSeriesByTab = ref<Record<string, string[]>>({})
 const legendColorsByTab = ref<Record<string, Record<string, string>>>({})
 const legendNamesByTab = ref<Record<string, Record<string, string>>>({})
+const yAxisOverrideByTab = ref<Record<string, { min?: number; max?: number }>>({})
+const yAxisBySymbolOverrideByTab = ref<Record<string, Record<string, { min?: number; max?: number }>>>({})
+
+const activeYAxisOverride = computed(() => {
+  const id = activeCategoryTabId.value
+  return id ? yAxisOverrideByTab.value[id] : undefined
+})
+const activeYAxisBySymbolOverride = computed(() => {
+  const id = activeCategoryTabId.value
+  return id ? yAxisBySymbolOverrideByTab.value[id] : undefined
+})
 
 // Navigation menu state
 const navMenuOpen = ref(false)
@@ -976,6 +1067,8 @@ const editingTabId = ref<string | null>(null)
 const editingTabLabel = ref('')
 const newTabAreaRef = ref<HTMLElement | null>(null)
 const emptyTabAreaRef = ref<HTMLElement | null>(null)
+const activeTabSettingsId = ref<string | null>(null)
+const tabSettingsName = ref('')
 
 watch(activeCategoryTabId, (next, prev) => {
   switchingTab.value = true
@@ -1021,6 +1114,13 @@ watch(selectedSymbols, (val) => {
     ...selectedSymbolsByTab.value,
     [activeId]: [...val]
   }
+  const bounds = yAxisBySymbolOverrideByTab.value[activeId]
+  if (bounds) {
+    const hasNewSymbol = val.some((sym) => !bounds[sym])
+    if (hasNewSymbol) {
+      clearYAxisOverrides(activeId)
+    }
+  }
 }, { deep: true })
 
 watch(hiddenSeries, (val) => {
@@ -1053,6 +1153,10 @@ watch(legendNames, (val) => {
   }
 }, { deep: true })
 
+watch([periodType, year, rawMode, cumulative, sumberDana, kategoriPlant, normalize, logScale], () => {
+  clearYAxisOverrides()
+})
+
 function addCategoryTab(category: CategoryValue, openSearch = false) {
   const baseLabel = categoryOptions.find(o => o.value === category)?.label || category
   const nextIndex = categoryTabs.value.filter(t => t.category === category).length + 1
@@ -1072,6 +1176,60 @@ function addCategoryTab(category: CategoryValue, openSearch = false) {
   if (openSearch) {
     openSearchModal()
   }
+}
+
+function closeCategoryTab(tabId: string) {
+  const idx = categoryTabs.value.findIndex((t) => t.id === tabId)
+  if (idx === -1) return
+  const wasActive = activeCategoryTabId.value === tabId
+  categoryTabs.value = categoryTabs.value.filter((t) => t.id !== tabId)
+  const { [tabId]: _sel, ...restSel } = selectedSymbolsByTab.value
+  const { [tabId]: _hid, ...restHid } = hiddenSeriesByTab.value
+  const { [tabId]: _lc, ...restLc } = legendColorsByTab.value
+  const { [tabId]: _ln, ...restLn } = legendNamesByTab.value
+  const { [tabId]: _yo, ...restYo } = yAxisOverrideByTab.value
+  const { [tabId]: _ys, ...restYs } = yAxisBySymbolOverrideByTab.value
+  selectedSymbolsByTab.value = restSel
+  hiddenSeriesByTab.value = restHid
+  legendColorsByTab.value = restLc
+  legendNamesByTab.value = restLn
+  yAxisOverrideByTab.value = restYo
+  yAxisBySymbolOverrideByTab.value = restYs
+
+  if (wasActive) {
+    const nextTab = categoryTabs.value[idx] || categoryTabs.value[idx - 1] || null
+    activeCategoryTabId.value = nextTab ? nextTab.id : null
+  }
+}
+
+function toggleTabSettings(tab: CategoryTab) {
+  if (activeTabSettingsId.value === tab.id) {
+    closeTabSettings()
+    return
+  }
+  activeTabSettingsId.value = tab.id
+  tabSettingsName.value = tab.label
+  nextTick(() => {
+    const input = document.querySelector<HTMLInputElement>('.tv-tab-settings-input')
+    input?.focus()
+    input?.select()
+  })
+}
+
+function closeTabSettings() {
+  activeTabSettingsId.value = null
+  tabSettingsName.value = ''
+}
+
+function commitTabSettingsName(tab: CategoryTab) {
+  if (activeTabSettingsId.value !== tab.id) return
+  const nextLabel = tabSettingsName.value.trim()
+  if (nextLabel) {
+    categoryTabs.value = categoryTabs.value.map((t) =>
+      t.id === tab.id ? { ...t, label: nextLabel } : t
+    )
+  }
+  closeTabSettings()
 }
 
 function startRenameTab(tab: CategoryTab) {
@@ -1237,8 +1395,15 @@ function openEmptyTabMenu() {
 }
 
 function handleDocumentClick(event: MouseEvent) {
-  if (!newTabMenuOpen.value) return
   const target = event.target as Node
+  if (activeTabSettingsId.value) {
+    const settingsEl = document.querySelector('.tv-tab-settings')
+    const cogEl = document.querySelector('.tv-category-cog')
+    if (settingsEl && settingsEl.contains(target)) return
+    if (cogEl && cogEl.contains(target)) return
+    closeTabSettings()
+  }
+  if (!newTabMenuOpen.value) return
   if (newTabAreaRef.value && newTabAreaRef.value.contains(target)) return
   if (emptyTabAreaRef.value && emptyTabAreaRef.value.contains(target)) return
   closeNewTabMenu()
@@ -1252,6 +1417,60 @@ function onDataLoaded(data: Record<string, any[]>) {
   if (!selectedSymbols.value.length) {
     summaryData.value = null
     return
+  }
+
+  const activeTabId = activeCategoryTabId.value
+  if (activeTabId && !yAxisOverrideByTab.value[activeTabId]) {
+    const symbolBounds: Record<string, { min?: number; max?: number }> = {}
+    let allValues: number[] = []
+    selectedSymbols.value.forEach((symbol) => {
+      const values = data[symbol] || []
+      if (!values.length) {
+        symbolBounds[symbol] = { min: undefined, max: undefined }
+        return
+      }
+      let seriesVals = values.map((d: any) => d.close).filter((v: any) => typeof v === 'number')
+      if (normalize.value && seriesVals.length) {
+        const firstVal = seriesVals[0]
+        if (firstVal > 0) {
+          seriesVals = seriesVals.map((v: number) => (v / firstVal) * 100)
+        }
+      }
+      if (!seriesVals.length) {
+        symbolBounds[symbol] = { min: undefined, max: undefined }
+        return
+      }
+      let minVal = Math.min(...seriesVals)
+      let maxVal = Math.max(...seriesVals)
+      if (logScale.value) {
+        minVal = Math.max(minVal, 1)
+      }
+      const range = Math.max(maxVal - minVal, 1)
+      const pad = range * 0.05
+      const paddedMin = minVal >= 0 ? Math.max(0, minVal - pad) : minVal - pad
+      symbolBounds[symbol] = { min: paddedMin, max: maxVal + pad }
+      allValues = allValues.concat(seriesVals)
+    })
+
+    if (allValues.length) {
+      let minVal = Math.min(...allValues)
+      let maxVal = Math.max(...allValues)
+      if (logScale.value) {
+        minVal = Math.max(minVal, 1)
+      }
+      const range = Math.max(maxVal - minVal, 1)
+      const pad = range * 0.05
+      const paddedMin = minVal >= 0 ? Math.max(0, minVal - pad) : minVal - pad
+      yAxisOverrideByTab.value = {
+        ...yAxisOverrideByTab.value,
+        [activeTabId]: { min: paddedMin, max: maxVal + pad }
+      }
+    }
+
+    yAxisBySymbolOverrideByTab.value = {
+      ...yAxisBySymbolOverrideByTab.value,
+      [activeTabId]: symbolBounds
+    }
   }
 
   const seriesSummaries: SummarySeries[] = []
@@ -1396,6 +1615,14 @@ const STORAGE_KEY = 'chartApp_state'
 // Save state to localStorage
 function saveState() {
     const state = {
+      categoryTabs: categoryTabs.value,
+      activeCategoryTabId: activeCategoryTabId.value,
+      selectedSymbolsByTab: selectedSymbolsByTab.value,
+      hiddenSeriesByTab: hiddenSeriesByTab.value,
+      legendColorsByTab: legendColorsByTab.value,
+      legendNamesByTab: legendNamesByTab.value,
+      yAxisOverrideByTab: yAxisOverrideByTab.value,
+      yAxisBySymbolOverrideByTab: yAxisBySymbolOverrideByTab.value,
       selectedSymbols: selectedSymbols.value,
       chartType: chartType.value,
       periodType: periodType.value,
@@ -1418,8 +1645,15 @@ function restoreState() {
   if (saved) {
     try {
       const state = JSON.parse(saved)
-      // DO NOT restore selectedSymbols to prevent auto-loading data
-      // if (state.selectedSymbols) selectedSymbols.value = state.selectedSymbols
+      if (state.categoryTabs) categoryTabs.value = state.categoryTabs
+      if (state.activeCategoryTabId !== undefined) activeCategoryTabId.value = state.activeCategoryTabId
+      if (state.selectedSymbolsByTab) selectedSymbolsByTab.value = state.selectedSymbolsByTab
+      if (state.hiddenSeriesByTab) hiddenSeriesByTab.value = state.hiddenSeriesByTab
+      if (state.legendColorsByTab) legendColorsByTab.value = state.legendColorsByTab
+      if (state.legendNamesByTab) legendNamesByTab.value = state.legendNamesByTab
+      if (state.yAxisOverrideByTab) yAxisOverrideByTab.value = state.yAxisOverrideByTab
+      if (state.yAxisBySymbolOverrideByTab) yAxisBySymbolOverrideByTab.value = state.yAxisBySymbolOverrideByTab
+      if (state.selectedSymbols) selectedSymbols.value = state.selectedSymbols
       if (state.chartType) chartType.value = state.chartType
       if (state.periodType) periodType.value = state.periodType
       if (state.year) year.value = state.year
@@ -1438,7 +1672,7 @@ function restoreState() {
 }
 
 // Watch for state changes and save
-watch([selectedSymbols, chartType, periodType, year, normalize, logScale, rawMode, cumulative, singleScale, scaleSide, sumberDana, kategoriPlant], saveState, { deep: true })
+watch([categoryTabs, activeCategoryTabId, selectedSymbolsByTab, hiddenSeriesByTab, legendColorsByTab, legendNamesByTab, yAxisOverrideByTab, yAxisBySymbolOverrideByTab, selectedSymbols, chartType, periodType, year, normalize, logScale, rawMode, cumulative, singleScale, scaleSide, sumberDana, kategoriPlant], saveState, { deep: true })
 
 // Init
 onMounted(() => {
@@ -1651,6 +1885,109 @@ onUnmounted(() => {
   background: rgba(41, 98, 255, 0.12);
 }
 
+.tv-category-indicator {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--stroke);
+  margin-right: 6px;
+  flex: 0 0 auto;
+}
+
+.tv-category-indicator.is-active {
+  background: var(--accent);
+}
+
+.tv-category-close {
+  margin-left: 6px;
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.9rem;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.tv-category-close:hover {
+  color: var(--ink);
+}
+
+.tv-category-cog {
+  margin-left: 6px;
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tv-category-cog:hover {
+  color: var(--ink);
+}
+
+.tv-tab-settings {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  background: var(--surface);
+  border: 1px solid var(--stroke);
+  border-radius: 6px;
+  padding: 8px;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 50;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.tv-tab-settings-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tv-tab-settings-label {
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.tv-tab-settings-input {
+  border: 1px solid var(--stroke);
+  background: var(--surface-alt);
+  color: var(--ink);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 0.78rem;
+  outline: none;
+}
+
+.tv-tab-settings-input:focus {
+  border-color: var(--accent);
+}
+
+.tv-tab-settings-save {
+  align-self: flex-end;
+  border: none;
+  background: var(--surface-2);
+  color: var(--ink);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.tv-tab-settings-save:hover {
+  background: var(--hover);
+}
+
 .tv-category-tab-input {
   width: 120px;
   max-width: 160px;
@@ -1765,10 +2102,17 @@ onUnmounted(() => {
   border-left: 1px solid var(--stroke);
 }
 
+.tv-right-stack {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+}
+
 .tv-drawing-sidebar {
   gap: 8px;
   padding: 8px 6px;
   width: 180px;
+  border-left: 1px solid var(--stroke);
 }
 
 .tv-drawing-prop {
@@ -1850,6 +2194,22 @@ onUnmounted(() => {
   inset: 0;
   opacity: 0;
   cursor: pointer;
+}
+
+.tv-drawing-close {
+  align-self: flex-end;
+  margin: 4px 6px 0;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.tv-drawing-close:hover {
+  color: var(--ink);
 }
 
 /* Sidebar Buttons */
