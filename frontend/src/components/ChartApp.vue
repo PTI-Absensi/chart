@@ -183,7 +183,7 @@
     </aside>
     
     <!-- Chart Area -->
-    <div class="tv-chart-area">
+    <div class="tv-chart-area" ref="chartAreaRef">
       <!-- Chart Canvas with Drawing Overlay -->
       <div class="tv-chart-canvas" :class="{ 'is-empty': !categoryTabs.length }">
         <div v-if="!categoryTabs.length" class="tv-empty-tabs">
@@ -280,10 +280,8 @@
                   class="tv-legend-color-dot" 
                   :style="{ backgroundColor: getLegendColor(symbol, idx), borderColor: getLegendColor(symbol, idx) }"
                 ></span>
-                <span class="tv-legend-symbol">{{ getLegendName(symbol) }}</span>
-                <span class="tv-legend-value" v-if="getSymbolValue(symbol)">
-                  {{ formatNumber(getSymbolValue(symbol)) }}
-                </span>
+              <span class="tv-legend-symbol">{{ getLegendName(symbol) }}</span>
+              <span class="tv-legend-desc">{{ getLegendDescription(symbol) }}</span>
                 <div class="tv-legend-actions">
                   <button
                     class="tv-legend-action"
@@ -424,7 +422,7 @@
       </div>
       
       <!-- Object Tree Panel -->
-      <div class="tv-panel tv-object-tree" v-if="showObjectTree">
+      <div class="tv-panel tv-object-tree" v-if="showObjectTree" :style="objectTreePanelStyle">
         <div class="tv-panel-header">
           <span>Drawing Objects</span>
           <button class="tv-panel-close" @click="showObjectTree = false">×</button>
@@ -450,7 +448,7 @@
       </div>
 
       <!-- Layers Panel -->
-      <div class="tv-panel tv-layers-panel" :class="{ 'is-shifted': showObjectTree }" v-if="showLayersPanel">
+      <div class="tv-panel tv-layers-panel" :class="{ 'is-shifted': showObjectTree }" v-if="showLayersPanel" :style="layersPanelStyle">
         <div class="tv-panel-header">
           <span>Layers</span>
           <button class="tv-panel-close" @click="showLayersPanel = false">×</button>
@@ -564,13 +562,13 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 17h16M7 4v16" stroke="currentColor" stroke-width="2"/></svg>
         </button>
         <div class="tv-sidebar-divider"></div>
-        <button class="tv-sidebar-btn" :class="{ active: showObjectTree }" @click="showObjectTree = !showObjectTree" title="Object Tree">
+      <button class="tv-sidebar-btn" ref="objectTreeBtnRef" :class="{ active: showObjectTree }" @click="showObjectTree = !showObjectTree" title="Object Tree">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
             <path d="M3 3h18v18H3z" stroke="currentColor" stroke-width="2"/>
             <path d="M7 12h10M7 8h6M7 16h8" stroke="currentColor" stroke-width="2"/>
           </svg>
         </button>
-        <button class="tv-sidebar-btn" :class="{ active: showLayersPanel }" @click="showLayersPanel = !showLayersPanel" title="Layers">
+      <button class="tv-sidebar-btn" ref="layersBtnRef" :class="{ active: showLayersPanel }" @click="showLayersPanel = !showLayersPanel" title="Layers">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
             <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="currentColor" stroke-width="2"/>
             <path d="M2 17l10 5 10-5" stroke="currentColor" stroke-width="2"/>
@@ -772,6 +770,11 @@ const drawingOverlayInteractive = computed(() => {
 const showObjectTree = ref(false)
 const showLayersPanel = ref(false)
 const legendCollapsed = ref(false)
+const chartAreaRef = ref<HTMLElement | null>(null)
+const objectTreeBtnRef = ref<HTMLElement | null>(null)
+const layersBtnRef = ref<HTMLElement | null>(null)
+const objectTreePanelStyle = ref<Record<string, string>>({})
+const layersPanelStyle = ref<Record<string, string>>({})
 
 // Get symbol value from summary data
 function getSymbolValue(symbol: string): number | undefined {
@@ -1465,6 +1468,29 @@ function updateChartViewport() {
 function handleResize() {
   windowHeight.value = window.innerHeight
   updateChartViewport()
+  updatePanelPositions()
+}
+
+function computePanelStyle(btnEl: HTMLElement | null): Record<string, string> {
+  if (!btnEl || !chartAreaRef.value) return {}
+  const areaRect = chartAreaRef.value.getBoundingClientRect()
+  const btnRect = btnEl.getBoundingClientRect()
+  const top = btnRect.top - areaRect.top + btnRect.height / 2
+  const right = areaRect.right - btnRect.left + 10
+  return {
+    top: `${top}px`,
+    right: `${right}px`,
+    transform: 'translateY(-50%)'
+  }
+}
+
+function updatePanelPositions() {
+  if (showObjectTree.value) {
+    objectTreePanelStyle.value = computePanelStyle(objectTreeBtnRef.value)
+  }
+  if (showLayersPanel.value) {
+    layersPanelStyle.value = computePanelStyle(layersBtnRef.value)
+  }
 }
 
 function onChartPointerDown(event: PointerEvent) {
@@ -1604,12 +1630,17 @@ function restoreState() {
 
 // Watch for state changes and save
 watch([categoryTabs, activeCategoryTabId, selectedSymbolsByTab, hiddenSeriesByTab, legendColorsByTab, legendNamesByTab, yAxisOverrideByTab, yAxisBySymbolOverrideByTab, selectedSymbols, chartType, periodType, year, normalize, logScale, rawMode, cumulative, singleScale, scaleSide, sumberDana, kategoriPlant], saveState, { deep: true })
+watch([showObjectTree, showLayersPanel], async () => {
+  await nextTick()
+  updatePanelPositions()
+})
 
 // Init
 onMounted(() => {
   restoreState() // Restore saved state first
   loadSymbols()
   nextTick(updateChartViewport)
+  nextTick(updatePanelPositions)
   window.addEventListener('resize', handleResize)
   window.addEventListener('keydown', handleGlobalShortcuts)
   document.addEventListener('click', handleDocumentClick)
@@ -3009,10 +3040,11 @@ onUnmounted(() => {
 /* ===== Object Tree & Layers Panels ===== */
 .tv-panel {
   position: absolute;
-  right: 60px;
-  bottom: 40px;
+  right: 0;
+  top: 0;
+  bottom: auto;
   width: 200px;  /* Reduced from 220px */
-  transform: translateY(calc(-100% - 8px));  /* Reduced from 12px */
+  transform: none;
   background: color-mix(in srgb, var(--surface) 92%, transparent);
   border: 1px solid var(--stroke);
   border-radius: 8px;
@@ -3021,11 +3053,17 @@ onUnmounted(() => {
 }
 
 .tv-layers-panel {
-  right: 60px;
+  right: 0;
+  top: 0;
+  bottom: auto;
 }
 
 .tv-layers-panel.is-shifted {
-  right: 280px;
+  right: 0;
+}
+
+.tv-object-tree {
+  top: 0;
 }
 
 .tv-panel-header {
