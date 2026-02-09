@@ -1118,6 +1118,7 @@ function addCategoryTab(category: CategoryValue, openSearch = false) {
   if (openSearch) {
     openSearchModal()
   }
+  return id
 }
 
 function closeCategoryTab(tabId: string) {
@@ -1215,28 +1216,34 @@ function selectSymbolWithScale(sym: SymbolItem, scaleMode: ScaleMode) {
     return
   }
 
-  // If no tabs yet, create one based on symbol type
-  if (!categoryTabs.value.length) {
-    const category = (sym.symbolType as CategoryValue) || 'all'
-    addCategoryTab(category, false)
-  }
-  
-  // Add symbol if not already selected
-  if (!selectedSymbols.value.includes(sym.symbol)) {
-    selectedSymbols.value.push(sym.symbol)
-    seriesScales.value[sym.symbol] = scaleMode
-    
-    // Apply scale mode effects
-    if (scaleMode === 'percent') {
-      // TODO: Enable normalize mode for this series
-      console.log(`Added ${sym.symbol} with Same % scale (normalized)`)
-    } else if (scaleMode === 'scale') {
-      // TODO: Add separate Y-axis for this series
-      console.log(`Added ${sym.symbol} with New price scale`)
-    } else if (scaleMode === 'pane') {
-      // TODO: Create new pane for this series
-      console.log(`Added ${sym.symbol} with New pane`)
+  // If no tabs yet, create a default tab before inserting data
+  const insertSymbol = () => {
+    if (!selectedSymbols.value.includes(sym.symbol)) {
+      selectedSymbols.value.push(sym.symbol)
+      seriesScales.value[sym.symbol] = scaleMode
+      
+      // Apply scale mode effects
+      if (scaleMode === 'percent') {
+        // TODO: Enable normalize mode for this series
+        console.log(`Added ${sym.symbol} with Same % scale (normalized)`)
+      } else if (scaleMode === 'scale') {
+        // TODO: Add separate Y-axis for this series
+        console.log(`Added ${sym.symbol} with New price scale`)
+      } else if (scaleMode === 'pane') {
+        // TODO: Create new pane for this series
+        console.log(`Added ${sym.symbol} with New pane`)
+      }
     }
+  }
+
+  if (!categoryTabs.value.length) {
+    addCategoryTab('all', false)
+    nextTick(insertSymbol)
+  } else {
+    if (!activeCategoryTabId.value) {
+      activeCategoryTabId.value = categoryTabs.value[0].id
+    }
+    insertSymbol()
   }
   
   // Close modal
