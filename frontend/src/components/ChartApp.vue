@@ -232,9 +232,7 @@
                 :style="{ backgroundColor: getLegendColor(symbol, idx), borderColor: getLegendColor(symbol, idx) }"
               ></span>
               <span class="tv-legend-symbol">{{ getLegendName(symbol) }}</span>
-              <span class="tv-legend-value" v-if="getSymbolValue(symbol)">
-                {{ formatNumber(getSymbolValue(symbol)) }}
-              </span>
+              <span class="tv-legend-desc">{{ getLegendDescription(symbol) }}</span>
               <div class="tv-legend-actions">
                 <button
                   class="tv-legend-action"
@@ -494,7 +492,7 @@
               <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 2h9l5 5v15H6z" stroke="currentColor" stroke-width="2"/><path d="M14 2v5h5" stroke="currentColor" stroke-width="2"/><path d="M8 10h8M8 14h6" stroke="currentColor" stroke-width="2"/></svg>
             </span>
             <span class="search-item-code">{{ sym.symbol }}</span>
-            <span class="search-item-name">{{ sym.name }}</span>
+            <span class="search-item-name">{{ sym.description || sym.name }}</span>
             <span class="search-item-unit">{{ sym.unit }}</span>
           </button>
           
@@ -703,6 +701,11 @@ function getLegendColor(symbol: string, idx: number): string {
 
 function getLegendName(symbol: string): string {
   return legendNames.value[symbol] || symbol
+}
+
+function getLegendDescription(symbol: string): string {
+  const meta = selectedSymbolMeta.value[symbol]
+  return meta?.description || meta?.name || symbol
 }
 
 function updateLegendName(symbol: string, name: string) {
@@ -1380,9 +1383,12 @@ onUnmounted(() => {
   font-weight: 500;
 }
 
-.tv-legend-value {
+.tv-legend-desc {
   color: var(--muted);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
+  max-width: 200px;
+  white-space: normal;
+  line-height: 1.2;
 }
 
 .tv-legend-actions {
@@ -1775,8 +1781,11 @@ onUnmounted(() => {
 
 .search-item-name {
   flex: 1;
+  min-width: 0;
   font-size: 0.85rem;
   color: var(--muted);
+  white-space: normal;
+  line-height: 1.2;
 }
 
 .search-item-unit {

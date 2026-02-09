@@ -74,8 +74,17 @@ const colors = [
   '#00bcd4', '#8bc34a', '#e91e63', '#3f51b5', '#009688'
 ]
 
+function toRgba(hex: string, alpha: number) {
+  const cleanHex = hex.replace('#', '')
+  const r = parseInt(cleanHex.substring(0, 2), 16)
+  const g = parseInt(cleanHex.substring(2, 4), 16)
+  const b = parseInt(cleanHex.substring(4, 6), 16)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
 function resolveColor(symbol: string, index: number): string {
-  return props.colorOverrides?.[symbol] || colors[index % colors.length]
+  const base = props.colorOverrides?.[symbol] || colors[index % colors.length]
+  return props.hiddenSeries.has(symbol) ? toRgba(base, 0.35) : base
 }
 
 // Computed chart type for ApexCharts
@@ -313,10 +322,7 @@ const chartSeries = computed(() => {
     return []
   }
 
-  // Filter out hidden symbols
-  const visibleSymbols = props.symbols.filter(s => !props.hiddenSeries.has(s))
-
-  return visibleSymbols.map((symbol) => {
+  return props.symbols.map((symbol) => {
     const data = rawData.value[symbol] || []
 
     let values = data.map((d: any) => d.close)

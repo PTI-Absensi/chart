@@ -1,5 +1,27 @@
 import format from 'pg-format'
 import { query } from '../db.js'
+import fs from 'fs/promises'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
+let symbolDescCache = null
+
+async function loadSymbolDescriptionMap() {
+  if (symbolDescCache) return symbolDescCache
+  try {
+    const filePath = path.resolve(__dirname, '..', '..', '..', 'db_symbols.json')
+    const raw = await fs.readFile(filePath, 'utf-8')
+    const list = JSON.parse(raw)
+    symbolDescCache = new Map(list.map((item) => [item.symbol, item.description || item.name]))
+  } catch (err) {
+    console.warn('Failed to load db_symbols.json for descriptions:', err?.message || err)
+    symbolDescCache = new Map()
+  }
+  return symbolDescCache
+}
 
 const METRICS = {
   DOC_PR: {
@@ -245,17 +267,22 @@ export async function getAllSymbols() {
     ORDER BY kode_data
   `
   try {
+    const descMap = await loadSymbolDescriptionMap()
     const result = await query(sql)
     const symbols = []
 
     // Process each row and create both dokumen and nilai variants
     result.rows.forEach(row => {
+      const rawDesc = (row.description || '').trim()
+      const fallbackDesc = descMap.get(row.symbol)
+      const description = rawDesc && rawDesc !== row.name ? rawDesc : (fallbackDesc || row.name)
+
       // Dokumen variant (original symbol)
       symbols.push({
         symbol: row.symbol,
         name: row.name,
         category: row.category,
-        description: row.description,
+        description,
         unit: 'Dokumen',
         symbolType: 'dokumen',  // NEW: type field
         sumber_dana: row.sumber_dana,
@@ -267,7 +294,7 @@ export async function getAllSymbols() {
         symbol: `${row.symbol}-N`,
         name: `${row.name} (Nilai)`,
         category: row.category,
-        description: `${row.description} - Nilai Rupiah`,
+        description: `${description} - Nilai Rupiah`,
         unit: 'Rp',
         symbolType: 'nilai',  // NEW: type field
         sumber_dana: row.sumber_dana,
