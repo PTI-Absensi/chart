@@ -31,7 +31,7 @@ const props = withDefaults(defineProps<{
   cumulative?: boolean
   singleScale?: boolean
   scaleSide?: 'left' | 'right'
-  symbolMeta?: Record<string, { name?: string; description?: string }>
+  symbolMeta?: Record<string, { name?: string; description?: string; unit?: string }>
   sumberDana?: string
   kategoriPlant?: string
   theme?: 'dark' | 'light'
@@ -106,6 +106,10 @@ const themeTokens = computed(() => {
   }
 })
 
+const numberShortId = new Intl.NumberFormat('id-ID', {
+  maximumFractionDigits: 1
+})
+
 const currencyShortId = new Intl.NumberFormat('id-ID', {
   style: 'currency',
   currency: 'IDR',
@@ -114,9 +118,30 @@ const currencyShortId = new Intl.NumberFormat('id-ID', {
   maximumFractionDigits: 1
 })
 
-function formatCurrencyShort(val: number): string {
+type CurrencyScale = { divisor: number; suffix: string; label: string }
+
+function formatCountShort(val: number): string {
+  if (!Number.isFinite(val)) return '0'
+  if (val >= 1e9) return (val / 1e9).toFixed(1) + 'B'
+  if (val >= 1e6) return (val / 1e6).toFixed(1) + 'M'
+  if (val >= 1e3) return (val / 1e3).toFixed(0) + 'K'
+  return val.toFixed(0)
+}
+
+function getCurrencyScale(maxVal: number): CurrencyScale {
+  if (!Number.isFinite(maxVal) || maxVal <= 0) return { divisor: 1, suffix: '', label: 'Rp' }
+  if (maxVal >= 1e12) return { divisor: 1e12, suffix: 'T', label: 'Triliun' }
+  if (maxVal >= 1e9) return { divisor: 1e9, suffix: 'M', label: 'Miliar' }
+  if (maxVal >= 1e6) return { divisor: 1e6, suffix: 'Jt', label: 'Juta' }
+  if (maxVal >= 1e3) return { divisor: 1e3, suffix: 'Rb', label: 'Ribu' }
+  return { divisor: 1, suffix: '', label: 'Rp' }
+}
+
+function formatCurrencyScaled(val: number, scale: CurrencyScale, mode: 'axis' | 'tooltip' = 'axis'): string {
   if (!Number.isFinite(val)) return 'Rp 0'
-  return currencyShortId.format(val)
+  if (scale.divisor === 1) return currencyShortId.format(val)
+  const suffix = mode === 'tooltip' ? scale.label : scale.suffix
+  return `Rp ${numberShortId.format(val / scale.divisor)} ${suffix}`.trim()
 }
 
 const dateFormatterId = new Intl.DateTimeFormat('id-ID', {
@@ -128,6 +153,25 @@ const dateFormatterId = new Intl.DateTimeFormat('id-ID', {
 // Chart options
 const chartOptions = computed(() => {
   const tokens = themeTokens.value
+  const primarySymbol = props.symbols.find((s) => getUnit(s) === 'Rp') || props.symbols[0]
+  const primaryUnit = primarySymbol ? getUnit(primarySymbol) : ''
+  const primaryScale = currencyScaleGlobal.value
+
+  const formatYAxisValue = (symbol: string | undefined, val: number, mode: 'axis' | 'tooltip' = 'axis') => {
+    const unit = symbol ? getUnit(symbol) : primaryUnit
+    if (unit === 'Rp') {
+      const scale = props.singleScale ? primaryScale : (currencyScaleBySymbol.value[symbol || ''] || primaryScale)
+      return formatCurrencyScaled(val, scale, mode)
+    }
+    return formatCountShort(val)
+  }
+
+  const unitLabel = (symbol: string | undefined) => {
+    const unit = symbol ? getUnit(symbol) : primaryUnit
+    if (unit !== 'Rp') return ''
+    const scale = props.singleScale ? primaryScale : (currencyScaleBySymbol.value[symbol || ''] || primaryScale)
+    return scale.label && scale.label !== 'Rp' ? `Rp (${scale.label})` : 'Rp'
+  }
   const hasRightAxis = props.singleScale
     ? props.scaleSide === 'right'
     : props.symbols.some((_, index) => index % 2 === 1)
@@ -267,7 +311,11 @@ const chartOptions = computed(() => {
             style: { colors: tokens.text },
             maxWidth:60,  // Limit width for cleaner layout
             offsetX: props.scaleSide === 'right' ? 0 : -12,
-            formatter: (val: number) => formatCurrencyShort(val)
+            formatter: (val: number) => formatYAxisValue(primarySymbol, val)
+          },
+          title: {
+            text: unitLabel(primarySymbol),
+            style: { color: tokens.text }
           },
           tooltip: { enabled: true }
         }
@@ -283,10 +331,10 @@ const chartOptions = computed(() => {
             style: { colors: resolveColor(symbol, index) },
             maxWidth: 60,  // Limit width
             offsetX: index % 2 === 1 ? 0 : -12,
-            formatter: (val: number) => formatCurrencyShort(val)
+            formatter: (val: number) => formatYAxisValue(symbol, val)
           },
           title: {
-            text: symbol,
+            text: unitLabel(symbol) ? `${symbol} (${unitLabel(symbol)})` : symbol,
             style: { color: resolveColor(symbol, index) }
           },
           tooltip: { enabled: true }
@@ -297,6 +345,12 @@ const chartOptions = computed(() => {
       intersect: false,
       x: {
         formatter: (val: number) => dateFormatterId.format(new Date(val))
+      },
+      y: {
+        formatter: (val: number, opts: any) => {
+          const seriesName = opts?.w?.globals?.seriesNames?.[opts.seriesIndex]
+          return formatYAxisValue(seriesName, val, 'tooltip')
+        }
       }
     },
     dataLabels: { enabled: false },
@@ -360,6 +414,32 @@ const xAxisBounds = computed(() => {
   const range = Math.max(maxTime - minTime, 7 * 24 * 60 * 60)
   const paddedMax = maxTime + Math.round(range * 0.05)
   return { min: minTime * 1000, max: paddedMax * 1000 }
+})
+
+function getUnit(symbol: string): string {
+  return props.symbolMeta?.[symbol]?.unit || ''
+}
+
+const currencyScaleBySymbol = computed<Record<string, CurrencyScale>>(() => {
+  const scales: Record<string, CurrencyScale> = {}
+  props.symbols.forEach((symbol) => {
+    if (getUnit(symbol) !== 'Rp') return
+    const data = rawData.value[symbol] || []
+    const maxVal = data.reduce((max, d) => Math.max(max, Number(d.close) || 0), 0)
+    scales[symbol] = getCurrencyScale(maxVal)
+  })
+  return scales
+})
+
+const currencyScaleGlobal = computed<CurrencyScale>(() => {
+  let maxVal = 0
+  props.symbols.forEach((symbol) => {
+    if (getUnit(symbol) !== 'Rp') return
+    const data = rawData.value[symbol] || []
+    const localMax = data.reduce((max, d) => Math.max(max, Number(d.close) || 0), 0)
+    if (localMax > maxVal) maxVal = localMax
+  })
+  return getCurrencyScale(maxVal)
 })
 
 const yAxisBounds = computed(() => {

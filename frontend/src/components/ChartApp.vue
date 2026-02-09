@@ -657,12 +657,12 @@ const searchInput = ref<HTMLInputElement | null>(null)
 const allSymbols = ref<SymbolItem[]>([])
 const loadingSymbols = ref(false)
 const selectedSymbolMeta = computed(() => {
-  const meta: Record<string, { name: string; description: string }> = {}
+  const meta: Record<string, { name: string; description: string; unit?: string }> = {}
   const bySymbol = new Map(allSymbols.value.map((s) => [s.symbol, s]))
   selectedSymbols.value.forEach((symbol) => {
     const item = bySymbol.get(symbol)
     if (item) {
-      meta[symbol] = { name: item.name, description: item.description }
+      meta[symbol] = { name: item.name, description: item.description, unit: item.unit }
     }
   })
   return meta
