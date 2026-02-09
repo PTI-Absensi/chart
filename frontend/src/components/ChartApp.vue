@@ -10,7 +10,12 @@
         <span class="tv-title">Procurement</span>
       </div>
       
-      <!-- New Tab (moved to legend group) -->
+      <button class="tv-btn tv-insert-btn" type="button" @click="openSearchModal" title="Insert Data">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+          <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        Insert
+      </button>
     </div>
     
     <div class="tv-header-center">
@@ -636,8 +641,11 @@
           >
             <!-- Type Icon -->
             <span class="search-item-icon" :class="sym.symbolType">
-              <svg v-if="sym.symbolType === 'nilai'" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 2v20M6 6l6-4 6 4M6 18l6 4 6-4" stroke="currentColor" stroke-width="2"/></svg>
-              <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 2h9l5 5v15H6z" stroke="currentColor" stroke-width="2"/><path d="M14 2v5h5" stroke="currentColor" stroke-width="2"/><path d="M8 10h8M8 14h6" stroke="currentColor" stroke-width="2"/></svg>
+              <svg v-if="sym.symbolType === 'dokumen'" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 2h9l5 5v15H6z" stroke="currentColor" stroke-width="2"/><path d="M14 2v5h5" stroke="currentColor" stroke-width="2"/><path d="M8 10h8M8 14h6" stroke="currentColor" stroke-width="2"/></svg>
+              <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2v20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                <path d="M16.5 6.5c0-1.9-1.6-3.5-4.5-3.5s-4.5 1.2-4.5 3.2c0 1.9 1.8 2.7 4.6 3.3 2.8.6 4.4 1.3 4.4 3.2 0 2.2-2 3.3-4.5 3.3s-4.5-1.1-4.5-3.3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
             </span>
             <span class="search-item-code">{{ sym.symbol }}</span>
             <span class="search-item-name">{{ sym.name }}</span>
@@ -1633,6 +1641,17 @@ onUnmounted(() => {
   align-items: center;
   gap: 6px;
   color: var(--ink);
+}
+
+.tv-insert-btn {
+  margin-left: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface-alt);
+  border: 1px solid var(--stroke);
+  border-radius: 4px;
+  padding: 4px 8px;
 }
 
 .tv-title {
