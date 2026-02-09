@@ -31,6 +31,8 @@ const props = withDefaults(defineProps<{
   cumulative?: boolean
   singleScale?: boolean
   scaleSide?: 'left' | 'right'
+  yAxisOverride?: { min?: number; max?: number }
+  yAxisBySymbolOverride?: Record<string, { min?: number; max?: number }>
   symbolMeta?: Record<string, { name?: string; description?: string }>
   sumberDana?: string
   kategoriPlant?: string
@@ -49,6 +51,8 @@ const props = withDefaults(defineProps<{
   cumulative: false,
   singleScale: false,
   scaleSide: 'left',
+  yAxisOverride: undefined,
+  yAxisBySymbolOverride: undefined,
   symbolMeta: () => ({}),
   sumberDana: '',
   kategoriPlant: '',
@@ -250,8 +254,8 @@ const chartOptions = computed(() => {
       ? {
           opposite: props.scaleSide === 'right',
           logarithmic: props.logScale,
-          min: yAxisBounds.value.min,
-          max: yAxisBounds.value.max,
+          min: props.yAxisOverride?.min ?? yAxisBounds.value.min,
+          max: props.yAxisOverride?.max ?? yAxisBounds.value.max,
           axisBorder: { show: true, offsetX: 0 },
           axisTicks: { show: true, offsetX: 0 },
           labels: {
@@ -266,8 +270,8 @@ const chartOptions = computed(() => {
           seriesName: symbol,
           opposite: index % 2 === 1, // Alternate left/right
           logarithmic: props.logScale,
-          min: yAxisBoundsBySymbol.value[symbol]?.min,
-          max: yAxisBoundsBySymbol.value[symbol]?.max,
+          min: props.yAxisBySymbolOverride?.[symbol]?.min ?? yAxisBoundsBySymbol.value[symbol]?.min,
+          max: props.yAxisBySymbolOverride?.[symbol]?.max ?? yAxisBoundsBySymbol.value[symbol]?.max,
           axisTicks: { show: true, offsetX: 0 },
           axisBorder: { show: true, color: resolveColor(symbol, index), offsetX: 0 },
           labels: {
