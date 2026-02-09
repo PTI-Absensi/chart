@@ -10,12 +10,7 @@
         <span class="tv-title">Procurement</span>
       </div>
       
-      <!-- Symbol Search -->
-      <div class="tv-symbol-search" @click="openSearchModal">
-        <span class="tv-symbol-name">{{ selectedSymbols.length > 0 ? selectedSymbols[0] : 'Kode Data' }}</span>
-        <span v-if="selectedSymbols.length > 1" class="tv-symbol-more">+{{ selectedSymbols.length - 1 }}</span>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2"/></svg>
-      </div>
+      <!-- New Tab (moved to legend group) -->
     </div>
     
     <div class="tv-header-center">
@@ -70,6 +65,18 @@
     </div>
     
     <div class="tv-header-right">
+      <button class="tv-btn icon" title="Undo (Ctrl/Cmd+Z)" @click="drawingRef?.undo?.()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+          <path d="M3 12a9 9 0 1 0 3-6.7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M3 5v4h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <button class="tv-btn icon" title="Redo (Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z)" @click="drawingRef?.redo?.()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+          <path d="M21 12a9 9 0 1 1-3-6.7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M21 5v4h-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
       <button class="tv-btn icon" title="Zoom In" @click="chartRef?.zoomIn()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M11 8v6M8 11h6M20 20l-4-4" stroke="currentColor" stroke-width="2"/></svg>
       </button>
@@ -130,6 +137,29 @@
         </svg>
       </button>
       
+      <div class="tv-sidebar-divider"></div>
+      
+      <button class="tv-sidebar-btn" :class="{ active: logScale }" @click="logScale = !logScale" title="Log Scale">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 19h16M6 16c2-3 4-4 6-4s4 1 6 4" stroke="currentColor" stroke-width="2"/></svg>
+      </button>
+      <button class="tv-sidebar-btn" :class="{ active: normalize }" @click="normalize = !normalize" title="Normalize">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 17h16M7 4v16" stroke="currentColor" stroke-width="2"/></svg>
+      </button>
+      <div class="tv-sidebar-divider"></div>
+      <button class="tv-sidebar-btn" :class="{ active: showObjectTree }" @click="showObjectTree = !showObjectTree" title="Object Tree">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path d="M3 3h18v18H3z" stroke="currentColor" stroke-width="2"/>
+          <path d="M7 12h10M7 8h6M7 16h8" stroke="currentColor" stroke-width="2"/>
+        </svg>
+      </button>
+      <button class="tv-sidebar-btn" :class="{ active: showLayersPanel }" @click="showLayersPanel = !showLayersPanel" title="Layers">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="currentColor" stroke-width="2"/>
+          <path d="M2 17l10 5 10-5" stroke="currentColor" stroke-width="2"/>
+          <path d="M2 12l10 5 10-5" stroke="currentColor" stroke-width="2"/>
+        </svg>
+      </button>
+      
       <!-- Navigation Popup -->
       <div v-if="navMenuOpen" class="tv-nav-popup">
         <div class="tv-nav-header">
@@ -176,166 +206,281 @@
     <!-- Chart Area -->
     <div class="tv-chart-area">
       <!-- Chart Canvas with Drawing Overlay -->
-      <div class="tv-chart-canvas">
-        <ProcurementChart
-          ref="chartRef"
-          :chart-type="chartType"
-          :period-type="periodType"
-          :year="year"
-          :symbols="selectedSymbols"
-          :symbol-meta="selectedSymbolMeta"
-          :hidden-series="hiddenSeries"
-          :color-overrides="legendColors"
-          :normalize="normalize"
+      <div class="tv-chart-canvas" :class="{ 'is-empty': !categoryTabs.length }">
+        <div v-if="!categoryTabs.length" class="tv-empty-tabs">
+          <div class="tv-empty-tabs-visual">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+              <rect x="3" y="4" width="18" height="14" rx="2" stroke="currentColor" stroke-width="2"/>
+              <path d="M7 8h10M7 12h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <path d="M12 18v3M9 21h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div class="tv-empty-tabs-text">No tab activated. Create a new one.</div>
+          <div class="tv-empty-tabs-actions" ref="emptyTabAreaRef">
+            <button
+              class="tv-add-tab-btn"
+              type="button"
+              @click="openEmptyTabMenu"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+              Add New Tab
+            </button>
+            <div v-if="newTabMenuOpen && newTabMenuFromEmpty" class="tv-new-tab-menu is-center" @click.stop>
+              <div class="tv-new-tab-submenu">
+                <button
+                  v-for="opt in categoryOptions"
+                  :key="opt.value"
+                  class="tv-new-tab-option"
+                  type="button"
+                  @click="addCategoryTab(opt.value, false)"
+                >
+                  {{ opt.label }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div
+          class="tv-chart-scroll"
+          ref="chartScrollRef"
+          @pointerdown="onChartPointerDown"
+          @pointermove="onChartPointerMove"
+          @pointerup="onChartPointerUp"
+          @pointerleave="onChartPointerUp"
+          @wheel.stop.prevent="onChartWheel"
+        >
+          <div class="tv-chart-scroll-inner">
+            <div class="tv-chart-frame" :style="{ height: chartHeight + 'px' }">
+              <ProcurementChart
+                ref="chartRef"
+                :chart-type="chartType"
+                :period-type="periodType"
+                :year="year"
+                :symbols="selectedSymbols"
+                :symbol-meta="selectedSymbolMeta"
+                :hidden-series="hiddenSeries"
+                :color-overrides="legendColors"
+                :normalize="normalize"
           :log-scale="logScale"
           :raw-mode="rawMode"
           :cumulative="cumulative"
           :single-scale="singleScale"
           :scale-side="scaleSide"
+          :y-axis-override="activeYAxisOverride"
+          :y-axis-by-symbol-override="activeYAxisBySymbolOverride"
           :sumber-dana="sumberDana"
           :kategori-plant="kategoriPlant"
           :theme="theme"
-          :height="chartHeight"
-          @data-loaded="onDataLoaded"
-          @error="onChartError"
-        />
-        <!-- Drawing Layer Overlay (canvas only, no toolbar) -->
-        <DrawingLayer 
-          ref="drawingRef" 
-          :height="chartHeight" 
-          :show-toolbar="false"
-          :active-tool="activeDrawingTool"
-          class="tv-drawing-overlay"
-          :class="{ 'is-drawing': activeDrawingTool !== 'select' }"
-        />
+                :height="chartHeight"
+                @data-loaded="onDataLoaded"
+                @error="onChartError"
+              />
+              <!-- Drawing Layer Overlay (canvas only, no toolbar) -->
+            <DrawingLayer 
+              ref="drawingRef" 
+              :height="chartHeight" 
+              :show-toolbar="false"
+              :active-tool="activeDrawingTool"
+              class="tv-drawing-overlay"
+              :class="{ 'is-interactive': drawingOverlayInteractive, 'is-drawing-tool': activeDrawingTool !== 'select' }"
+              @selection="onDrawingSelection"
+            />
+          </div>
+        </div>
+      </div>
         
-        <!-- Collapsible Legend Overlay (TradingView style) -->
-        <div class="tv-legend-overlay" :class="{ 'is-collapsed': legendCollapsed }">
-          <button class="tv-legend-toggle" @click="legendCollapsed = !legendCollapsed" title="Toggle Legend">
-            <svg 
-              width="16" height="16" viewBox="0 0 24 24" fill="none"
-              :class="{ 'chevron-rotated': !legendCollapsed }"
-            >
-              <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
-          
-          <div class="tv-legend-content" v-show="!legendCollapsed">
-            <div 
-              v-for="(symbol, idx) in selectedSymbols" 
-              :key="symbol" 
-              class="tv-legend-row"
-              :class="{ 'tv-legend-row--hidden': hiddenSeries.has(symbol) }"
-            >
-              <span 
-                class="tv-legend-color-dot" 
-                :style="{ backgroundColor: getLegendColor(symbol, idx), borderColor: getLegendColor(symbol, idx) }"
-              ></span>
-              <span class="tv-legend-symbol">{{ getLegendName(symbol) }}</span>
-              <span class="tv-legend-desc">{{ getLegendDescription(symbol) }}</span>
-              <div class="tv-legend-actions">
-                <button
-                  class="tv-legend-action"
-                  :class="{ 'is-active': !hiddenSeries.has(symbol) }"
-                  type="button"
-                  @click.stop="toggleSeriesVisibility(symbol)"
-                  :title="hiddenSeries.has(symbol) ? 'Show series' : 'Hide series'"
+        <!-- Collapsible Legend + Tabs Group -->
+        <div class="tv-legend-group">
+          <div class="tv-legend-overlay" :class="{ 'is-collapsed': legendCollapsed }">
+            <button class="tv-legend-toggle" @click="legendCollapsed = !legendCollapsed" title="Toggle Legend">
+              <svg 
+                width="16" height="16" viewBox="0 0 24 24" fill="none"
+                :class="{ 'chevron-rotated': !legendCollapsed }"
+              >
+                <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            
+            <div class="tv-legend-content" v-show="!legendCollapsed">
+              <div 
+                v-for="(symbol, idx) in selectedSymbols" 
+                :key="symbol" 
+                class="tv-legend-row"
+                :class="{ 'tv-legend-row--hidden': hiddenSeries.has(symbol) }"
+              >
+                <span 
+                  class="tv-legend-color-dot" 
+                  :style="{ backgroundColor: getLegendColor(symbol, idx), borderColor: getLegendColor(symbol, idx) }"
+                ></span>
+                <span class="tv-legend-symbol">{{ getLegendName(symbol) }}</span>
+                <span class="tv-legend-value" v-if="getSymbolValue(symbol)">
+                  {{ formatNumber(getSymbolValue(symbol)) }}
+                </span>
+                <div class="tv-legend-actions">
+                  <button
+                    class="tv-legend-action"
+                    :class="{ 'is-active': !hiddenSeries.has(symbol) }"
+                    type="button"
+                    @click.stop="toggleSeriesVisibility(symbol)"
+                    :title="hiddenSeries.has(symbol) ? 'Show series' : 'Hide series'"
+                  >
+                    <svg v-if="hiddenSeries.has(symbol)" width="14" height="14" viewBox="0 0 24 24" fill="none">
+                      <path d="M3 3l18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                      <path d="M10.58 10.58A2 2 0 0 0 12 14a2 2 0 0 0 1.42-.58" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                      <path d="M9.88 5.08A10.94 10.94 0 0 1 12 5c6.5 0 10 7 10 7a18.53 18.53 0 0 1-3.3 4.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                      <path d="M6.1 6.1C3.7 7.9 2 10 2 10s3.5 7 10 7c1.2 0 2.3-.2 3.3-.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                    <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none">
+                      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" stroke="currentColor" stroke-width="2"/>
+                      <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                  </button>
+                  <button
+                    class="tv-legend-action is-trash"
+                    type="button"
+                    @click.stop="removeSymbol(symbol)"
+                    title="Remove series"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                      <path d="M3 6h18" stroke="currentColor" stroke-width="2"/>
+                      <path d="M8 6V4h8v2" stroke="currentColor" stroke-width="2"/>
+                      <path d="M6 6l1 14h10l1-14" stroke="currentColor" stroke-width="2"/>
+                      <path d="M10 10v8M14 10v8" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                  </button>
+                  <button
+                    class="tv-legend-action is-cog"
+                    type="button"
+                    @click.stop="toggleLegendSettings(symbol)"
+                    title="Legend settings"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                      <path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" stroke="currentColor" stroke-width="2"/>
+                      <path d="M19.4 15a7.8 7.8 0 0 0 .1-1 7.8 7.8 0 0 0-.1-1l2-1.6-2-3.4-2.4 1a7.6 7.6 0 0 0-1.7-1l-.3-2.6H9l-.3 2.6a7.6 7.6 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.8 7.8 0 0 0-.1 1 7.8 7.8 0 0 0 .1 1l-2 1.6 2 3.4 2.4-1a7.6 7.6 0 0 0 1.7 1l.3 2.6h6l.3-2.6a7.6 7.6 0 0 0 1.7-1l2.4 1 2-3.4-2-1.6z" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                  </button>
+                </div>
+                <div
+                  v-if="activeLegendSettings === symbol"
+                  class="tv-legend-settings"
+                  @click.stop
                 >
-                  <svg v-if="hiddenSeries.has(symbol)" width="14" height="14" viewBox="0 0 24 24" fill="none">
-                    <path d="M3 3l18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                    <path d="M10.58 10.58A2 2 0 0 0 12 14a2 2 0 0 0 1.42-.58" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                    <path d="M9.88 5.08A10.94 10.94 0 0 1 12 5c6.5 0 10 7 10 7a18.53 18.53 0 0 1-3.3 4.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                    <path d="M6.1 6.1C3.7 7.9 2 10 2 10s3.5 7 10 7c1.2 0 2.3-.2 3.3-.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                  </svg>
-                  <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none">
-                    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" stroke="currentColor" stroke-width="2"/>
-                    <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
-                  </svg>
-                </button>
-                <button
-                  class="tv-legend-action is-trash"
-                  type="button"
-                  @click.stop="removeSymbol(symbol)"
-                  title="Remove series"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                    <path d="M3 6h18" stroke="currentColor" stroke-width="2"/>
-                    <path d="M8 6V4h8v2" stroke="currentColor" stroke-width="2"/>
-                    <path d="M6 6l1 14h10l1-14" stroke="currentColor" stroke-width="2"/>
-                    <path d="M10 10v8M14 10v8" stroke="currentColor" stroke-width="2"/>
-                  </svg>
-                </button>
-                <button
-                  class="tv-legend-action is-cog"
-                  type="button"
-                  @click.stop="toggleLegendSettings(symbol)"
-                  title="Legend settings"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <div class="tv-legend-settings-row">
+                    <label class="tv-legend-settings-label">Name</label>
+                    <input
+                      class="tv-legend-settings-input"
+                      type="text"
+                      :value="legendNames[symbol] ?? symbol"
+                      @input="updateLegendName(symbol, ($event.target as HTMLInputElement).value)"
+                      placeholder="Legend name"
+                    />
+                  </div>
+                  <div class="tv-legend-settings-row">
+                    <label class="tv-legend-settings-label">Color</label>
+                    <input
+                      class="tv-legend-settings-color"
+                      type="color"
+                      :value="legendColors[symbol] ?? getLegendColor(symbol, idx)"
+                      @input="updateLegendColor(symbol, ($event.target as HTMLInputElement).value)"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div class="tv-legend-empty" v-if="!selectedSymbols.length">
+                No series selected
+              </div>
+            </div>
+          </div>
+          <div class="tv-category-bar" ref="newTabAreaRef" @click.stop>
+            <button class="tv-new-tab-btn is-tab" type="button" @click="newTabMenuOpen = !newTabMenuOpen; newTabMenuMode = 'root'; newTabMenuOnlyCategories = false" title="New Tab">
+              <span class="tv-new-tab-plus">+</span>
+              <span class="tv-new-tab-balloon">New</span>
+            </button>
+            <div class="tv-category-tabs">
+              <div
+                v-for="tab in categoryTabs"
+                :key="tab.id"
+                :class="['tv-category-tab', { active: activeCategoryTabId === tab.id }]"
+                @click="activeCategoryTabId = tab.id"
+                @dblclick.stop="startRenameTab(tab)"
+              >
+                <span class="tv-category-indicator" :class="{ 'is-active': activeCategoryTabId === tab.id }"></span>
+                <span v-if="editingTabId !== tab.id">{{ tab.label }}</span>
+                <input
+                  v-else
+                  v-model="editingTabLabel"
+                  class="tv-category-tab-input"
+                  type="text"
+                  @click.stop
+                  @keydown.enter.prevent="commitRenameTab(tab)"
+                  @keydown.esc.prevent="cancelRenameTab"
+                  @blur="commitRenameTab(tab)"
+                />
+                <button class="tv-category-cog" type="button" title="Tab settings" @click.stop="toggleTabSettings(tab)">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
                     <path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" stroke="currentColor" stroke-width="2"/>
                     <path d="M19.4 15a7.8 7.8 0 0 0 .1-1 7.8 7.8 0 0 0-.1-1l2-1.6-2-3.4-2.4 1a7.6 7.6 0 0 0-1.7-1l-.3-2.6H9l-.3 2.6a7.6 7.6 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.8 7.8 0 0 0-.1 1 7.8 7.8 0 0 0 .1 1l-2 1.6 2 3.4 2.4-1a7.6 7.6 0 0 0 1.7 1l.3 2.6h6l.3-2.6a7.6 7.6 0 0 0 1.7-1l2.4 1 2-3.4-2-1.6z" stroke="currentColor" stroke-width="2"/>
                   </svg>
                 </button>
-              </div>
-              <div
-                v-if="activeLegendSettings === symbol"
-                class="tv-legend-settings"
-                @click.stop
-              >
-                <div class="tv-legend-settings-row">
-                  <label class="tv-legend-settings-label">Name</label>
-                  <input
-                    class="tv-legend-settings-input"
-                    type="text"
-                    :value="legendNames[symbol] ?? symbol"
-                    @input="updateLegendName(symbol, ($event.target as HTMLInputElement).value)"
-                    placeholder="Legend name"
-                  />
-                </div>
-                <div class="tv-legend-settings-row">
-                  <label class="tv-legend-settings-label">Color</label>
-                  <input
-                    class="tv-legend-settings-color"
-                    type="color"
-                    :value="legendColors[symbol] ?? getLegendColor(symbol, idx)"
-                    @input="updateLegendColor(symbol, ($event.target as HTMLInputElement).value)"
-                  />
+                <button class="tv-category-close" type="button" title="Close tab" @click.stop="closeCategoryTab(tab.id)">
+                  ×
+                </button>
+                <div
+                  v-if="activeTabSettingsId === tab.id"
+                  class="tv-tab-settings"
+                  @click.stop
+                >
+                  <div class="tv-tab-settings-row">
+                    <label class="tv-tab-settings-label">Name</label>
+                    <input
+                      class="tv-tab-settings-input"
+                      type="text"
+                      v-model="tabSettingsName"
+                      @keydown.enter.prevent="commitTabSettingsName(tab)"
+                      @keydown.esc.prevent="closeTabSettings"
+                    />
+                  </div>
+                  <button class="tv-tab-settings-save" type="button" @click="commitTabSettingsName(tab)">
+                    Save
+                  </button>
                 </div>
               </div>
             </div>
-            <div class="tv-legend-empty" v-if="!selectedSymbols.length">
-              No series selected
+            <div v-if="newTabMenuOpen && !newTabMenuFromEmpty" class="tv-new-tab-menu" @click.stop>
+              <template v-if="!newTabMenuOnlyCategories">
+                <button
+                  class="tv-new-tab-option"
+                  type="button"
+                  @click="newTabMenuMode = 'category'"
+                >
+                  Add New Tab
+                </button>
+                <button
+                  class="tv-new-tab-option"
+                  type="button"
+                  @click="openSearchModal(); newTabMenuOpen = false; newTabMenuOnlyCategories = false"
+                >
+                  Insert Data
+                </button>
+              </template>
+              <div v-if="newTabMenuMode === 'category'" class="tv-new-tab-submenu">
+                <button
+                  v-for="opt in categoryOptions"
+                  :key="opt.value"
+                  class="tv-new-tab-option"
+                  type="button"
+                  @click="addCategoryTab(opt.value, false)"
+                >
+                  {{ opt.label }}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
       
-      <!-- Bottom-right floating buttons -->
-      <div class="tv-float-btns">
-        <button class="tv-float-btn" :class="{ active: logScale }" @click="logScale = !logScale" title="Log Scale">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 19h16M6 16c2-3 4-4 6-4s4 1 6 4" stroke="currentColor" stroke-width="2"/></svg>
-        </button>
-        <button class="tv-float-btn" :class="{ active: normalize }" @click="normalize = !normalize" title="Normalize">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 17h16M7 4v16" stroke="currentColor" stroke-width="2"/></svg>
-        </button>
-        <div class="tv-float-divider"></div>
-        <!-- Object Tree Button -->
-        <button class="tv-float-btn" :class="{ active: showObjectTree }" @click="showObjectTree = !showObjectTree" title="Object Tree">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <path d="M3 3h18v18H3z" stroke="currentColor" stroke-width="2"/>
-            <path d="M7 12h10M7 8h6M7 16h8" stroke="currentColor" stroke-width="2"/>
-          </svg>
-        </button>
-        <!-- Layers Button -->
-        <button class="tv-float-btn" :class="{ active: showLayersPanel }" @click="showLayersPanel = !showLayersPanel" title="Layers">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="currentColor" stroke-width="2"/>
-            <path d="M2 17l10 5 10-5" stroke="currentColor" stroke-width="2"/>
-            <path d="M2 12l10 5 10-5" stroke="currentColor" stroke-width="2"/>
-          </svg>
-        </button>
-      </div>
-
       <!-- Object Tree Panel -->
       <div class="tv-panel tv-object-tree" v-if="showObjectTree">
         <div class="tv-panel-header">
@@ -426,6 +571,72 @@
         </template>
       </div>
     </div>
+    
+    <div class="tv-right-stack">
+      <!-- Right Sidebar: Drawing Properties (only when selected) -->
+      <aside class="tv-sidebar tv-drawing-sidebar" v-if="selectedDrawing">
+        <button class="tv-drawing-close" type="button" title="Close properties" @click="clearSelectedDrawing">
+          ×
+        </button>
+        <div class="tv-drawing-prop">
+          <div class="tv-drawing-label">Line</div>
+          <input
+            class="tv-drawing-input"
+            type="text"
+            v-model="selectedDrawingName"
+            @keydown.enter.prevent="commitSelectedDrawingName"
+            @blur="commitSelectedDrawingName"
+            :placeholder="selectedDrawing.type"
+          />
+        </div>
+        <button class="tv-drawing-trash" type="button" title="Delete drawing" @click="deleteSelectedDrawing">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path d="M3 6h18" stroke="currentColor" stroke-width="2"/>
+            <path d="M8 6V4h8v2" stroke="currentColor" stroke-width="2"/>
+            <path d="M6 6l1 14h10l1-14" stroke="currentColor" stroke-width="2"/>
+            <path d="M10 10v8M14 10v8" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          Delete
+        </button>
+        <div class="tv-sidebar-divider"></div>
+        <div class="tv-drawing-prop">
+          <div class="tv-drawing-label">Color</div>
+          <label class="tv-drawing-color-picker">
+            <input
+              type="color"
+              class="tv-drawing-color-input"
+              :value="selectedDrawing.color"
+              @input="updateSelectedDrawingColor(($event.target as HTMLInputElement).value)"
+            />
+            <span class="tv-drawing-color" :style="{ backgroundColor: selectedDrawing.color }"></span>
+          </label>
+        </div>
+      </aside>
+
+      <!-- Right Navbar -->
+      <aside class="tv-sidebar tv-sidebar-right">
+        <button class="tv-sidebar-btn" :class="{ active: logScale }" @click="logScale = !logScale" title="Log Scale">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 19h16M6 16c2-3 4-4 6-4s4 1 6 4" stroke="currentColor" stroke-width="2"/></svg>
+        </button>
+        <button class="tv-sidebar-btn" :class="{ active: normalize }" @click="normalize = !normalize" title="Normalize">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 17h16M7 4v16" stroke="currentColor" stroke-width="2"/></svg>
+        </button>
+        <div class="tv-sidebar-divider"></div>
+        <button class="tv-sidebar-btn" :class="{ active: showObjectTree }" @click="showObjectTree = !showObjectTree" title="Object Tree">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M3 3h18v18H3z" stroke="currentColor" stroke-width="2"/>
+            <path d="M7 12h10M7 8h6M7 16h8" stroke="currentColor" stroke-width="2"/>
+          </svg>
+        </button>
+        <button class="tv-sidebar-btn" :class="{ active: showLayersPanel }" @click="showLayersPanel = !showLayersPanel" title="Layers">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="currentColor" stroke-width="2"/>
+            <path d="M2 17l10 5 10-5" stroke="currentColor" stroke-width="2"/>
+            <path d="M2 12l10 5 10-5" stroke="currentColor" stroke-width="2"/>
+          </svg>
+        </button>
+      </aside>
+    </div>
   </main>
 
   <!-- Search Modal with TradingView-style Filters -->
@@ -449,16 +660,15 @@
         />
       </div>
       
-      <!-- Category Filter Tabs -->
+      <!-- Category Filter Tabs (Search only) -->
       <div class="search-filter-tabs">
-        <button 
-          v-for="tab in filterTabs" 
-          :key="tab.value"
-          :class="['filter-tab', { active: activeFilterTab === tab.value }]"
-          @click="activeFilterTab = tab.value"
+        <button
+          v-for="opt in categoryOptions"
+          :key="opt.value"
+          :class="['filter-tab', { active: activeSearchCategory === opt.value }]"
+          @click="activeSearchCategory = opt.value"
         >
-          <span v-html="tab.icon"></span>
-          {{ tab.label }}
+          {{ opt.label }}
         </button>
       </div>
       
@@ -603,6 +813,13 @@ function clearDrawings() {
 // Chart ref
 const chartRef = ref<InstanceType<typeof ProcurementChart> | null>(null)
 const drawingRef = ref<InstanceType<typeof DrawingLayer> | null>(null)
+const selectedDrawing = ref<{ type: string; points: number[]; color: string; name?: string } | null>(null)
+const selectedDrawingIndex = ref<number | null>(null)
+const selectedDrawingName = ref('')
+const drawingOverlayInteractive = computed(() => {
+  if (activeDrawingTool.value !== 'select') return true
+  return (drawingRef.value?.drawings?.length || 0) > 0
+})
 
 // Panel visibility state
 const showObjectTree = ref(false)
@@ -619,9 +836,80 @@ function getSymbolValue(symbol: string): number | undefined {
 // Delete drawing by index
 function deleteDrawing(idx: number) {
   if (drawingRef.value?.drawings) {
+    drawingRef.value.pushHistory?.()
     drawingRef.value.drawings.splice(idx, 1)
     drawingRef.value.redraw?.()
+    if (selectedDrawingIndex.value !== null) {
+      if (!drawingRef.value.drawings.length) {
+        selectedDrawing.value = null
+        selectedDrawingIndex.value = null
+        selectedDrawingName.value = ''
+      } else if (idx === selectedDrawingIndex.value) {
+        selectedDrawing.value = null
+        selectedDrawingIndex.value = null
+        selectedDrawingName.value = ''
+      } else if (idx < selectedDrawingIndex.value) {
+        selectedDrawingIndex.value -= 1
+      }
+    }
   }
+}
+
+function onDrawingSelection(payload: { drawing: { type: string; points: number[]; color: string; name?: string }; index: number } | null) {
+  selectedDrawing.value = payload?.drawing || null
+  selectedDrawingIndex.value = payload?.index ?? null
+  selectedDrawingName.value = payload?.drawing?.name || ''
+}
+
+function commitSelectedDrawingName() {
+  if (!drawingRef.value || !selectedDrawing.value) return
+  const drawings = drawingRef.value.drawings
+  if (selectedDrawingIndex.value === null) return
+  const matchIndex = selectedDrawingIndex.value
+  const nextName = selectedDrawingName.value.trim()
+  drawingRef.value.pushHistory?.()
+  drawings[matchIndex].name = nextName || undefined
+  selectedDrawing.value = { ...drawings[matchIndex] }
+  drawingRef.value.redraw?.()
+}
+
+function updateSelectedDrawingColor(nextColor: string) {
+  if (!drawingRef.value || !selectedDrawing.value) return
+  if (selectedDrawingIndex.value === null) return
+  const drawings = drawingRef.value.drawings
+  const matchIndex = selectedDrawingIndex.value
+  drawingRef.value.pushHistory?.()
+  drawings[matchIndex].color = nextColor
+  selectedDrawing.value = { ...drawings[matchIndex] }
+  drawingRef.value.redraw?.()
+}
+
+function clearYAxisOverrides(tabId?: string) {
+  if (!tabId) {
+    yAxisOverrideByTab.value = {}
+    yAxisBySymbolOverrideByTab.value = {}
+    return
+  }
+  const next = { ...yAxisOverrideByTab.value }
+  const nextBySymbol = { ...yAxisBySymbolOverrideByTab.value }
+  delete next[tabId]
+  delete nextBySymbol[tabId]
+  yAxisOverrideByTab.value = next
+  yAxisBySymbolOverrideByTab.value = nextBySymbol
+}
+
+function deleteSelectedDrawing() {
+  if (selectedDrawingIndex.value === null) return
+  deleteDrawing(selectedDrawingIndex.value)
+  selectedDrawing.value = null
+  selectedDrawingIndex.value = null
+  selectedDrawingName.value = ''
+}
+
+function clearSelectedDrawing() {
+  selectedDrawing.value = null
+  selectedDrawingIndex.value = null
+  selectedDrawingName.value = ''
 }
 
 // Chart state
@@ -638,17 +926,39 @@ const sumberDana = ref('')
 const kategoriPlant = ref('')
 const maxSeries = ref(5) // Default max 5 series
 const selectedSymbols = ref<string[]>([])
+const selectedSymbolsByTab = ref<Record<string, string[]>>({})
+const switchingTab = ref(false)
 const hiddenSeries = ref<Set<string>>(new Set())
 const legendColors = ref<Record<string, string>>({})
 const legendNames = ref<Record<string, string>>({})
 const activeLegendSettings = ref<string | null>(null)
 
+const hiddenSeriesByTab = ref<Record<string, string[]>>({})
+const legendColorsByTab = ref<Record<string, Record<string, string>>>({})
+const legendNamesByTab = ref<Record<string, Record<string, string>>>({})
+const yAxisOverrideByTab = ref<Record<string, { min?: number; max?: number }>>({})
+const yAxisBySymbolOverrideByTab = ref<Record<string, Record<string, { min?: number; max?: number }>>>({})
+
+const activeYAxisOverride = computed(() => {
+  const id = activeCategoryTabId.value
+  return id ? yAxisOverrideByTab.value[id] : undefined
+})
+const activeYAxisBySymbolOverride = computed(() => {
+  const id = activeCategoryTabId.value
+  return id ? yAxisBySymbolOverrideByTab.value[id] : undefined
+})
+
 // Navigation menu state
 const navMenuOpen = ref(false)
 
-// Dynamic chart height - calculate based on viewport
+// Dynamic chart height - based on chart viewport (adds padding for axis labels)
 const windowHeight = ref(window.innerHeight)
-const chartHeight = computed(() => windowHeight.value - 80) // header(40) + summary(40)
+const chartScrollRef = ref<HTMLElement | null>(null)
+let chartResizeObserver: ResizeObserver | null = null
+const chartViewportHeight = ref(0)
+const chartHeight = computed(() => Math.max(0, chartViewportHeight.value))
+const isPanning = ref(false)
+const panStart = ref({ x: 0, y: 0, left: 0, top: 0 })
 
 // Search modal state
 const searchModalOpen = ref(false)
@@ -723,34 +1033,237 @@ function toggleLegendSettings(symbol: string) {
 // Filtered symbols for search
 const filteredSymbols = computed(() => {
   let symbols = allSymbols.value
-  
-  // Filter by active tab
-  if (activeFilterTab.value !== 'all') {
-    symbols = symbols.filter(s => s.symbolType === activeFilterTab.value)
+
+  // Filter by search category
+  if (activeSearchCategory.value !== 'all') {
+    symbols = symbols.filter(s => s.symbolType === activeSearchCategory.value)
   }
-  
+
   // Filter by search query
   if (searchQuery.value) {
     const q = searchQuery.value.toLowerCase()
-    symbols = symbols.filter(s => 
-      s.symbol.toLowerCase().includes(q) || 
+    symbols = symbols.filter(s =>
+      s.symbol.toLowerCase().includes(q) ||
       s.name.toLowerCase().includes(q) ||
       (s.description && s.description.toLowerCase().includes(q))
     )
   }
-  
+
   return symbols
 })
 
-// TradingView-style filter tabs
-type FilterTabValue = 'all' | 'dokumen' | 'nilai'
-const filterTabs: { value: FilterTabValue; label: string; icon: string }[] = [
-  { value: 'all', label: 'All', icon: '' },
-  { value: 'dokumen', label: 'Dokumen', icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 2h9l5 5v15H6z" stroke="currentColor" stroke-width="2"/><path d="M14 2v5h5" stroke="currentColor" stroke-width="2"/></svg>' },
-  { value: 'nilai', label: 'Nilai', icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2v20M6 6l6-4 6 4M6 18l6 4 6-4" stroke="currentColor" stroke-width="2"/></svg>' }
+type CategoryValue = 'all' | 'dokumen' | 'nilai'
+type CategoryTab = { id: string; label: string; category: CategoryValue }
+
+const categoryOptions: { value: CategoryValue; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'dokumen', label: 'Dokumen' },
+  { value: 'nilai', label: 'Nilai' }
 ]
 
-const activeFilterTab = ref<FilterTabValue>('all')
+const categoryTabs = ref<CategoryTab[]>([])
+const activeCategoryTabId = ref<string | null>(null)
+const newTabMenuOpen = ref(false)
+const newTabMenuMode = ref<'root' | 'category'>('root')
+const newTabMenuOnlyCategories = ref(false)
+const newTabMenuFromEmpty = ref(false)
+const activeSearchCategory = ref<CategoryValue>('all')
+const editingTabId = ref<string | null>(null)
+const editingTabLabel = ref('')
+const newTabAreaRef = ref<HTMLElement | null>(null)
+const emptyTabAreaRef = ref<HTMLElement | null>(null)
+const activeTabSettingsId = ref<string | null>(null)
+const tabSettingsName = ref('')
+
+watch(activeCategoryTabId, (next, prev) => {
+  switchingTab.value = true
+  if (prev) {
+    selectedSymbolsByTab.value = {
+      ...selectedSymbolsByTab.value,
+      [prev]: [...selectedSymbols.value]
+    }
+    hiddenSeriesByTab.value = {
+      ...hiddenSeriesByTab.value,
+      [prev]: Array.from(hiddenSeries.value)
+    }
+    legendColorsByTab.value = {
+      ...legendColorsByTab.value,
+      [prev]: { ...legendColors.value }
+    }
+    legendNamesByTab.value = {
+      ...legendNamesByTab.value,
+      [prev]: { ...legendNames.value }
+    }
+  }
+  if (next) {
+    selectedSymbols.value = [...(selectedSymbolsByTab.value[next] || [])]
+    hiddenSeries.value = new Set(hiddenSeriesByTab.value[next] || [])
+    legendColors.value = { ...(legendColorsByTab.value[next] || {}) }
+    legendNames.value = { ...(legendNamesByTab.value[next] || {}) }
+    activeLegendSettings.value = null
+  } else {
+    selectedSymbols.value = []
+    hiddenSeries.value = new Set()
+    legendColors.value = {}
+    legendNames.value = {}
+    activeLegendSettings.value = null
+  }
+  switchingTab.value = false
+})
+
+watch(selectedSymbols, (val) => {
+  if (switchingTab.value) return
+  const activeId = activeCategoryTabId.value
+  if (!activeId) return
+  selectedSymbolsByTab.value = {
+    ...selectedSymbolsByTab.value,
+    [activeId]: [...val]
+  }
+  const bounds = yAxisBySymbolOverrideByTab.value[activeId]
+  if (bounds) {
+    const hasNewSymbol = val.some((sym) => !bounds[sym])
+    if (hasNewSymbol) {
+      clearYAxisOverrides(activeId)
+    }
+  }
+}, { deep: true })
+
+watch(hiddenSeries, (val) => {
+  if (switchingTab.value) return
+  const activeId = activeCategoryTabId.value
+  if (!activeId) return
+  hiddenSeriesByTab.value = {
+    ...hiddenSeriesByTab.value,
+    [activeId]: Array.from(val)
+  }
+}, { deep: true })
+
+watch(legendColors, (val) => {
+  if (switchingTab.value) return
+  const activeId = activeCategoryTabId.value
+  if (!activeId) return
+  legendColorsByTab.value = {
+    ...legendColorsByTab.value,
+    [activeId]: { ...val }
+  }
+}, { deep: true })
+
+watch(legendNames, (val) => {
+  if (switchingTab.value) return
+  const activeId = activeCategoryTabId.value
+  if (!activeId) return
+  legendNamesByTab.value = {
+    ...legendNamesByTab.value,
+    [activeId]: { ...val }
+  }
+}, { deep: true })
+
+watch([periodType, year, rawMode, cumulative, sumberDana, kategoriPlant, normalize, logScale], () => {
+  clearYAxisOverrides()
+})
+
+function addCategoryTab(category: CategoryValue, openSearch = false) {
+  const baseLabel = categoryOptions.find(o => o.value === category)?.label || category
+  const nextIndex = categoryTabs.value.filter(t => t.category === category).length + 1
+  const label = category === 'all' && nextIndex === 1 ? baseLabel : `${baseLabel} ${nextIndex}`
+  const id = `tab-${category}-${Date.now()}`
+  categoryTabs.value = [...categoryTabs.value, { id, label, category }]
+  selectedSymbolsByTab.value = { ...selectedSymbolsByTab.value, [id]: [] }
+  hiddenSeriesByTab.value = { ...hiddenSeriesByTab.value, [id]: [] }
+  legendColorsByTab.value = { ...legendColorsByTab.value, [id]: {} }
+  legendNamesByTab.value = { ...legendNamesByTab.value, [id]: {} }
+  activeCategoryTabId.value = id
+  newTabMenuOpen.value = false
+  newTabMenuMode.value = 'root'
+  newTabMenuOnlyCategories.value = false
+  newTabMenuFromEmpty.value = false
+  newTabMenuFromEmpty.value = false
+  if (openSearch) {
+    openSearchModal()
+  }
+}
+
+function closeCategoryTab(tabId: string) {
+  const idx = categoryTabs.value.findIndex((t) => t.id === tabId)
+  if (idx === -1) return
+  const wasActive = activeCategoryTabId.value === tabId
+  categoryTabs.value = categoryTabs.value.filter((t) => t.id !== tabId)
+  const { [tabId]: _sel, ...restSel } = selectedSymbolsByTab.value
+  const { [tabId]: _hid, ...restHid } = hiddenSeriesByTab.value
+  const { [tabId]: _lc, ...restLc } = legendColorsByTab.value
+  const { [tabId]: _ln, ...restLn } = legendNamesByTab.value
+  const { [tabId]: _yo, ...restYo } = yAxisOverrideByTab.value
+  const { [tabId]: _ys, ...restYs } = yAxisBySymbolOverrideByTab.value
+  selectedSymbolsByTab.value = restSel
+  hiddenSeriesByTab.value = restHid
+  legendColorsByTab.value = restLc
+  legendNamesByTab.value = restLn
+  yAxisOverrideByTab.value = restYo
+  yAxisBySymbolOverrideByTab.value = restYs
+
+  if (wasActive) {
+    const nextTab = categoryTabs.value[idx] || categoryTabs.value[idx - 1] || null
+    activeCategoryTabId.value = nextTab ? nextTab.id : null
+  }
+}
+
+function toggleTabSettings(tab: CategoryTab) {
+  if (activeTabSettingsId.value === tab.id) {
+    closeTabSettings()
+    return
+  }
+  activeTabSettingsId.value = tab.id
+  tabSettingsName.value = tab.label
+  nextTick(() => {
+    const input = document.querySelector<HTMLInputElement>('.tv-tab-settings-input')
+    input?.focus()
+    input?.select()
+  })
+}
+
+function closeTabSettings() {
+  activeTabSettingsId.value = null
+  tabSettingsName.value = ''
+}
+
+function commitTabSettingsName(tab: CategoryTab) {
+  if (activeTabSettingsId.value !== tab.id) return
+  const nextLabel = tabSettingsName.value.trim()
+  if (nextLabel) {
+    categoryTabs.value = categoryTabs.value.map((t) =>
+      t.id === tab.id ? { ...t, label: nextLabel } : t
+    )
+  }
+  closeTabSettings()
+}
+
+function startRenameTab(tab: CategoryTab) {
+  editingTabId.value = tab.id
+  editingTabLabel.value = tab.label
+  nextTick(() => {
+    const inputs = document.querySelectorAll<HTMLInputElement>('.tv-category-tab-input')
+    const input = Array.from(inputs).find((el) => el.value === tab.label)
+    input?.focus()
+    input?.select()
+  })
+}
+
+function commitRenameTab(tab: CategoryTab) {
+  if (editingTabId.value !== tab.id) return
+  const nextLabel = editingTabLabel.value.trim()
+  if (nextLabel) {
+    categoryTabs.value = categoryTabs.value.map((t) =>
+      t.id === tab.id ? { ...t, label: nextLabel } : t
+    )
+  }
+  editingTabId.value = null
+  editingTabLabel.value = ''
+}
+
+function cancelRenameTab() {
+  editingTabId.value = null
+  editingTabLabel.value = ''
+}
 const hoveredSymbol = ref<string | null>(null)
 
 // Track scale mode per series: 'same' | 'percent' | 'scale' | 'pane'
@@ -763,6 +1276,12 @@ function selectSymbolWithScale(sym: SymbolItem, scaleMode: ScaleMode) {
   if (selectedSymbols.value.length >= maxSeries.value) {
     alert(`Maximum ${maxSeries.value} series sudah terpilih. Hapus salah satu series atau ubah max series di dropdown.`)
     return
+  }
+
+  // If no tabs yet, create one based on symbol type
+  if (!categoryTabs.value.length) {
+    const category = (sym.symbolType as CategoryValue) || 'all'
+    addCategoryTab(category, false)
   }
   
   // Add symbol if not already selected
@@ -851,6 +1370,7 @@ function openSearchModal() {
   console.log('[DEBUG] openSearchModal called')  // Debug log
   searchModalOpen.value = true
   searchQuery.value = ''
+  activeSearchCategory.value = 'all'
   nextTick(() => {
     searchInput.value?.focus()
   })
@@ -859,6 +1379,39 @@ function openSearchModal() {
 // Close search modal
 function closeSearchModal() {
   searchModalOpen.value = false
+  newTabMenuOpen.value = false
+  newTabMenuMode.value = 'root'
+  newTabMenuOnlyCategories.value = false
+  newTabMenuFromEmpty.value = false
+}
+
+function closeNewTabMenu() {
+  newTabMenuOpen.value = false
+  newTabMenuMode.value = 'root'
+  newTabMenuOnlyCategories.value = false
+  newTabMenuFromEmpty.value = false
+}
+
+function openEmptyTabMenu() {
+  newTabMenuOpen.value = true
+  newTabMenuMode.value = 'category'
+  newTabMenuOnlyCategories.value = true
+  newTabMenuFromEmpty.value = true
+}
+
+function handleDocumentClick(event: MouseEvent) {
+  const target = event.target as Node
+  if (activeTabSettingsId.value) {
+    const settingsEl = document.querySelector('.tv-tab-settings')
+    const cogEl = document.querySelector('.tv-category-cog')
+    if (settingsEl && settingsEl.contains(target)) return
+    if (cogEl && cogEl.contains(target)) return
+    closeTabSettings()
+  }
+  if (!newTabMenuOpen.value) return
+  if (newTabAreaRef.value && newTabAreaRef.value.contains(target)) return
+  if (emptyTabAreaRef.value && emptyTabAreaRef.value.contains(target)) return
+  closeNewTabMenu()
 }
 
 // Filter symbols (no-op, computed handles it)
@@ -869,6 +1422,60 @@ function onDataLoaded(data: Record<string, any[]>) {
   if (!selectedSymbols.value.length) {
     summaryData.value = null
     return
+  }
+
+  const activeTabId = activeCategoryTabId.value
+  if (activeTabId && !yAxisOverrideByTab.value[activeTabId]) {
+    const symbolBounds: Record<string, { min?: number; max?: number }> = {}
+    let allValues: number[] = []
+    selectedSymbols.value.forEach((symbol) => {
+      const values = data[symbol] || []
+      if (!values.length) {
+        symbolBounds[symbol] = { min: undefined, max: undefined }
+        return
+      }
+      let seriesVals = values.map((d: any) => d.close).filter((v: any) => typeof v === 'number')
+      if (normalize.value && seriesVals.length) {
+        const firstVal = seriesVals[0]
+        if (firstVal > 0) {
+          seriesVals = seriesVals.map((v: number) => (v / firstVal) * 100)
+        }
+      }
+      if (!seriesVals.length) {
+        symbolBounds[symbol] = { min: undefined, max: undefined }
+        return
+      }
+      let minVal = Math.min(...seriesVals)
+      let maxVal = Math.max(...seriesVals)
+      if (logScale.value) {
+        minVal = Math.max(minVal, 1)
+      }
+      const range = Math.max(maxVal - minVal, 1)
+      const pad = range * 0.05
+      const paddedMin = minVal >= 0 ? Math.max(0, minVal - pad) : minVal - pad
+      symbolBounds[symbol] = { min: paddedMin, max: maxVal + pad }
+      allValues = allValues.concat(seriesVals)
+    })
+
+    if (allValues.length) {
+      let minVal = Math.min(...allValues)
+      let maxVal = Math.max(...allValues)
+      if (logScale.value) {
+        minVal = Math.max(minVal, 1)
+      }
+      const range = Math.max(maxVal - minVal, 1)
+      const pad = range * 0.05
+      const paddedMin = minVal >= 0 ? Math.max(0, minVal - pad) : minVal - pad
+      yAxisOverrideByTab.value = {
+        ...yAxisOverrideByTab.value,
+        [activeTabId]: { min: paddedMin, max: maxVal + pad }
+      }
+    }
+
+    yAxisBySymbolOverrideByTab.value = {
+      ...yAxisBySymbolOverrideByTab.value,
+      [activeTabId]: symbolBounds
+    }
   }
 
   const seriesSummaries: SummarySeries[] = []
@@ -923,8 +1530,88 @@ function formatNumber(val: number | undefined): string {
 }
 
 // Handle resize
+function updateChartViewport() {
+  if (chartScrollRef.value) {
+    chartViewportHeight.value = chartScrollRef.value.clientHeight
+  }
+}
+
 function handleResize() {
   windowHeight.value = window.innerHeight
+  updateChartViewport()
+}
+
+function onChartPointerDown(event: PointerEvent) {
+  if (!chartScrollRef.value) return
+  if (activeDrawingTool.value !== 'select') return
+  if (event.button !== 0) return
+  const target = event.target as HTMLElement | null
+  if (target?.closest('.drawing-layer')) return
+  isPanning.value = true
+  chartScrollRef.value.setPointerCapture(event.pointerId)
+  panStart.value = {
+    x: event.clientX,
+    y: event.clientY,
+    left: 0,
+    top: 0
+  }
+}
+
+function onChartPointerMove(event: PointerEvent) {
+  if (!isPanning.value) return
+  const dx = event.clientX - panStart.value.x
+  chartRef.value?.panByPixels?.(dx)
+}
+
+function onChartPointerUp(event: PointerEvent) {
+  if (!chartScrollRef.value) return
+  if (!isPanning.value) return
+  isPanning.value = false
+  chartScrollRef.value.releasePointerCapture(event.pointerId)
+}
+
+function onChartWheel(event: WheelEvent) {
+  if (event.shiftKey && event.deltaY !== 0) {
+    chartRef.value?.panByPixels?.(event.deltaY)
+    return
+  }
+  if (event.deltaX !== 0) {
+    chartRef.value?.panByPixels?.(event.deltaX)
+    return
+  }
+  if (event.deltaY !== 0) {
+    chartRef.value?.panByPixels?.(event.deltaY)
+  }
+}
+
+function handleGlobalShortcuts(event: KeyboardEvent) {
+  const target = event.target as HTMLElement | null
+  const isEditable =
+    target &&
+    (target.tagName === 'INPUT' ||
+      target.tagName === 'TEXTAREA' ||
+      target.isContentEditable)
+  if (isEditable) return
+
+  const isMac = navigator.platform.toLowerCase().includes('mac')
+  const modKey = isMac ? event.metaKey : event.ctrlKey
+  if (!modKey) return
+
+  const key = event.key.toLowerCase()
+  if (key === 'z' && event.shiftKey) {
+    event.preventDefault()
+    drawingRef.value?.redo?.()
+    return
+  }
+  if (key === 'z') {
+    event.preventDefault()
+    drawingRef.value?.undo?.()
+    return
+  }
+  if (key === 'y') {
+    event.preventDefault()
+    drawingRef.value?.redo?.()
+  }
 }
 
 // ===== PERSIST STATE TO LOCALSTORAGE =====
@@ -933,6 +1620,14 @@ const STORAGE_KEY = 'chartApp_state'
 // Save state to localStorage
 function saveState() {
     const state = {
+      categoryTabs: categoryTabs.value,
+      activeCategoryTabId: activeCategoryTabId.value,
+      selectedSymbolsByTab: selectedSymbolsByTab.value,
+      hiddenSeriesByTab: hiddenSeriesByTab.value,
+      legendColorsByTab: legendColorsByTab.value,
+      legendNamesByTab: legendNamesByTab.value,
+      yAxisOverrideByTab: yAxisOverrideByTab.value,
+      yAxisBySymbolOverrideByTab: yAxisBySymbolOverrideByTab.value,
       selectedSymbols: selectedSymbols.value,
       chartType: chartType.value,
       periodType: periodType.value,
@@ -955,8 +1650,15 @@ function restoreState() {
   if (saved) {
     try {
       const state = JSON.parse(saved)
-      // DO NOT restore selectedSymbols to prevent auto-loading data
-      // if (state.selectedSymbols) selectedSymbols.value = state.selectedSymbols
+      if (state.categoryTabs) categoryTabs.value = state.categoryTabs
+      if (state.activeCategoryTabId !== undefined) activeCategoryTabId.value = state.activeCategoryTabId
+      if (state.selectedSymbolsByTab) selectedSymbolsByTab.value = state.selectedSymbolsByTab
+      if (state.hiddenSeriesByTab) hiddenSeriesByTab.value = state.hiddenSeriesByTab
+      if (state.legendColorsByTab) legendColorsByTab.value = state.legendColorsByTab
+      if (state.legendNamesByTab) legendNamesByTab.value = state.legendNamesByTab
+      if (state.yAxisOverrideByTab) yAxisOverrideByTab.value = state.yAxisOverrideByTab
+      if (state.yAxisBySymbolOverrideByTab) yAxisBySymbolOverrideByTab.value = state.yAxisBySymbolOverrideByTab
+      if (state.selectedSymbols) selectedSymbols.value = state.selectedSymbols
       if (state.chartType) chartType.value = state.chartType
       if (state.periodType) periodType.value = state.periodType
       if (state.year) year.value = state.year
@@ -975,17 +1677,30 @@ function restoreState() {
 }
 
 // Watch for state changes and save
-watch([selectedSymbols, chartType, periodType, year, normalize, logScale, rawMode, cumulative, singleScale, scaleSide, sumberDana, kategoriPlant], saveState, { deep: true })
+watch([categoryTabs, activeCategoryTabId, selectedSymbolsByTab, hiddenSeriesByTab, legendColorsByTab, legendNamesByTab, yAxisOverrideByTab, yAxisBySymbolOverrideByTab, selectedSymbols, chartType, periodType, year, normalize, logScale, rawMode, cumulative, singleScale, scaleSide, sumberDana, kategoriPlant], saveState, { deep: true })
 
 // Init
 onMounted(() => {
   restoreState() // Restore saved state first
   loadSymbols()
+  nextTick(updateChartViewport)
   window.addEventListener('resize', handleResize)
+  window.addEventListener('keydown', handleGlobalShortcuts)
+  document.addEventListener('click', handleDocumentClick)
+  if (chartScrollRef.value) {
+    chartResizeObserver = new ResizeObserver(updateChartViewport)
+    chartResizeObserver.observe(chartScrollRef.value)
+  }
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
+  window.removeEventListener('keydown', handleGlobalShortcuts)
+  document.removeEventListener('click', handleDocumentClick)
+  if (chartResizeObserver && chartScrollRef.value) {
+    chartResizeObserver.unobserve(chartScrollRef.value)
+    chartResizeObserver = null
+  }
 })
 </script>
 
@@ -1038,6 +1753,254 @@ onUnmounted(() => {
 
 .tv-symbol-search:hover {
   background: var(--hover);
+}
+
+.tv-new-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid var(--stroke);
+  border-radius: 4px;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 0.85rem;
+  flex: 0 0 auto;
+}
+
+.tv-new-tab-btn.is-tab {
+  border-radius: 999px;
+  font-size: 0.78rem;
+  padding: 4px 8px;
+}
+
+.tv-new-tab-plus {
+  font-weight: 700;
+  line-height: 1;
+}
+
+.tv-new-tab-balloon {
+  font-size: 0.65rem;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  line-height: 1;
+}
+
+.tv-new-tab-btn:hover {
+  background: var(--hover);
+}
+
+.tv-new-tab-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  background: var(--surface);
+  border: 1px solid var(--stroke);
+  border-radius: 6px;
+  padding: 6px;
+  min-width: 140px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 30;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.tv-new-tab-menu.is-center {
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.tv-new-tab-submenu {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--stroke);
+  margin-top: 4px;
+}
+
+.tv-new-tab-option {
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 6px 8px;
+  border-radius: 4px;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 0.78rem;
+}
+
+.tv-new-tab-option:hover {
+  background: var(--surface-2);
+}
+
+.tv-category-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  position: relative;
+  z-index: 41;
+  pointer-events: auto;
+}
+
+.tv-category-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  overflow-x: auto;
+  min-width: 0;
+  flex: 1 1 auto;
+  padding-bottom: 2px;
+}
+
+.tv-category-tabs::-webkit-scrollbar {
+  height: 4px;
+}
+
+.tv-category-tabs::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+}
+
+.tv-category-tab {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  border: 1px solid var(--stroke);
+  background: transparent;
+  color: var(--muted);
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tv-category-tab.active {
+  color: var(--ink);
+  border-color: var(--accent);
+  background: rgba(41, 98, 255, 0.12);
+}
+
+.tv-category-indicator {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--stroke);
+  margin-right: 6px;
+  flex: 0 0 auto;
+}
+
+.tv-category-indicator.is-active {
+  background: var(--accent);
+}
+
+.tv-category-close {
+  margin-left: 6px;
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.9rem;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.tv-category-close:hover {
+  color: var(--ink);
+}
+
+.tv-category-cog {
+  margin-left: 6px;
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tv-category-cog:hover {
+  color: var(--ink);
+}
+
+.tv-tab-settings {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  background: var(--surface);
+  border: 1px solid var(--stroke);
+  border-radius: 6px;
+  padding: 8px;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 50;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.tv-tab-settings-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tv-tab-settings-label {
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.tv-tab-settings-input {
+  border: 1px solid var(--stroke);
+  background: var(--surface-alt);
+  color: var(--ink);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 0.78rem;
+  outline: none;
+}
+
+.tv-tab-settings-input:focus {
+  border-color: var(--accent);
+}
+
+.tv-tab-settings-save {
+  align-self: flex-end;
+  border: none;
+  background: var(--surface-2);
+  color: var(--ink);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.tv-tab-settings-save:hover {
+  background: var(--hover);
+}
+
+.tv-category-tab-input {
+  width: 120px;
+  max-width: 160px;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: inherit;
+  font-size: 0.78rem;
 }
 
 .tv-symbol-name {
@@ -1137,6 +2100,121 @@ onUnmounted(() => {
   position: relative;
   padding: 4px 0;
   gap: 2px;
+}
+
+.tv-sidebar-right {
+  border-right: none;
+  border-left: 1px solid var(--stroke);
+}
+
+.tv-right-stack {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+}
+
+.tv-drawing-sidebar {
+  gap: 8px;
+  padding: 8px 6px;
+  width: 180px;
+  border-left: 1px solid var(--stroke);
+}
+
+.tv-drawing-prop {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 4px;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.tv-drawing-label {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+
+.tv-drawing-value {
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 0.78rem;
+  text-transform: capitalize;
+}
+
+.tv-drawing-input {
+  background: transparent;
+  border: 1px solid var(--stroke);
+  border-radius: 6px;
+  padding: 6px 8px;
+  color: var(--ink);
+  font-size: 0.78rem;
+  outline: none;
+}
+
+.tv-drawing-input:focus {
+  border-color: var(--accent);
+}
+
+.tv-drawing-color {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid var(--stroke);
+}
+
+.tv-drawing-trash {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 6px 0;
+  padding: 6px 8px;
+  border: 1px solid var(--stroke);
+  background: transparent;
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+
+.tv-drawing-trash:hover {
+  color: #ef5350;
+  border-color: rgba(239, 83, 80, 0.4);
+  background: rgba(239, 83, 80, 0.1);
+}
+
+.tv-drawing-color-picker {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.tv-drawing-color-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.tv-drawing-close {
+  align-self: flex-end;
+  margin: 4px 6px 0;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.tv-drawing-close:hover {
+  color: var(--ink);
 }
 
 /* Sidebar Buttons */
@@ -1242,6 +2320,7 @@ onUnmounted(() => {
   flex-direction: column;
   background: var(--bg);
   overflow: hidden;
+  min-height: 0;
 }
 
 .tv-chart-canvas {
@@ -1249,6 +2328,99 @@ onUnmounted(() => {
   position: relative;
   width: 100%;
   height: 100%;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.tv-chart-canvas.is-empty :deep(.drawing-layer) {
+  pointer-events: none;
+}
+
+.tv-chart-scroll {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  max-width: 100%;
+  max-height: 100%;
+  overscroll-behavior: contain;
+  cursor: grab;
+  scrollbar-width: none;
+}
+
+.tv-chart-scroll:active {
+  cursor: grabbing;
+}
+
+.tv-chart-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.tv-chart-scroll-inner {
+  position: relative;
+  min-width: 100%;
+  min-height: 100%;
+  padding: 0;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+}
+
+.tv-chart-frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.tv-empty-tabs {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--muted);
+  z-index: 30;
+  pointer-events: auto;
+  text-align: center;
+}
+
+.tv-empty-tabs-visual {
+  color: var(--muted);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.tv-empty-tabs-text {
+  font-size: 0.9rem;
+  pointer-events: none;
+}
+
+.tv-empty-tabs-actions {
+  position: relative;
+  pointer-events: auto;
+}
+
+.tv-add-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: #1e6bff;
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(30, 107, 255, 0.35);
+}
+
+.tv-add-tab-btn:hover {
+  background: #1557d6;
 }
 
 .tv-chart-canvas :deep(.chart-wrapper) {
@@ -1258,6 +2430,16 @@ onUnmounted(() => {
 
 .tv-chart-canvas :deep(.apexcharts-canvas) {
   width: 100% !important;
+}
+
+/* Hide axes when there are no tabs */
+.tv-chart-canvas.is-empty :deep(.apexcharts-xaxis),
+.tv-chart-canvas.is-empty :deep(.apexcharts-yaxis),
+.tv-chart-canvas.is-empty :deep(.apexcharts-xaxis-texts-g),
+.tv-chart-canvas.is-empty :deep(.apexcharts-yaxis-texts-g),
+.tv-chart-canvas.is-empty :deep(.apexcharts-xaxis-tick),
+.tv-chart-canvas.is-empty :deep(.apexcharts-yaxis-tick) {
+  display: none !important;
 }
 
 /* Drawing Layer Overlay */
@@ -1272,9 +2454,16 @@ onUnmounted(() => {
 }
 
 /* Only enable pointer events on canvas when drawing tool is active (not select) */
-.tv-drawing-overlay.is-drawing :deep(canvas) {
+.tv-drawing-overlay.is-interactive :deep(canvas) {
   pointer-events: auto;
+}
+
+.tv-drawing-overlay.is-drawing-tool :deep(canvas) {
   cursor: crosshair;
+}
+
+.tv-drawing-overlay.is-interactive:not(.is-drawing-tool) :deep(canvas) {
+  cursor: pointer;
 }
 
 .tv-drawing-overlay :deep(.drawing-toolbar) {
@@ -1293,12 +2482,20 @@ onUnmounted(() => {
   width: auto !important;
 }
 
-/* Collapsible Legend Overlay */
-.tv-legend-overlay {
+/* Collapsible Legend + Tabs Group */
+.tv-legend-group {
   position: absolute;
   top: 8px;
   left: 8px;
-  z-index: 25;
+  z-index: 40;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: fit-content;
+  max-width: calc(100% - 16px);
+}
+
+.tv-legend-overlay {
   display: flex;
   align-items: flex-start;
   gap: 4px;
@@ -1308,6 +2505,7 @@ onUnmounted(() => {
   padding: 6px 8px;
   transition: all 0.2s ease;
   max-width: 280px;
+  pointer-events: auto;
 }
 
 .tv-legend-overlay.is-collapsed {
@@ -1346,6 +2544,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 3px;
+  min-width: 0;
 }
 
 .tv-legend-row {
@@ -1354,6 +2553,7 @@ onUnmounted(() => {
   gap: 6px;
   font-size: 0.78rem;
   white-space: nowrap;
+  flex-wrap: nowrap;
   transition: opacity 0.15s;
   position: relative;
 }
@@ -1381,14 +2581,19 @@ onUnmounted(() => {
 .tv-legend-symbol {
   color: var(--ink);
   font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .tv-legend-desc {
   color: var(--muted);
-  font-size: 0.7rem;
-  max-width: 200px;
-  white-space: normal;
-  line-height: 1.2;
+  font-size: 0.72rem;
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 
 .tv-legend-actions {
@@ -1396,6 +2601,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 4px;
   margin-left: auto;
+  flex: 0 0 auto;
 }
 
 .tv-legend-action {
@@ -1474,6 +2680,7 @@ onUnmounted(() => {
   color: var(--muted);
   font-size: 0.75rem;
   font-style: italic;
+  white-space: nowrap;
 }
 
 /* Hide ApexCharts built-in legend - using our custom chevron legend instead */
@@ -1561,41 +2768,6 @@ onUnmounted(() => {
 
 .tv-legend-btn:hover {
   color: #fff;
-}
-
-/* Floating Buttons (bottom-right) */
-.tv-float-btns {
-  position: absolute;
-  bottom: 88px;
-  right: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  z-index: 10;
-}
-
-.tv-float-btn {
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--surface);
-  border: 1px solid var(--stroke);
-  border-radius: 4px;
-  color: var(--muted);
-  cursor: pointer;
-}
-
-.tv-float-btn:hover {
-  background: var(--hover);
-  color: var(--ink);
-}
-
-.tv-float-btn.active {
-  background: rgba(41, 98, 255, 0.15);
-  color: var(--accent);
-  border-color: var(--accent);
 }
 
 /* Summary Bar (bottom) */
@@ -1715,6 +2887,56 @@ onUnmounted(() => {
   padding: 8px 12px;
   border-bottom: 1px solid var(--stroke);
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.category-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.category-tabs-actions {
+  margin-left: auto;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.new-tab-btn {
+  white-space: nowrap;
+}
+
+.new-tab-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--stroke);
+  border-radius: 6px;
+  padding: 6px;
+  min-width: 140px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 5;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.new-tab-option {
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 6px 8px;
+  border-radius: 4px;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 0.78rem;
+}
+
+.new-tab-option:hover {
+  background: var(--surface-2);
 }
 
 .filter-tab {
@@ -1840,14 +3062,6 @@ onUnmounted(() => {
   color: #ef5350;
 }
 
-/* ===== Floating Button Divider ===== */
-.tv-float-divider {
-  width: 1px;
-  height: 16px;
-  background: rgba(255,255,255,0.2);
-  margin: 0 4px;
-}
-
 /* ===== Object Tree & Layers Panels ===== */
 .tv-panel {
   position: absolute;
@@ -1863,11 +3077,11 @@ onUnmounted(() => {
 }
 
 .tv-layers-panel {
-  right: 85px;
+  right: 60px;
 }
 
 .tv-layers-panel.is-shifted {
-  right: 288px;
+  right: 280px;
 }
 
 .tv-panel-header {

@@ -1,5 +1,5 @@
 <template>
-  <div class="drawing-layer" ref="containerRef" :class="{ 'is-drawing': activeTool !== 'select' }">
+  <div class="drawing-layer" ref="containerRef" :class="{ 'is-interactive': isInteractive, 'is-drawing': activeTool !== 'select' }">
     <canvas ref="canvasRef" :id="canvasId"></canvas>
     
     <!-- Drawing Toolbar - Collapsible -->
@@ -87,14 +87,23 @@ const containerRef = ref<HTMLDivElement | null>(null)
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 let ctx: CanvasRenderingContext2D | null = null
 
+// Emits
+const emit = defineEmits<{
+  (e: 'selection', payload: { drawing: { type: string; points: number[]; color: string; name?: string }; index: number } | null): void
+}>()
+
 // State - use prop if provided, otherwise local state
 const internalActiveTool = ref<string>(props.activeTool)
 const activeTool = computed(() => props.showToolbar ? internalActiveTool.value : props.activeTool)
 const isDrawing = ref(false)
 const startPoint = ref<{ x: number; y: number } | null>(null)
-const drawings = ref<Array<{type: string, points: number[], color: string}>>([])
+const drawings = ref<Array<{type: string, points: number[], color: string, name?: string}>>([])
+const selectedIndex = ref<number | null>(null)
+const history = ref<Array<Array<{type: string, points: number[], color: string, name?: string}>>>([])
+const redoStack = ref<Array<Array<{type: string, points: number[], color: string, name?: string}>>>([])
 const toolbarCollapsed = ref(true) // Start collapsed to not block Y-axis
 const currentColor = ref('#2962ff') // Default drawing color - user can pick
+const isInteractive = computed(() => activeTool.value !== 'select' || drawings.value.length > 0)
 
 // Current free draw path
 let currentPath: number[] = []
@@ -159,7 +168,11 @@ function getMousePos(e: MouseEvent) {
 }
 
 function handleMouseDown(e: MouseEvent) {
-  if (activeTool.value === 'select') return
+  if (activeTool.value === 'select') {
+    const pos = getMousePos(e)
+    selectAt(pos.x, pos.y)
+    return
+  }
   
   const pos = getMousePos(e)
   startPoint.value = pos
@@ -213,29 +226,36 @@ function handleMouseUp(e: MouseEvent) {
   const pos = getMousePos(e)
   const color = currentColor.value
 
+  pushHistory()
+  const name = getNextLineName()
+
   if (activeTool.value === 'hline') {
     drawings.value.push({
       type: 'hline',
       points: [0, startPoint.value.y, canvasRef.value.width, startPoint.value.y],
-      color
+      color,
+      name
     })
   } else if (activeTool.value === 'vline') {
     drawings.value.push({
       type: 'vline',
       points: [startPoint.value.x, 0, startPoint.value.x, canvasRef.value.height],
-      color
+      color,
+      name
     })
   } else if (activeTool.value === 'trendline') {
     drawings.value.push({
       type: 'trendline',
       points: [startPoint.value.x, startPoint.value.y, pos.x, pos.y],
-      color
+      color,
+      name
     })
   } else if (activeTool.value === 'freedraw' && currentPath.length > 2) {
     drawings.value.push({
       type: 'freedraw',
       points: [...currentPath],
-      color
+      color,
+      name
     })
   }
 
@@ -245,6 +265,18 @@ function handleMouseUp(e: MouseEvent) {
   redraw()
 
   console.log('Drawing added, total:', drawings.value.length)
+}
+
+function getNextLineName() {
+  let max = 0
+  for (const d of drawings.value) {
+    if (!d.name) continue
+    const match = /^Line\s+(\d+)$/i.exec(d.name)
+    if (!match) continue
+    const num = Number.parseInt(match[1], 10)
+    if (Number.isFinite(num)) max = Math.max(max, num)
+  }
+  return `Line ${max + 1}`
 }
 
 function redraw() {
@@ -272,6 +304,51 @@ function redraw() {
   }
 }
 
+function distancePointToSegment(px: number, py: number, x1: number, y1: number, x2: number, y2: number) {
+  const dx = x2 - x1
+  const dy = y2 - y1
+  if (dx === 0 && dy === 0) return Math.hypot(px - x1, py - y1)
+  const t = ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy)
+  const clamped = Math.max(0, Math.min(1, t))
+  const cx = x1 + clamped * dx
+  const cy = y1 + clamped * dy
+  return Math.hypot(px - cx, py - cy)
+}
+
+function hitTestDrawing(d: {type: string, points: number[]}, x: number, y: number) {
+  const threshold = 6
+  if (d.type === 'freedraw') {
+    for (let i = 0; i < d.points.length - 2; i += 2) {
+      const dist = distancePointToSegment(x, y, d.points[i], d.points[i + 1], d.points[i + 2], d.points[i + 3])
+      if (dist <= threshold) return true
+    }
+    return false
+  }
+  const [x1, y1, x2, y2] = d.points
+  return distancePointToSegment(x, y, x1, y1, x2, y2) <= threshold
+}
+
+function emitSelection() {
+  if (selectedIndex.value === null) {
+    emit('selection', null)
+    return
+  }
+  const drawing = drawings.value[selectedIndex.value]
+  emit('selection', { drawing: { ...drawing, points: [...drawing.points] }, index: selectedIndex.value })
+}
+
+function selectAt(x: number, y: number) {
+  for (let i = drawings.value.length - 1; i >= 0; i -= 1) {
+    if (hitTestDrawing(drawings.value[i], x, y)) {
+      selectedIndex.value = i
+      emitSelection()
+      return
+    }
+  }
+  selectedIndex.value = null
+  emitSelection()
+}
+
 // Set active tool
 function setTool(toolId: string) {
   internalActiveTool.value = toolId
@@ -280,9 +357,46 @@ function setTool(toolId: string) {
 
 // Clear all drawings
 function clearAll() {
+  if (drawings.value.length) {
+    pushHistory()
+  }
   drawings.value = []
+  selectedIndex.value = null
+  emitSelection()
   redraw()
   console.log('Canvas cleared')
+}
+
+function pushHistory() {
+  history.value.push(drawings.value.map((d) => ({ ...d, points: [...d.points] })))
+  if (history.value.length > 50) {
+    history.value.shift()
+  }
+  redoStack.value = []
+}
+
+function undo() {
+  if (!history.value.length) return
+  redoStack.value.push(drawings.value.map((d) => ({ ...d, points: [...d.points] })))
+  const prev = history.value.pop()
+  drawings.value = prev ? prev.map((d) => ({ ...d, points: [...d.points] })) : []
+  if (selectedIndex.value !== null && selectedIndex.value >= drawings.value.length) {
+    selectedIndex.value = null
+    emitSelection()
+  }
+  redraw()
+}
+
+function redo() {
+  if (!redoStack.value.length) return
+  history.value.push(drawings.value.map((d) => ({ ...d, points: [...d.points] })))
+  const next = redoStack.value.pop()
+  drawings.value = next ? next.map((d) => ({ ...d, points: [...d.points] })) : []
+  if (selectedIndex.value !== null && selectedIndex.value >= drawings.value.length) {
+    selectedIndex.value = null
+    emitSelection()
+  }
+  redraw()
 }
 
 // Resize handler
@@ -321,7 +435,10 @@ defineExpose({
   clearAll,
   setTool,
   drawings,
-  redraw
+  redraw,
+  pushHistory,
+  undo,
+  redo
 })
 </script>
 
@@ -336,7 +453,7 @@ defineExpose({
   pointer-events: none;
 }
 
-.drawing-layer.is-drawing {
+.drawing-layer.is-interactive {
   pointer-events: auto;
 }
 
