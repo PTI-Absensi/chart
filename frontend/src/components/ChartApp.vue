@@ -275,14 +275,14 @@
                 :key="symbol" 
                 class="tv-legend-row"
                 :class="{ 'tv-legend-row--hidden': hiddenSeries.has(symbol) }"
+                :title="formatLegendTooltip(symbol)"
               >
                 <span 
                   class="tv-legend-color-dot" 
                   :style="{ backgroundColor: getLegendColor(symbol, idx), borderColor: getLegendColor(symbol, idx) }"
                 ></span>
-                <span class="tv-legend-symbol">{{ getLegendName(symbol) }}</span>
-                <span class="tv-legend-value" v-if="getSymbolValue(symbol)">
-                  {{ formatNumber(getSymbolValue(symbol)) }}
+                <span class="tv-legend-symbol">
+                  {{ formatLegendText(symbol) }}
                 </span>
                 <div class="tv-legend-actions">
                   <button
@@ -964,6 +964,17 @@ function getLegendColor(symbol: string, idx: number): string {
 
 function getLegendName(symbol: string): string {
   return legendNames.value[symbol] || symbol
+}
+
+function formatLegendText(symbol: string): string {
+  const rawDesc = selectedSymbolMeta.value?.[symbol]?.description || ''
+  const desc = rawDesc.replace(/nilai rupiah/gi, '').trim()
+  if (!desc) return symbol
+  return `${symbol} - ${desc}`.replace(/\s*-\s*$/, '')
+}
+
+function formatLegendTooltip(symbol: string): string {
+  return formatLegendText(symbol)
 }
 
 function updateLegendName(symbol: string, name: string) {
@@ -2524,7 +2535,9 @@ onUnmounted(() => {
   color: var(--muted);
   font-size: 0.72rem;
   white-space: nowrap;
-  flex: 0 0 auto;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .tv-legend-actions {
