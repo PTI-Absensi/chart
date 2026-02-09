@@ -10,12 +10,7 @@
         <span class="tv-title">Procurement</span>
       </div>
       
-      <button class="tv-btn tv-insert-btn" type="button" @click="openSearchModal" title="Insert Data">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-          <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        </svg>
-        Insert
-      </button>
+      
     </div>
     
     <div class="tv-header-center">
@@ -365,9 +360,13 @@
             </div>
           </div>
           <div class="tv-category-bar">
-            <button class="tv-new-tab-btn is-tab" type="button" @click="addCategoryTab('all', false)" title="New Tab">
+            <button class="tv-new-tab-btn is-tab" type="button" @click="openSearchModal" title="Tambah data">
               <span class="tv-new-tab-plus">+</span>
-              <span class="tv-new-tab-balloon">New</span>
+              <span class="tv-new-tab-balloon">Tambah data</span>
+            </button>
+            <button class="tv-new-tab-btn is-tab" type="button" @click="addCategoryTab('all', false)" title="Tab baru">
+              <span class="tv-new-tab-plus">+</span>
+              <span class="tv-new-tab-balloon">Tab baru</span>
             </button>
             <div class="tv-category-tabs">
               <div
@@ -647,8 +646,10 @@
                 <path d="M16.5 6.5c0-1.9-1.6-3.5-4.5-3.5s-4.5 1.2-4.5 3.2c0 1.9 1.8 2.7 4.6 3.3 2.8.6 4.4 1.3 4.4 3.2 0 2.2-2 3.3-4.5 3.3s-4.5-1.1-4.5-3.3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
               </svg>
             </span>
-            <span class="search-item-code">{{ sym.symbol }}</span>
-            <span class="search-item-name">{{ sym.name }}</span>
+            <span class="search-item-content">
+              <span class="search-item-code">{{ sym.symbol }}</span>
+              <span class="search-item-desc" v-if="sym.description">{{ sym.description }}</span>
+            </span>
             <span class="search-item-unit">{{ sym.unit }}</span>
           </button>
           
@@ -949,6 +950,12 @@ function toggleSeriesVisibility(symbol: string) {
   // Reassign to trigger reactivity
   // ProcurementChart will filter based on hiddenSeries prop
   hiddenSeries.value = newSet
+
+  if (summaryData.value) {
+    const nextSeries = summaryData.value.series.filter((s) => !newSet.has(s.symbol))
+    const totalAll = nextSeries.reduce((sum, s) => sum + s.total, 0)
+    summaryData.value = nextSeries.length ? { totalAll, series: nextSeries } : null
+  }
 }
 
 function getLegendColor(symbol: string, idx: number): string {
@@ -1280,6 +1287,11 @@ function removeSymbol(symbol: string) {
     newSet.delete(symbol)
     hiddenSeries.value = newSet
   }
+  if (summaryData.value) {
+    const nextSeries = summaryData.value.series.filter((s) => s.symbol !== symbol)
+    const totalAll = nextSeries.reduce((sum, s) => sum + s.total, 0)
+    summaryData.value = nextSeries.length ? { totalAll, series: nextSeries } : null
+  }
   if (legendColors.value[symbol]) {
     const next = { ...legendColors.value }
     delete next[symbol]
@@ -1390,6 +1402,7 @@ function onDataLoaded(data: Record<string, any[]>) {
   let totalAll = 0
 
   selectedSymbols.value.forEach((symbol, index) => {
+    if (hiddenSeries.value.has(symbol)) return
     const values = data[symbol] || []
     if (!values.length) return
 
@@ -1643,17 +1656,6 @@ onUnmounted(() => {
   color: var(--ink);
 }
 
-.tv-insert-btn {
-  margin-left: 10px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--surface-alt);
-  border: 1px solid var(--stroke);
-  border-radius: 4px;
-  padding: 4px 8px;
-}
-
 .tv-title {
   font-size: 0.85rem;
   font-weight: 600;
@@ -1775,9 +1777,12 @@ onUnmounted(() => {
   flex-wrap: nowrap;
   white-space: nowrap;
   overflow-x: auto;
+  overflow-y: hidden;
   min-width: 0;
   flex: 1 1 auto;
   padding-bottom: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
 }
 
 .tv-category-tabs::-webkit-scrollbar {
@@ -2917,13 +2922,31 @@ onUnmounted(() => {
 
 .search-item-code {
   font-weight: 600;
-  min-width: 80px;
+  display: block;
 }
 
 .search-item-name {
-  flex: 1;
   font-size: 0.85rem;
+  color: var(--ink);
+  line-height: 1.2;
+  display: block;
+}
+
+.search-item-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-self: center;
+}
+
+.search-item-desc {
+  font-size: 0.75rem;
   color: var(--muted);
+  white-space: normal;
+  overflow: visible;
+  display: block;
 }
 
 .search-item-unit {
