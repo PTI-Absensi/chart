@@ -139,27 +139,6 @@
       
       <div class="tv-sidebar-divider"></div>
       
-      <button class="tv-sidebar-btn" :class="{ active: logScale }" @click="logScale = !logScale" title="Log Scale">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 19h16M6 16c2-3 4-4 6-4s4 1 6 4" stroke="currentColor" stroke-width="2"/></svg>
-      </button>
-      <button class="tv-sidebar-btn" :class="{ active: normalize }" @click="normalize = !normalize" title="Normalize">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 17h16M7 4v16" stroke="currentColor" stroke-width="2"/></svg>
-      </button>
-      <div class="tv-sidebar-divider"></div>
-      <button class="tv-sidebar-btn" :class="{ active: showObjectTree }" @click="showObjectTree = !showObjectTree" title="Object Tree">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-          <path d="M3 3h18v18H3z" stroke="currentColor" stroke-width="2"/>
-          <path d="M7 12h10M7 8h6M7 16h8" stroke="currentColor" stroke-width="2"/>
-        </svg>
-      </button>
-      <button class="tv-sidebar-btn" :class="{ active: showLayersPanel }" @click="showLayersPanel = !showLayersPanel" title="Layers">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-          <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="currentColor" stroke-width="2"/>
-          <path d="M2 17l10 5 10-5" stroke="currentColor" stroke-width="2"/>
-          <path d="M2 12l10 5 10-5" stroke="currentColor" stroke-width="2"/>
-        </svg>
-      </button>
-      
       <!-- Navigation Popup -->
       <div v-if="navMenuOpen" class="tv-nav-popup">
         <div class="tv-nav-header">
@@ -216,30 +195,17 @@
             </svg>
           </div>
           <div class="tv-empty-tabs-text">No tab activated. Create a new one.</div>
-          <div class="tv-empty-tabs-actions" ref="emptyTabAreaRef">
+          <div class="tv-empty-tabs-actions">
             <button
               class="tv-add-tab-btn"
               type="button"
-              @click="openEmptyTabMenu"
+              @click="addCategoryTab('all', false)"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                 <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
               </svg>
               Add New Tab
             </button>
-            <div v-if="newTabMenuOpen && newTabMenuFromEmpty" class="tv-new-tab-menu is-center" @click.stop>
-              <div class="tv-new-tab-submenu">
-                <button
-                  v-for="opt in categoryOptions"
-                  :key="opt.value"
-                  class="tv-new-tab-option"
-                  type="button"
-                  @click="addCategoryTab(opt.value, false)"
-                >
-                  {{ opt.label }}
-                </button>
-              </div>
-            </div>
           </div>
         </div>
         <div
@@ -393,8 +359,8 @@
               </div>
             </div>
           </div>
-          <div class="tv-category-bar" ref="newTabAreaRef" @click.stop>
-            <button class="tv-new-tab-btn is-tab" type="button" @click="newTabMenuOpen = !newTabMenuOpen; newTabMenuMode = 'root'; newTabMenuOnlyCategories = false" title="New Tab">
+          <div class="tv-category-bar">
+            <button class="tv-new-tab-btn is-tab" type="button" @click="addCategoryTab('all', false)" title="New Tab">
               <span class="tv-new-tab-plus">+</span>
               <span class="tv-new-tab-balloon">New</span>
             </button>
@@ -448,35 +414,7 @@
                 </div>
               </div>
             </div>
-            <div v-if="newTabMenuOpen && !newTabMenuFromEmpty" class="tv-new-tab-menu" @click.stop>
-              <template v-if="!newTabMenuOnlyCategories">
-                <button
-                  class="tv-new-tab-option"
-                  type="button"
-                  @click="newTabMenuMode = 'category'"
-                >
-                  Add New Tab
-                </button>
-                <button
-                  class="tv-new-tab-option"
-                  type="button"
-                  @click="openSearchModal(); newTabMenuOpen = false; newTabMenuOnlyCategories = false"
-                >
-                  Insert Data
-                </button>
-              </template>
-              <div v-if="newTabMenuMode === 'category'" class="tv-new-tab-submenu">
-                <button
-                  v-for="opt in categoryOptions"
-                  :key="opt.value"
-                  class="tv-new-tab-option"
-                  type="button"
-                  @click="addCategoryTab(opt.value, false)"
-                >
-                  {{ opt.label }}
-                </button>
-              </div>
-            </div>
+            <!-- Menu removed: New button now directly creates a tab -->
           </div>
         </div>
       </div>
@@ -1058,15 +996,10 @@ const categoryOptions: { value: CategoryValue; label: string }[] = [
 
 const categoryTabs = ref<CategoryTab[]>([])
 const activeCategoryTabId = ref<string | null>(null)
-const newTabMenuOpen = ref(false)
-const newTabMenuMode = ref<'root' | 'category'>('root')
-const newTabMenuOnlyCategories = ref(false)
-const newTabMenuFromEmpty = ref(false)
+// New button now creates a tab directly (menu removed)
 const activeSearchCategory = ref<CategoryValue>('all')
 const editingTabId = ref<string | null>(null)
 const editingTabLabel = ref('')
-const newTabAreaRef = ref<HTMLElement | null>(null)
-const emptyTabAreaRef = ref<HTMLElement | null>(null)
 const activeTabSettingsId = ref<string | null>(null)
 const tabSettingsName = ref('')
 
@@ -1158,9 +1091,8 @@ watch([periodType, year, rawMode, cumulative, sumberDana, kategoriPlant, normali
 })
 
 function addCategoryTab(category: CategoryValue, openSearch = false) {
-  const baseLabel = categoryOptions.find(o => o.value === category)?.label || category
-  const nextIndex = categoryTabs.value.filter(t => t.category === category).length + 1
-  const label = category === 'all' && nextIndex === 1 ? baseLabel : `${baseLabel} ${nextIndex}`
+  const nextIndex = categoryTabs.value.length + 1
+  const label = `Tab ${nextIndex}`
   const id = `tab-${category}-${Date.now()}`
   categoryTabs.value = [...categoryTabs.value, { id, label, category }]
   selectedSymbolsByTab.value = { ...selectedSymbolsByTab.value, [id]: [] }
@@ -1168,11 +1100,6 @@ function addCategoryTab(category: CategoryValue, openSearch = false) {
   legendColorsByTab.value = { ...legendColorsByTab.value, [id]: {} }
   legendNamesByTab.value = { ...legendNamesByTab.value, [id]: {} }
   activeCategoryTabId.value = id
-  newTabMenuOpen.value = false
-  newTabMenuMode.value = 'root'
-  newTabMenuOnlyCategories.value = false
-  newTabMenuFromEmpty.value = false
-  newTabMenuFromEmpty.value = false
   if (openSearch) {
     openSearchModal()
   }
@@ -1374,24 +1301,6 @@ function openSearchModal() {
 // Close search modal
 function closeSearchModal() {
   searchModalOpen.value = false
-  newTabMenuOpen.value = false
-  newTabMenuMode.value = 'root'
-  newTabMenuOnlyCategories.value = false
-  newTabMenuFromEmpty.value = false
-}
-
-function closeNewTabMenu() {
-  newTabMenuOpen.value = false
-  newTabMenuMode.value = 'root'
-  newTabMenuOnlyCategories.value = false
-  newTabMenuFromEmpty.value = false
-}
-
-function openEmptyTabMenu() {
-  newTabMenuOpen.value = true
-  newTabMenuMode.value = 'category'
-  newTabMenuOnlyCategories.value = true
-  newTabMenuFromEmpty.value = true
 }
 
 function handleDocumentClick(event: MouseEvent) {
@@ -1403,10 +1312,6 @@ function handleDocumentClick(event: MouseEvent) {
     if (cogEl && cogEl.contains(target)) return
     closeTabSettings()
   }
-  if (!newTabMenuOpen.value) return
-  if (newTabAreaRef.value && newTabAreaRef.value.contains(target)) return
-  if (emptyTabAreaRef.value && emptyTabAreaRef.value.contains(target)) return
-  closeNewTabMenu()
 }
 
 // Filter symbols (no-op, computed handles it)
