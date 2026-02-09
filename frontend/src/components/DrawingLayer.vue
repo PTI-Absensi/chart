@@ -93,6 +93,8 @@ const activeTool = computed(() => props.showToolbar ? internalActiveTool.value :
 const isDrawing = ref(false)
 const startPoint = ref<{ x: number; y: number } | null>(null)
 const drawings = ref<Array<{type: string, points: number[], color: string}>>([])
+const history = ref<Array<Array<{type: string, points: number[], color: string}>>>([])
+const redoStack = ref<Array<Array<{type: string, points: number[], color: string}>>>([])
 const toolbarCollapsed = ref(true) // Start collapsed to not block Y-axis
 const currentColor = ref('#2962ff') // Default drawing color - user can pick
 
@@ -213,6 +215,8 @@ function handleMouseUp(e: MouseEvent) {
   const pos = getMousePos(e)
   const color = currentColor.value
 
+  pushHistory()
+
   if (activeTool.value === 'hline') {
     drawings.value.push({
       type: 'hline',
@@ -280,9 +284,36 @@ function setTool(toolId: string) {
 
 // Clear all drawings
 function clearAll() {
+  if (drawings.value.length) {
+    pushHistory()
+  }
   drawings.value = []
   redraw()
   console.log('Canvas cleared')
+}
+
+function pushHistory() {
+  history.value.push(drawings.value.map((d) => ({ ...d, points: [...d.points] })))
+  if (history.value.length > 50) {
+    history.value.shift()
+  }
+  redoStack.value = []
+}
+
+function undo() {
+  if (!history.value.length) return
+  redoStack.value.push(drawings.value.map((d) => ({ ...d, points: [...d.points] })))
+  const prev = history.value.pop()
+  drawings.value = prev ? prev.map((d) => ({ ...d, points: [...d.points] })) : []
+  redraw()
+}
+
+function redo() {
+  if (!redoStack.value.length) return
+  history.value.push(drawings.value.map((d) => ({ ...d, points: [...d.points] })))
+  const next = redoStack.value.pop()
+  drawings.value = next ? next.map((d) => ({ ...d, points: [...d.points] })) : []
+  redraw()
 }
 
 // Resize handler
@@ -321,7 +352,10 @@ defineExpose({
   clearAll,
   setTool,
   drawings,
-  redraw
+  redraw,
+  pushHistory,
+  undo,
+  redo
 })
 </script>
 
