@@ -10,7 +10,7 @@
         <span class="tv-title">Procurement</span>
       </div>
       
-      <!-- New Tab (moved to legend group) -->
+      
     </div>
     
     <div class="tv-header-center">
@@ -139,27 +139,6 @@
       
       <div class="tv-sidebar-divider"></div>
       
-      <button class="tv-sidebar-btn" :class="{ active: logScale }" @click="logScale = !logScale" title="Log Scale">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 19h16M6 16c2-3 4-4 6-4s4 1 6 4" stroke="currentColor" stroke-width="2"/></svg>
-      </button>
-      <button class="tv-sidebar-btn" :class="{ active: normalize }" @click="normalize = !normalize" title="Normalize">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 17h16M7 4v16" stroke="currentColor" stroke-width="2"/></svg>
-      </button>
-      <div class="tv-sidebar-divider"></div>
-      <button class="tv-sidebar-btn" :class="{ active: showObjectTree }" @click="showObjectTree = !showObjectTree" title="Object Tree">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-          <path d="M3 3h18v18H3z" stroke="currentColor" stroke-width="2"/>
-          <path d="M7 12h10M7 8h6M7 16h8" stroke="currentColor" stroke-width="2"/>
-        </svg>
-      </button>
-      <button class="tv-sidebar-btn" :class="{ active: showLayersPanel }" @click="showLayersPanel = !showLayersPanel" title="Layers">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-          <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="currentColor" stroke-width="2"/>
-          <path d="M2 17l10 5 10-5" stroke="currentColor" stroke-width="2"/>
-          <path d="M2 12l10 5 10-5" stroke="currentColor" stroke-width="2"/>
-        </svg>
-      </button>
-      
       <!-- Navigation Popup -->
       <div v-if="navMenuOpen" class="tv-nav-popup">
         <div class="tv-nav-header">
@@ -216,30 +195,17 @@
             </svg>
           </div>
           <div class="tv-empty-tabs-text">No tab activated. Create a new one.</div>
-          <div class="tv-empty-tabs-actions" ref="emptyTabAreaRef">
+          <div class="tv-empty-tabs-actions">
             <button
               class="tv-add-tab-btn"
               type="button"
-              @click="openEmptyTabMenu"
+              @click="addCategoryTab('all', false)"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                 <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
               </svg>
               Add New Tab
             </button>
-            <div v-if="newTabMenuOpen && newTabMenuFromEmpty" class="tv-new-tab-menu is-center" @click.stop>
-              <div class="tv-new-tab-submenu">
-                <button
-                  v-for="opt in categoryOptions"
-                  :key="opt.value"
-                  class="tv-new-tab-option"
-                  type="button"
-                  @click="addCategoryTab(opt.value, false)"
-                >
-                  {{ opt.label }}
-                </button>
-              </div>
-            </div>
           </div>
         </div>
         <div
@@ -393,10 +359,14 @@
               </div>
             </div>
           </div>
-          <div class="tv-category-bar" ref="newTabAreaRef" @click.stop>
-            <button class="tv-new-tab-btn is-tab" type="button" @click="newTabMenuOpen = !newTabMenuOpen; newTabMenuMode = 'root'; newTabMenuOnlyCategories = false" title="New Tab">
+          <div class="tv-category-bar">
+            <button class="tv-new-tab-btn is-tab" type="button" @click="openSearchModal" title="Tambah data">
               <span class="tv-new-tab-plus">+</span>
-              <span class="tv-new-tab-balloon">New</span>
+              <span class="tv-new-tab-balloon">Tambah data</span>
+            </button>
+            <button class="tv-new-tab-btn is-tab" type="button" @click="addCategoryTab('all', false)" title="Tab baru">
+              <span class="tv-new-tab-plus">+</span>
+              <span class="tv-new-tab-balloon">Tab baru</span>
             </button>
             <div class="tv-category-tabs">
               <div
@@ -448,35 +418,7 @@
                 </div>
               </div>
             </div>
-            <div v-if="newTabMenuOpen && !newTabMenuFromEmpty" class="tv-new-tab-menu" @click.stop>
-              <template v-if="!newTabMenuOnlyCategories">
-                <button
-                  class="tv-new-tab-option"
-                  type="button"
-                  @click="newTabMenuMode = 'category'"
-                >
-                  Add New Tab
-                </button>
-                <button
-                  class="tv-new-tab-option"
-                  type="button"
-                  @click="openSearchModal(); newTabMenuOpen = false; newTabMenuOnlyCategories = false"
-                >
-                  Insert Data
-                </button>
-              </template>
-              <div v-if="newTabMenuMode === 'category'" class="tv-new-tab-submenu">
-                <button
-                  v-for="opt in categoryOptions"
-                  :key="opt.value"
-                  class="tv-new-tab-option"
-                  type="button"
-                  @click="addCategoryTab(opt.value, false)"
-                >
-                  {{ opt.label }}
-                </button>
-              </div>
-            </div>
+            <!-- Menu removed: New button now directly creates a tab -->
           </div>
         </div>
       </div>
@@ -698,11 +640,16 @@
           >
             <!-- Type Icon -->
             <span class="search-item-icon" :class="sym.symbolType">
-              <svg v-if="sym.symbolType === 'nilai'" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 2v20M6 6l6-4 6 4M6 18l6 4 6-4" stroke="currentColor" stroke-width="2"/></svg>
-              <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 2h9l5 5v15H6z" stroke="currentColor" stroke-width="2"/><path d="M14 2v5h5" stroke="currentColor" stroke-width="2"/><path d="M8 10h8M8 14h6" stroke="currentColor" stroke-width="2"/></svg>
+              <svg v-if="sym.symbolType === 'dokumen'" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 2h9l5 5v15H6z" stroke="currentColor" stroke-width="2"/><path d="M14 2v5h5" stroke="currentColor" stroke-width="2"/><path d="M8 10h8M8 14h6" stroke="currentColor" stroke-width="2"/></svg>
+              <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2v20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                <path d="M16.5 6.5c0-1.9-1.6-3.5-4.5-3.5s-4.5 1.2-4.5 3.2c0 1.9 1.8 2.7 4.6 3.3 2.8.6 4.4 1.3 4.4 3.2 0 2.2-2 3.3-4.5 3.3s-4.5-1.1-4.5-3.3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
             </span>
-            <span class="search-item-code">{{ sym.symbol }}</span>
-            <span class="search-item-name">{{ sym.description || sym.name }}</span>
+            <span class="search-item-content">
+              <span class="search-item-code">{{ sym.symbol }}</span>
+              <span class="search-item-desc" v-if="sym.description">{{ sym.description }}</span>
+            </span>
             <span class="search-item-unit">{{ sym.unit }}</span>
           </button>
           
@@ -1003,6 +950,12 @@ function toggleSeriesVisibility(symbol: string) {
   // Reassign to trigger reactivity
   // ProcurementChart will filter based on hiddenSeries prop
   hiddenSeries.value = newSet
+
+  if (summaryData.value) {
+    const nextSeries = summaryData.value.series.filter((s) => !newSet.has(s.symbol))
+    const totalAll = nextSeries.reduce((sum, s) => sum + s.total, 0)
+    summaryData.value = nextSeries.length ? { totalAll, series: nextSeries } : null
+  }
 }
 
 function getLegendColor(symbol: string, idx: number): string {
@@ -1063,15 +1016,10 @@ const categoryOptions: { value: CategoryValue; label: string }[] = [
 
 const categoryTabs = ref<CategoryTab[]>([])
 const activeCategoryTabId = ref<string | null>(null)
-const newTabMenuOpen = ref(false)
-const newTabMenuMode = ref<'root' | 'category'>('root')
-const newTabMenuOnlyCategories = ref(false)
-const newTabMenuFromEmpty = ref(false)
+// New button now creates a tab directly (menu removed)
 const activeSearchCategory = ref<CategoryValue>('all')
 const editingTabId = ref<string | null>(null)
 const editingTabLabel = ref('')
-const newTabAreaRef = ref<HTMLElement | null>(null)
-const emptyTabAreaRef = ref<HTMLElement | null>(null)
 const activeTabSettingsId = ref<string | null>(null)
 const tabSettingsName = ref('')
 
@@ -1163,9 +1111,8 @@ watch([periodType, year, rawMode, cumulative, sumberDana, kategoriPlant, normali
 })
 
 function addCategoryTab(category: CategoryValue, openSearch = false) {
-  const baseLabel = categoryOptions.find(o => o.value === category)?.label || category
-  const nextIndex = categoryTabs.value.filter(t => t.category === category).length + 1
-  const label = category === 'all' && nextIndex === 1 ? baseLabel : `${baseLabel} ${nextIndex}`
+  const nextIndex = categoryTabs.value.length + 1
+  const label = `Tab ${nextIndex}`
   const id = `tab-${category}-${Date.now()}`
   categoryTabs.value = [...categoryTabs.value, { id, label, category }]
   selectedSymbolsByTab.value = { ...selectedSymbolsByTab.value, [id]: [] }
@@ -1173,11 +1120,6 @@ function addCategoryTab(category: CategoryValue, openSearch = false) {
   legendColorsByTab.value = { ...legendColorsByTab.value, [id]: {} }
   legendNamesByTab.value = { ...legendNamesByTab.value, [id]: {} }
   activeCategoryTabId.value = id
-  newTabMenuOpen.value = false
-  newTabMenuMode.value = 'root'
-  newTabMenuOnlyCategories.value = false
-  newTabMenuFromEmpty.value = false
-  newTabMenuFromEmpty.value = false
   if (openSearch) {
     openSearchModal()
   }
@@ -1350,6 +1292,11 @@ function removeSymbol(symbol: string) {
     newSet.delete(symbol)
     hiddenSeries.value = newSet
   }
+  if (summaryData.value) {
+    const nextSeries = summaryData.value.series.filter((s) => s.symbol !== symbol)
+    const totalAll = nextSeries.reduce((sum, s) => sum + s.total, 0)
+    summaryData.value = nextSeries.length ? { totalAll, series: nextSeries } : null
+  }
   if (legendColors.value[symbol]) {
     const next = { ...legendColors.value }
     delete next[symbol]
@@ -1379,24 +1326,6 @@ function openSearchModal() {
 // Close search modal
 function closeSearchModal() {
   searchModalOpen.value = false
-  newTabMenuOpen.value = false
-  newTabMenuMode.value = 'root'
-  newTabMenuOnlyCategories.value = false
-  newTabMenuFromEmpty.value = false
-}
-
-function closeNewTabMenu() {
-  newTabMenuOpen.value = false
-  newTabMenuMode.value = 'root'
-  newTabMenuOnlyCategories.value = false
-  newTabMenuFromEmpty.value = false
-}
-
-function openEmptyTabMenu() {
-  newTabMenuOpen.value = true
-  newTabMenuMode.value = 'category'
-  newTabMenuOnlyCategories.value = true
-  newTabMenuFromEmpty.value = true
 }
 
 function handleDocumentClick(event: MouseEvent) {
@@ -1408,10 +1337,6 @@ function handleDocumentClick(event: MouseEvent) {
     if (cogEl && cogEl.contains(target)) return
     closeTabSettings()
   }
-  if (!newTabMenuOpen.value) return
-  if (newTabAreaRef.value && newTabAreaRef.value.contains(target)) return
-  if (emptyTabAreaRef.value && emptyTabAreaRef.value.contains(target)) return
-  closeNewTabMenu()
 }
 
 // Filter symbols (no-op, computed handles it)
@@ -1482,6 +1407,7 @@ function onDataLoaded(data: Record<string, any[]>) {
   let totalAll = 0
 
   selectedSymbols.value.forEach((symbol, index) => {
+    if (hiddenSeries.value.has(symbol)) return
     const values = data[symbol] || []
     if (!values.length) return
 
@@ -1856,9 +1782,12 @@ onUnmounted(() => {
   flex-wrap: nowrap;
   white-space: nowrap;
   overflow-x: auto;
+  overflow-y: hidden;
   min-width: 0;
   flex: 1 1 auto;
   padding-bottom: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
 }
 
 .tv-category-tabs::-webkit-scrollbar {
@@ -2998,16 +2927,31 @@ onUnmounted(() => {
 
 .search-item-code {
   font-weight: 600;
-  min-width: 80px;
+  display: block;
 }
 
 .search-item-name {
+  font-size: 0.85rem;
+  color: var(--ink);
+  line-height: 1.2;
+  display: block;
+}
+
+.search-item-content {
   flex: 1;
   min-width: 0;
-  font-size: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-self: center;
+}
+
+.search-item-desc {
+  font-size: 0.75rem;
   color: var(--muted);
   white-space: normal;
-  line-height: 1.2;
+  overflow: visible;
+  display: block;
 }
 
 .search-item-unit {
