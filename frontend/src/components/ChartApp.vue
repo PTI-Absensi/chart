@@ -323,7 +323,7 @@
             
             <div class="tv-legend-content" v-show="!legendCollapsed">
               <div 
-                v-for="(symbol, idx) in selectedSymbols" 
+                v-for="(symbol, idx) in allPaneSymbols" 
                 :key="symbol" 
                 class="tv-legend-row"
                 :class="{ 'tv-legend-row--hidden': hiddenSeries.has(symbol) }"
@@ -406,7 +406,7 @@
                   </div>
                 </div>
               </div>
-              <div class="tv-legend-empty" v-if="!selectedSymbols.length">
+              <div class="tv-legend-empty" v-if="!allPaneSymbols.length">
                 No series selected
               </div>
             </div>
@@ -1092,7 +1092,7 @@ function buildSymbolMeta(symbols: string[]) {
   return meta
 }
 
-const selectedSymbolMeta = computed(() => buildSymbolMeta(selectedSymbols.value))
+const selectedSymbolMeta = computed(() => buildSymbolMeta(allPaneSymbols.value))
 
 // Go to page (for navigation menu)
 function goToPage(page: string) {
