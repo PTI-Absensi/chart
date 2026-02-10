@@ -157,7 +157,7 @@ onMounted(() => {
     if (startEl.value) params.set('start_date', startEl.value)
     if (endEl.value) params.set('end_date', endEl.value)
 
-    const res = await authFetch(`/api/dfg/preview?${params.toString()}`)
+    const res = await authFetch(`/dfg/preview?${params.toString()}`)
     const json = await res.json()
     if (commandPreview) commandPreview.textContent = json.command || ''
     return json.file_url

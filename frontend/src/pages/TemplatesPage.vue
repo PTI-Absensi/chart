@@ -36,6 +36,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { apiFetch, buildApiUrl } from '../utils/api'
 
 type Template = { id: string; name: string; created_at: string }
 
@@ -45,14 +46,14 @@ const newName = ref('')
 const formatDate = (value: string) => new Date(value).toLocaleString()
 
 const loadTemplates = async () => {
-  const res = await fetch('/api/templates')
+  const res = await apiFetch('/templates')
   const json = await res.json()
   templates.value = json.data || []
 }
 
 const createTemplate = async () => {
   if (!newName.value.trim()) return
-  const res = await fetch('/api/templates', {
+  const res = await apiFetch('/templates', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name: newName.value.trim(), content: {} })
@@ -64,7 +65,7 @@ const createTemplate = async () => {
 }
 
 const exportTemplate = (id: string) => {
-  window.open(`/api/exports/template/${id}`, '_blank')
+  window.open(buildApiUrl(`/exports/template/${id}`), '_blank')
 }
 
 onMounted(loadTemplates)

@@ -81,6 +81,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { authFetch } from '../utils/auth'
+import { buildApiUrl } from '../utils/api'
 
 type Chart = { id: string; name: string }
 type LayoutItem = { chartId: string; w: number }
@@ -98,20 +99,20 @@ const selectedWidth = ref(1)
 const formatDate = (value: string) => new Date(value).toLocaleString()
 
 const loadDashboards = async () => {
-  const res = await authFetch('/api/dashboards')
+  const res = await authFetch('/dashboards')
   const json = await res.json()
   dashboards.value = json.data || []
 }
 
 const loadCharts = async () => {
-  const res = await authFetch('/api/charts')
+  const res = await authFetch('/charts')
   const json = await res.json()
   charts.value = json.data || []
 }
 
 const createDashboard = async () => {
   if (!newName.value.trim()) return
-  const res = await authFetch('/api/dashboards', {
+  const res = await authFetch('/dashboards', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name: newName.value.trim(), layout: [] })
@@ -139,7 +140,7 @@ const removeChart = (chartId: string) => {
 
 const saveLayout = async () => {
   if (!activeDashboard.value) return
-  const res = await authFetch(`/api/dashboards/${activeDashboard.value.id}`, {
+  const res = await authFetch(`/dashboards/${activeDashboard.value.id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ layout: activeLayout.value })
@@ -152,14 +153,14 @@ const saveLayout = async () => {
 }
 
 const deleteDashboard = async (id: string) => {
-  await authFetch(`/api/dashboards/${id}`, { method: 'DELETE' })
+  await authFetch(`/dashboards/${id}`, { method: 'DELETE' })
   activeDashboard.value = null
   activeLayout.value = []
   await loadDashboards()
 }
 
 const exportDashboard = (id: string) => {
-  window.open(`/api/exports/dashboard/${id}`, '_blank')
+  window.open(buildApiUrl(`/exports/dashboard/${id}`), '_blank')
 }
 
 const chartName = (id: string) => charts.value.find((chart) => chart.id === id)?.name || id

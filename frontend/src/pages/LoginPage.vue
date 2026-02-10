@@ -23,6 +23,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { setToken } from '../utils/auth'
+import { apiFetch } from '../utils/api'
 
 const router = useRouter()
 const username = ref('')
@@ -32,7 +33,7 @@ const error = ref('')
 const submit = async () => {
   error.value = ''
   try {
-    const res = await fetch('/api/auth/login', {
+    const res = await apiFetch('/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: username.value, password: password.value })
