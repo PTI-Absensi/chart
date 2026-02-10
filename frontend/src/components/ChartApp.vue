@@ -16,27 +16,31 @@
     <div class="tv-header-center">
       <!-- Period Type -->
       <div class="tv-btn-group-wrap">
-        <div class="tv-btn-group" :class="{ 'is-collapsed': periodButtonsCollapsed }">
+        <div class="tv-dropdown" ref="periodDropdownRef">
           <button
-            v-if="!periodButtonsCollapsed || periodType === 'calendar'"
-            :class="['tv-btn', { active: periodType === 'calendar' }]"
-            @click="periodType = 'calendar'"
+            type="button"
+            class="tv-btn tv-dropdown-btn"
+            :class="{ 'is-open': periodMenuOpen }"
+            @click.stop="togglePeriodMenu"
           >
-            Kalender
+            {{ periodTypeLabel }}
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" :class="{ 'chevron-rotated': periodMenuOpen }">
+              <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
           </button>
-          <button
-            v-if="!periodButtonsCollapsed || periodType === 'fiscal'"
-            :class="['tv-btn', { active: periodType === 'fiscal' }]"
-            @click="periodType = 'fiscal'"
-          >
-            Anggaran
-          </button>
+          <div v-if="periodMenuOpen" class="tv-dropdown-menu" @click.stop>
+            <button
+              v-for="opt in periodOptions"
+              :key="opt.value"
+              type="button"
+              class="tv-dropdown-item"
+              :class="{ active: periodType === opt.value }"
+              @click="selectPeriodType(opt.value)"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
         </div>
-        <button class="tv-btn-group-toggle" @click="periodButtonsCollapsed = !periodButtonsCollapsed" :title="periodButtonsCollapsed ? 'Expand period buttons' : 'Collapse period buttons'">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" :class="{ 'chevron-rotated': !periodButtonsCollapsed }">
-            <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </button>
       </div>
         
         <!-- Year -->
@@ -77,16 +81,31 @@
         
       <!-- Chart Type (tanpa candlestick) -->
       <div class="tv-btn-group-wrap">
-        <div class="tv-btn-group" :class="{ 'is-collapsed': chartTypeButtonsCollapsed }">
-          <button v-for="type in chartTypesForHeader" :key="type.value" :class="['tv-btn', { active: chartType === type.value }]" @click="chartType = type.value" :title="type.label">
-            {{ type.label }}
+        <div class="tv-dropdown" ref="chartTypeDropdownRef">
+          <button
+            type="button"
+            class="tv-btn tv-dropdown-btn"
+            :class="{ 'is-open': chartTypeMenuOpen }"
+            @click.stop="toggleChartTypeMenu"
+          >
+            {{ chartTypeLabel }}
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" :class="{ 'chevron-rotated': chartTypeMenuOpen }">
+              <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
           </button>
+          <div v-if="chartTypeMenuOpen" class="tv-dropdown-menu" @click.stop>
+            <button
+              v-for="type in chartTypes"
+              :key="type.value"
+              type="button"
+              class="tv-dropdown-item"
+              :class="{ active: chartType === type.value }"
+              @click="selectChartType(type.value)"
+            >
+              {{ type.label }}
+            </button>
+          </div>
         </div>
-        <button class="tv-btn-group-toggle" @click="chartTypeButtonsCollapsed = !chartTypeButtonsCollapsed" :title="chartTypeButtonsCollapsed ? 'Expand chart type buttons' : 'Collapse chart type buttons'">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" :class="{ 'chevron-rotated': !chartTypeButtonsCollapsed }">
-            <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </button>
       </div>
     </div>
     
@@ -514,9 +533,16 @@
       <!-- Compact Summary Bar - Always visible -->
       <div class="tv-summary-bar">
         <template v-if="summaryData">
-          <div class="tv-summary-item">
+          <div class="tv-summary-item" v-if="summaryData.unit">
             <span class="tv-summary-label">Total (Gabungan):</span>
-            <span class="tv-summary-value">{{ formatNumber(summaryData.totalAll) }}</span>
+            <span class="tv-summary-value">{{ formatValue(summaryData.totalAll, summaryData.unit) }}</span>
+            <span class="tv-summary-unit" v-if="summaryData.unit !== 'Rp'">{{ summaryData.unit }}</span>
+          </div>
+          <div class="tv-summary-item" v-else>
+            <span class="tv-summary-label">Total Dokumen:</span>
+            <span class="tv-summary-value">{{ formatValue(summaryData.totalByUnit.Dokumen || 0, 'Dokumen') }}</span>
+            <span class="tv-summary-label">Total Rp:</span>
+            <span class="tv-summary-value">{{ formatValue(summaryData.totalByUnit.Rp || 0, 'Rp') }}</span>
           </div>
           <div class="tv-summary-series">
             <div
@@ -526,8 +552,8 @@
             >
               <span class="tv-summary-dot" :style="{ backgroundColor: series.color }"></span>
               <span class="tv-summary-series-name">{{ getLegendName(series.symbol) }}</span>
-              <span class="tv-summary-series-metric">Σ {{ formatNumber(series.total) }}</span>
-              <span class="tv-summary-series-metric">Terakhir {{ formatNumber(series.latest) }}</span>
+              <span class="tv-summary-series-metric">Σ {{ formatValue(series.total, series.unit) }} <span v-if="series.unit !== 'Rp'">{{ series.unit }}</span></span>
+              <span class="tv-summary-series-metric">Terakhir {{ formatValue(series.latest, series.unit) }} <span v-if="series.unit !== 'Rp'">{{ series.unit }}</span></span>
               <span class="tv-summary-date">{{ series.latestDate || '' }}</span>
             </div>
           </div>
@@ -728,10 +754,13 @@ interface SummarySeries {
   latest: number
   latestDate?: string
   color: string
+  unit: string
 }
 
 interface SummaryData {
   totalAll: number
+  unit: string | null
+  totalByUnit: Record<string, number>
   series: SummarySeries[]
 }
 
@@ -742,12 +771,10 @@ const chartTypes = [
   { value: 'bar', label: 'Bar' }
 ] as const
 
-// Filtered chart types (tanpa candlestick) untuk header
-const chartTypesFiltered = computed(() => chartTypes)
-const chartTypesForHeader = computed(() => {
-  if (!chartTypeButtonsCollapsed.value) return chartTypesFiltered.value
-  return chartTypesFiltered.value.filter(type => type.value === chartType.value)
-})
+const periodOptions = [
+  { value: 'calendar', label: 'Kalender' },
+  { value: 'fiscal', label: 'Anggaran' }
+] as const
 
 // Colors for series
 const colors = [
@@ -802,8 +829,10 @@ const drawingOverlayInteractive = computed(() => {
 const showObjectTree = ref(false)
 const showLayersPanel = ref(false)
 const legendCollapsed = ref(false)
-const periodButtonsCollapsed = ref(false)
-const chartTypeButtonsCollapsed = ref(false)
+const periodMenuOpen = ref(false)
+const chartTypeMenuOpen = ref(false)
+const periodDropdownRef = ref<HTMLElement | null>(null)
+const chartTypeDropdownRef = ref<HTMLElement | null>(null)
 const chartAreaRef = ref<HTMLElement | null>(null)
 const objectTreeBtnRef = ref<HTMLElement | null>(null)
 const layersBtnRef = ref<HTMLElement | null>(null)
@@ -899,6 +928,34 @@ function clearSelectedDrawing() {
 // Chart state
 const chartType = ref<'line' | 'area' | 'bar'>('line')
 const periodType = ref<'calendar' | 'fiscal'>('calendar')
+const periodTypeLabel = computed(() => {
+  const match = periodOptions.find((opt) => opt.value === periodType.value)
+  return match ? match.label : 'Kalender'
+})
+const chartTypeLabel = computed(() => {
+  const match = chartTypes.find((opt) => opt.value === chartType.value)
+  return match ? match.label : String(chartType.value)
+})
+
+function togglePeriodMenu() {
+  periodMenuOpen.value = !periodMenuOpen.value
+  if (periodMenuOpen.value) chartTypeMenuOpen.value = false
+}
+
+function toggleChartTypeMenu() {
+  chartTypeMenuOpen.value = !chartTypeMenuOpen.value
+  if (chartTypeMenuOpen.value) periodMenuOpen.value = false
+}
+
+function selectPeriodType(value: 'calendar' | 'fiscal') {
+  periodType.value = value
+  periodMenuOpen.value = false
+}
+
+function selectChartType(value: 'line' | 'area' | 'bar') {
+  chartType.value = value
+  chartTypeMenuOpen.value = false
+}
 const year = ref(2025)
 const normalize = ref(false)
 const logScale = ref(false)
@@ -1017,6 +1074,12 @@ function formatLegendTooltip(symbol: string): string {
 function getLegendDescription(symbol: string): string {
   const meta = selectedSymbolMeta.value[symbol]
   return meta?.description || meta?.name || symbol
+}
+
+function getSymbolUnit(symbol: string): string {
+  const meta = selectedSymbolMeta.value[symbol]
+  if (meta?.unit) return meta.unit
+  return symbol.endsWith('-N') ? 'Rp' : 'Dokumen'
 }
 
 function updateLegendName(symbol: string, name: string) {
@@ -1392,6 +1455,18 @@ function handleDocumentClick(event: MouseEvent) {
     if (cogEl && cogEl.contains(target)) return
     closeTabSettings()
   }
+  if (periodMenuOpen.value) {
+    const dropdown = periodDropdownRef.value
+    if (!dropdown || !dropdown.contains(target)) {
+      periodMenuOpen.value = false
+    }
+  }
+  if (chartTypeMenuOpen.value) {
+    const dropdown = chartTypeDropdownRef.value
+    if (!dropdown || !dropdown.contains(target)) {
+      chartTypeMenuOpen.value = false
+    }
+  }
 }
 
 // Filter symbols (no-op, computed handles it)
@@ -1459,7 +1534,7 @@ function onDataLoaded(data: Record<string, any[]>) {
   }
 
   const seriesSummaries: SummarySeries[] = []
-  let totalAll = 0
+  const totalByUnit: Record<string, number> = {}
 
   selectedSymbols.value.forEach((symbol, index) => {
     if (hiddenSeries.value.has(symbol)) return
@@ -1468,7 +1543,8 @@ function onDataLoaded(data: Record<string, any[]>) {
 
     const closes = values.map((d: any) => d.close)
     const total = closes.reduce((a: number, b: number) => a + b, 0)
-    totalAll += total
+    const unit = getSymbolUnit(symbol)
+    totalByUnit[unit] = (totalByUnit[unit] || 0) + total
 
     let latestIdx = closes.length - 1
     while (latestIdx >= 0 && closes[latestIdx] === 0) {
@@ -1484,11 +1560,15 @@ function onDataLoaded(data: Record<string, any[]>) {
       total,
       latest,
       latestDate,
-      color: getLegendColor(symbol, index)
+      color: getLegendColor(symbol, index),
+      unit
     })
   })
 
-  summaryData.value = seriesSummaries.length ? { totalAll, series: seriesSummaries } : null
+  const units = Object.keys(totalByUnit)
+  const unit = units.length === 1 ? units[0] : null
+  const totalAll = unit ? totalByUnit[unit] : 0
+  summaryData.value = seriesSummaries.length ? { totalAll, unit, totalByUnit, series: seriesSummaries } : null
 }
 
 // Handle chart error
@@ -1505,9 +1585,22 @@ const currencyShortId = new Intl.NumberFormat('id-ID', {
   maximumFractionDigits: 1
 })
 
-function formatNumber(val: number | undefined): string {
+const numberShortId = new Intl.NumberFormat('id-ID', {
+  maximumFractionDigits: 1
+})
+
+function formatCountShort(val: number): string {
   if (val === undefined || val === null || Number.isNaN(val)) return '--'
-  return currencyShortId.format(val)
+  if (val >= 1e9) return (val / 1e9).toFixed(1) + 'B'
+  if (val >= 1e6) return (val / 1e6).toFixed(1) + 'M'
+  if (val >= 1e3) return (val / 1e3).toFixed(0) + 'K'
+  return val.toFixed(0)
+}
+
+function formatValue(val: number | undefined, unit: string): string {
+  if (val === undefined || val === null || Number.isNaN(val)) return '--'
+  if (unit === 'Rp') return currencyShortId.format(val)
+  return formatCountShort(val)
 }
 
 // Handle resize
@@ -1748,6 +1841,74 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+.tv-dropdown {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.tv-btn.tv-dropdown-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface-alt);
+  border: 1px solid var(--stroke);
+  color: var(--ink);
+}
+
+.tv-btn.tv-dropdown-btn:hover {
+  background: var(--hover);
+}
+
+.tv-btn.tv-dropdown-btn.is-open {
+  background: rgba(41, 98, 255, 0.12);
+  color: var(--accent);
+}
+
+.tv-btn.tv-dropdown-btn svg {
+  transition: transform 0.2s ease;
+}
+
+.tv-btn.tv-dropdown-btn .chevron-rotated {
+  transform: rotate(180deg);
+}
+
+.tv-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 140px;
+  background: var(--surface);
+  border: 1px solid var(--stroke);
+  border-radius: 6px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 60;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+}
+
+.tv-dropdown-item {
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.tv-dropdown-item:hover {
+  background: var(--surface-alt);
+}
+
+.tv-dropdown-item.active {
+  background: rgba(41, 98, 255, 0.15);
+  color: var(--accent);
 }
 
 .tv-btn-group-toggle {
@@ -2851,6 +3012,11 @@ onUnmounted(() => {
 .tv-summary-value {
   font-weight: 600;
   color: var(--ink);
+}
+
+.tv-summary-unit {
+  color: var(--muted);
+  font-size: 0.7rem;
 }
 
 .tv-summary-date {
