@@ -420,7 +420,7 @@ async function fetchSymbolData(symbol: string) {
     if (props.sumberDana) params.set('sumber_dana', props.sumberDana)
     if (props.kategoriPlant) params.set('kategori_plant', props.kategoriPlant)
     
-    const url = `/api/procurement/data/${symbol}?${params}`
+    const url = `/procurement/data/${symbol}?${params}`
     console.log('Fetching:', url)
     const res = await authFetch(url)
     const json = await res.json()

@@ -125,7 +125,7 @@ onMounted(() => {
     if (!file) return
     const form = new FormData()
     form.append('file', file)
-    authFetch('/api/process-time/parse', { method: 'POST', body: form })
+    authFetch('/process-time/parse', { method: 'POST', body: form })
       .then((res) => res.json())
       .then((json) => {
         renderTable(json.data || [])

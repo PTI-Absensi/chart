@@ -29,6 +29,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { apiFetch } from '../utils/api'
 
 type User = { username: string; roles: string[] }
 
@@ -36,13 +37,13 @@ const roles = ref<string[]>([])
 const users = ref<User[]>([])
 
 const loadRoles = async () => {
-  const res = await fetch('/api/permissions/roles')
+  const res = await apiFetch('/permissions/roles')
   const json = await res.json()
   roles.value = json.data || []
 }
 
 const loadUsers = async () => {
-  const res = await fetch('/api/permissions/users')
+  const res = await apiFetch('/permissions/users')
   const json = await res.json()
   users.value = json.data || []
 }

@@ -68,6 +68,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { apiFetch, buildApiUrl } from '../utils/api'
 
 type Source = { id: string; name: string }
 type Chart = {
@@ -91,20 +92,20 @@ const form = ref({
 })
 
 const loadSources = async () => {
-  const res = await fetch('/api/sources')
+  const res = await apiFetch('/sources')
   const json = await res.json()
   sources.value = json.data || []
 }
 
 const loadCharts = async () => {
-  const res = await fetch('/api/charts')
+  const res = await apiFetch('/charts')
   const json = await res.json()
   charts.value = json.data || []
 }
 
 const createChart = async () => {
   error.value = ''
-  const res = await fetch('/api/charts', {
+  const res = await apiFetch('/charts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(form.value)
@@ -119,12 +120,12 @@ const createChart = async () => {
 }
 
 const deleteChart = async (id: string) => {
-  await fetch(`/api/charts/${id}`, { method: 'DELETE' })
+  await apiFetch(`/charts/${id}`, { method: 'DELETE' })
   await loadCharts()
 }
 
 const exportChart = async (id: string) => {
-  window.open(`/api/exports/chart/${id}`, '_blank')
+  window.open(buildApiUrl(`/exports/chart/${id}`), '_blank')
 }
 
 onMounted(() => {
