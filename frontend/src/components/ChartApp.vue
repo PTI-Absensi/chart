@@ -15,51 +15,77 @@
     
     <div class="tv-header-center">
       <!-- Period Type -->
-      <div class="tv-btn-group">
-        <button :class="['tv-btn', { active: periodType === 'calendar' }]" @click="periodType = 'calendar'">Kalender</button>
-        <button :class="['tv-btn', { active: periodType === 'fiscal' }]" @click="periodType = 'fiscal'">Anggaran</button>
+      <div class="tv-btn-group-wrap">
+        <div class="tv-btn-group" :class="{ 'is-collapsed': periodButtonsCollapsed }">
+          <button
+            v-if="!periodButtonsCollapsed || periodType === 'calendar'"
+            :class="['tv-btn', { active: periodType === 'calendar' }]"
+            @click="periodType = 'calendar'"
+          >
+            Kalender
+          </button>
+          <button
+            v-if="!periodButtonsCollapsed || periodType === 'fiscal'"
+            :class="['tv-btn', { active: periodType === 'fiscal' }]"
+            @click="periodType = 'fiscal'"
+          >
+            Anggaran
+          </button>
+        </div>
+        <button class="tv-btn-group-toggle" @click="periodButtonsCollapsed = !periodButtonsCollapsed" :title="periodButtonsCollapsed ? 'Expand period buttons' : 'Collapse period buttons'">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" :class="{ 'chevron-rotated': !periodButtonsCollapsed }">
+            <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
       </div>
-      
-      <!-- Year -->
-      <select v-model="year" class="tv-select">
-        <option :value="2024">2024</option>
-        <option :value="2025">2025</option>
-        <option :value="2026">2026</option>
-      </select>
-      
-      <!-- Filters -->
-      <select v-model="sumberDana" class="tv-select">
-        <option value="">Semua Dana</option>
-        <option value="eksploitasi">Eksploitasi</option>
-        <option value="investasi">Investasi</option>
-      </select>
-      
-      <select v-model="kategoriPlant" class="tv-select">
-        <option value="">Semua Plant</option>
-        <option value="PG">PG</option>
-        <option value="MKSO">MKSO</option>
-        <option value="HO">HO</option>
-      </select>
-      
-      <!-- Max Series Limit -->
-      <select v-model="maxSeries" class="tv-select" title="Maximum series to display">
-        <option :value="3">Max 3</option>
-        <option :value="5">Max 5</option>
-        <option :value="10">Max 10</option>
-      </select>
-      
-      <!-- Mode Buttons -->
-      <button :class="['tv-btn', { active: rawMode }]" @click="rawMode = !rawMode" title="Raw data">Raw</button>
-      <button :class="['tv-btn', { active: cumulative }]" @click="cumulative = !cumulative" title="Kumulatif">Σ</button>
-      <button :class="['tv-btn', { active: singleScale }]" @click="singleScale = !singleScale" title="Single Y scale">1 Skala</button>
-      <button class="tv-btn" @click="scaleSide = scaleSide === 'left' ? 'right' : 'left'" title="Posisi Skala">
-        {{ scaleSide === 'left' ? 'Skala Kiri' : 'Skala Kanan' }}
-      </button>
-      
+        
+        <!-- Year -->
+        <select v-model="year" class="tv-select">
+          <option :value="2024">2024</option>
+          <option :value="2025">2025</option>
+          <option :value="2026">2026</option>
+        </select>
+        
+        <!-- Filters -->
+        <select v-model="sumberDana" class="tv-select">
+          <option value="">Semua Dana</option>
+          <option value="eksploitasi">Eksploitasi</option>
+          <option value="investasi">Investasi</option>
+        </select>
+        
+        <select v-model="kategoriPlant" class="tv-select">
+          <option value="">Semua Plant</option>
+          <option value="PG">PG</option>
+          <option value="MKSO">MKSO</option>
+          <option value="HO">HO</option>
+        </select>
+        
+        <!-- Max Series Limit -->
+        <select v-model="maxSeries" class="tv-select" title="Maximum series to display">
+          <option :value="3">Max 3</option>
+          <option :value="5">Max 5</option>
+          <option :value="10">Max 10</option>
+        </select>
+        
+        <!-- Mode Buttons -->
+        <button :class="['tv-btn', { active: rawMode }]" @click="rawMode = !rawMode" title="Raw data">Raw</button>
+        <button :class="['tv-btn', { active: cumulative }]" @click="cumulative = !cumulative" title="Kumulatif">Σ</button>
+        <button :class="['tv-btn', { active: singleScale }]" @click="singleScale = !singleScale" title="Single Y scale">1 Skala</button>
+        <button class="tv-btn" @click="scaleSide = scaleSide === 'left' ? 'right' : 'left'" title="Posisi Skala">
+          {{ scaleSide === 'left' ? 'Skala Kiri' : 'Skala Kanan' }}
+        </button>
+        
       <!-- Chart Type (tanpa candlestick) -->
-      <div class="tv-btn-group">
-        <button v-for="type in chartTypesFiltered" :key="type.value" :class="['tv-btn', { active: chartType === type.value }]" @click="chartType = type.value" :title="type.label">
-          {{ type.label }}
+      <div class="tv-btn-group-wrap">
+        <div class="tv-btn-group" :class="{ 'is-collapsed': chartTypeButtonsCollapsed }">
+          <button v-for="type in chartTypesForHeader" :key="type.value" :class="['tv-btn', { active: chartType === type.value }]" @click="chartType = type.value" :title="type.label">
+            {{ type.label }}
+          </button>
+        </div>
+        <button class="tv-btn-group-toggle" @click="chartTypeButtonsCollapsed = !chartTypeButtonsCollapsed" :title="chartTypeButtonsCollapsed ? 'Expand chart type buttons' : 'Collapse chart type buttons'">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" :class="{ 'chevron-rotated': !chartTypeButtonsCollapsed }">
+            <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
         </button>
       </div>
     </div>
@@ -718,6 +744,10 @@ const chartTypes = [
 
 // Filtered chart types (tanpa candlestick) untuk header
 const chartTypesFiltered = computed(() => chartTypes)
+const chartTypesForHeader = computed(() => {
+  if (!chartTypeButtonsCollapsed.value) return chartTypesFiltered.value
+  return chartTypesFiltered.value.filter(type => type.value === chartType.value)
+})
 
 // Colors for series
 const colors = [
@@ -772,6 +802,8 @@ const drawingOverlayInteractive = computed(() => {
 const showObjectTree = ref(false)
 const showLayersPanel = ref(false)
 const legendCollapsed = ref(false)
+const periodButtonsCollapsed = ref(false)
+const chartTypeButtonsCollapsed = ref(false)
 const chartAreaRef = ref<HTMLElement | null>(null)
 const objectTreeBtnRef = ref<HTMLElement | null>(null)
 const layersBtnRef = ref<HTMLElement | null>(null)
@@ -1519,6 +1551,7 @@ function onChartPointerDown(event: PointerEvent) {
   if (event.button !== 0) return
   const target = event.target as HTMLElement | null
   if (target?.closest('.drawing-layer')) return
+  event.preventDefault()
   isPanning.value = true
   chartScrollRef.value.setPointerCapture(event.pointerId)
   panStart.value = {
@@ -1703,6 +1736,40 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.tv-header-center {
+  flex: 1;
+  justify-content: center;
+  min-width: 0;
+}
+
+.tv-btn-group-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tv-btn-group-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 1px solid var(--stroke);
+  background: var(--surface-alt);
+  color: var(--ink);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.tv-btn-group-toggle:hover {
+  background: var(--hover);
+}
+
+.tv-btn-group-toggle .chevron-rotated {
+  transform: rotate(180deg);
 }
 
 .tv-logo {
@@ -2031,6 +2098,9 @@ onUnmounted(() => {
   border-radius: 0;
 }
 
+.tv-btn-group.is-collapsed {
+}
+
 .tv-select {
   padding: 4px 8px;
   background: var(--surface-alt);
@@ -2326,6 +2396,9 @@ onUnmounted(() => {
   overscroll-behavior: contain;
   cursor: grab;
   scrollbar-width: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
 }
 
 .tv-chart-scroll:active {
