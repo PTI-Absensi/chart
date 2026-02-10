@@ -122,13 +122,13 @@
           <path d="M21 5v4h-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
         </svg>
       </button>
-      <button class="tv-btn icon" title="Zoom In" @click="chartRef?.zoomIn()">
+      <button class="tv-btn icon" title="Zoom In" @click="zoomAllIn">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M11 8v6M8 11h6M20 20l-4-4" stroke="currentColor" stroke-width="2"/></svg>
       </button>
-      <button class="tv-btn icon" title="Zoom Out" @click="chartRef?.zoomOut()">
+      <button class="tv-btn icon" title="Zoom Out" @click="zoomAllOut">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M8 11h6M20 20l-4-4" stroke="currentColor" stroke-width="2"/></svg>
       </button>
-      <button class="tv-btn icon" title="Fit" @click="chartRef?.refresh()">
+      <button class="tv-btn icon" title="Fit" @click="refreshAllCharts">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" stroke="currentColor" stroke-width="2"/></svg>
       </button>
       <button class="tv-btn icon" title="Export" @click="chartRef?.exportPng()">
@@ -263,35 +263,42 @@
           @wheel.stop.prevent="onChartWheel"
         >
           <div class="tv-chart-scroll-inner">
-            <div class="tv-chart-frame" :style="{ height: chartHeight + 'px' }">
+            <div
+              v-for="pane in paneLayout"
+              :key="pane.id"
+              class="tv-chart-frame tv-chart-pane"
+              :class="{ 'is-subpane': !pane.isMain }"
+              :style="{ height: pane.height + 'px' }"
+            >
               <ProcurementChart
-                ref="chartRef"
+                :ref="setPaneChartRef(pane.id)"
                 :chart-type="chartType"
                 :period-type="periodType"
                 :year="year"
-                :symbols="selectedSymbols"
-                :symbol-meta="selectedSymbolMeta"
-                :hidden-series="hiddenSeries"
-                :color-overrides="legendColors"
+                :symbols="pane.symbols"
+                :symbol-meta="buildSymbolMeta(pane.symbols)"
+                :hidden-series="pane.isMain ? hiddenSeries : emptyHiddenSet"
+                :color-overrides="pane.isMain ? legendColors : {}"
                 :normalize="normalize"
           :log-scale="logScale"
           :raw-mode="rawMode"
           :cumulative="cumulative"
           :single-scale="singleScale"
           :scale-side="scaleSide"
-          :y-axis-override="activeYAxisOverride"
-          :y-axis-by-symbol-override="activeYAxisBySymbolOverride"
+          :y-axis-override="pane.isMain ? activeYAxisOverride : undefined"
+          :y-axis-by-symbol-override="pane.isMain ? activeYAxisBySymbolOverride : undefined"
           :sumber-dana="sumberDana"
           :kategori-plant="kategoriPlant"
           :theme="theme"
-                :height="chartHeight"
-                @data-loaded="onDataLoaded"
-                @error="onChartError"
+                :height="pane.height"
+                @data-loaded="(data) => onPaneDataLoaded(pane.id, data)"
+                @error="(msg) => onPaneError(pane.id, msg)"
               />
               <!-- Drawing Layer Overlay (canvas only, no toolbar) -->
             <DrawingLayer 
+              v-if="pane.isMain"
               ref="drawingRef" 
-              :height="chartHeight" 
+              :height="pane.height" 
               :show-toolbar="false"
               :active-tool="activeDrawingTool"
               class="tv-drawing-overlay"
@@ -503,12 +510,12 @@
         <div class="tv-panel-body">
           <div class="tv-layer-section">
             <div class="tv-layer-title">Data Series</div>
-            <div class="tv-layer-empty" v-if="!selectedSymbols.length">No series selected</div>
-            <div 
-              v-for="symbol in selectedSymbols" 
-              :key="symbol"
-              class="tv-layer-item tv-layer-item-interactive"
-            >
+              <div class="tv-layer-empty" v-if="!allPaneSymbols.length">No series selected</div>
+              <div 
+                v-for="symbol in allPaneSymbols" 
+                :key="symbol"
+                class="tv-layer-item tv-layer-item-interactive"
+              >
               <span class="tv-layer-icon">📊</span>
               <span class="tv-layer-name">{{ symbol }}</span>
               <button class="tv-layer-delete" @click="removeSymbol(symbol)" title="Remove series">×</button>
@@ -684,7 +691,7 @@
             type="button"
             class="search-item"
             :class="{ 
-              'is-selected': selectedSymbols.includes(sym.symbol),
+              'is-selected': allPaneSymbolsSet.has(sym.symbol),
               'is-nilai': sym.symbolType === 'nilai',
               'is-dokumen': sym.symbolType === 'dokumen'
             }"
@@ -706,7 +713,7 @@
           </button>
           
           <!-- Scale Options (shown on hover) -->
-          <div class="scale-options" v-if="hoveredSymbol === sym.symbol && !selectedSymbols.includes(sym.symbol)">
+          <div class="scale-options" v-if="hoveredSymbol === sym.symbol && !allPaneSymbolsSet.has(sym.symbol)">
             <button 
               class="scale-btn" 
               title="Same % scale (normalized)"
@@ -816,6 +823,36 @@ function clearDrawings() {
 
 // Chart ref
 const chartRef = ref<InstanceType<typeof ProcurementChart> | null>(null)
+const paneChartRefs = new Map<string, InstanceType<typeof ProcurementChart> | null>()
+
+function setPaneChartRef(paneId: string) {
+  return (el: InstanceType<typeof ProcurementChart> | null) => {
+    if (paneId === 'main') chartRef.value = el
+    if (!el) {
+      paneChartRefs.delete(paneId)
+    } else {
+      paneChartRefs.set(paneId, el)
+    }
+  }
+}
+
+function applyToCharts(fn: (chart: InstanceType<typeof ProcurementChart>) => void) {
+  paneChartRefs.forEach((chart) => {
+    if (chart) fn(chart)
+  })
+}
+
+function zoomAllIn() {
+  applyToCharts((chart) => chart.zoomIn?.())
+}
+
+function zoomAllOut() {
+  applyToCharts((chart) => chart.zoomOut?.())
+}
+
+function refreshAllCharts() {
+  applyToCharts((chart) => chart.refresh?.())
+}
 const drawingRef = ref<InstanceType<typeof DrawingLayer> | null>(null)
 const selectedDrawing = ref<{ type: string; points: number[]; color: string; name?: string } | null>(null)
 const selectedDrawingIndex = ref<number | null>(null)
@@ -973,6 +1010,23 @@ const hiddenSeries = ref<Set<string>>(new Set())
 const legendColors = ref<Record<string, string>>({})
 const legendNames = ref<Record<string, string>>({})
 const activeLegendSettings = ref<string | null>(null)
+const extraPanesByTab = ref<Record<string, PaneState[]>>({})
+const emptyHiddenSet = new Set<string>()
+
+const activeExtraPanes = computed(() => {
+  const id = activeCategoryTabId.value
+  return id ? extraPanesByTab.value[id] || [] : []
+})
+
+const allPaneSymbols = computed(() => {
+  const symbols = new Set<string>(selectedSymbols.value)
+  activeExtraPanes.value.forEach((pane) => {
+    pane.symbols.forEach((symbol) => symbols.add(symbol))
+  })
+  return Array.from(symbols)
+})
+const allPaneSymbolsSet = computed(() => new Set(allPaneSymbols.value))
+
 
 const hiddenSeriesByTab = ref<Record<string, string[]>>({})
 const legendColorsByTab = ref<Record<string, Record<string, string>>>({})
@@ -997,9 +1051,27 @@ const windowHeight = ref(window.innerHeight)
 const chartScrollRef = ref<HTMLElement | null>(null)
 let chartResizeObserver: ResizeObserver | null = null
 const chartViewportHeight = ref(0)
-const chartHeight = computed(() => Math.max(0, chartViewportHeight.value))
+let viewportUpdatePending = false
 const isPanning = ref(false)
 const panStart = ref({ x: 0, y: 0, left: 0, top: 0 })
+
+const paneLayout = computed(() => {
+  const panes: (PaneState & { isMain: boolean })[] = [
+    { id: 'main', symbols: selectedSymbols.value, isMain: true }
+  ]
+  activeExtraPanes.value.forEach((pane) => panes.push({ ...pane, isMain: false }))
+
+  const totalHeight = Math.max(0, chartViewportHeight.value)
+  const count = Math.max(1, panes.length)
+  const base = Math.floor(totalHeight / count)
+  let remainder = totalHeight - base * count
+
+  return panes.map((pane) => {
+    const height = base + (remainder > 0 ? 1 : 0)
+    if (remainder > 0) remainder -= 1
+    return { ...pane, height }
+  })
+})
 
 // Search modal state
 const searchModalOpen = ref(false)
@@ -1007,17 +1079,20 @@ const searchQuery = ref('')
 const searchInput = ref<HTMLInputElement | null>(null)
 const allSymbols = ref<SymbolItem[]>([])
 const loadingSymbols = ref(false)
-const selectedSymbolMeta = computed(() => {
+const symbolMetaLookup = computed(() => new Map(allSymbols.value.map((s) => [s.symbol, s])))
+
+function buildSymbolMeta(symbols: string[]) {
   const meta: Record<string, { name: string; description: string; unit?: string }> = {}
-  const bySymbol = new Map(allSymbols.value.map((s) => [s.symbol, s]))
-  selectedSymbols.value.forEach((symbol) => {
-    const item = bySymbol.get(symbol)
+  symbols.forEach((symbol) => {
+    const item = symbolMetaLookup.value.get(symbol)
     if (item) {
       meta[symbol] = { name: item.name, description: item.description, unit: item.unit }
     }
   })
   return meta
-})
+}
+
+const selectedSymbolMeta = computed(() => buildSymbolMeta(selectedSymbols.value))
 
 // Go to page (for navigation menu)
 function goToPage(page: string) {
@@ -1047,8 +1122,12 @@ function toggleSeriesVisibility(symbol: string) {
 
   if (summaryData.value) {
     const nextSeries = summaryData.value.series.filter((s) => !newSet.has(s.symbol))
-    const totalAll = nextSeries.reduce((sum, s) => sum + s.total, 0)
-    summaryData.value = nextSeries.length ? { totalAll, series: nextSeries } : null
+    const totalByUnit: Record<string, number> = {}
+    nextSeries.forEach((s) => { totalByUnit[s.unit] = (totalByUnit[s.unit] || 0) + s.total })
+    const units = Object.keys(totalByUnit)
+    const unit = units.length === 1 ? units[0] : null
+    const totalAll = unit ? totalByUnit[unit] : 0
+    summaryData.value = nextSeries.length ? { totalAll, unit, totalByUnit, series: nextSeries } : null
   }
 }
 
@@ -1118,6 +1197,7 @@ const filteredSymbols = computed(() => {
 
 type CategoryValue = 'all' | 'dokumen' | 'nilai'
 type CategoryTab = { id: string; label: string; category: CategoryValue }
+type PaneState = { id: string; symbols: string[] }
 
 const categoryOptions: { value: CategoryValue; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -1230,6 +1310,7 @@ function addCategoryTab(category: CategoryValue, openSearch = false) {
   hiddenSeriesByTab.value = { ...hiddenSeriesByTab.value, [id]: [] }
   legendColorsByTab.value = { ...legendColorsByTab.value, [id]: {} }
   legendNamesByTab.value = { ...legendNamesByTab.value, [id]: {} }
+  extraPanesByTab.value = { ...extraPanesByTab.value, [id]: [] }
   activeCategoryTabId.value = id
   if (openSearch) {
     openSearchModal()
@@ -1248,12 +1329,14 @@ function closeCategoryTab(tabId: string) {
   const { [tabId]: _ln, ...restLn } = legendNamesByTab.value
   const { [tabId]: _yo, ...restYo } = yAxisOverrideByTab.value
   const { [tabId]: _ys, ...restYs } = yAxisBySymbolOverrideByTab.value
+  const { [tabId]: _panes, ...restPanes } = extraPanesByTab.value
   selectedSymbolsByTab.value = restSel
   hiddenSeriesByTab.value = restHid
   legendColorsByTab.value = restLc
   legendNamesByTab.value = restLn
   yAxisOverrideByTab.value = restYo
   yAxisBySymbolOverrideByTab.value = restYs
+  extraPanesByTab.value = restPanes
 
   if (wasActive) {
     const nextTab = categoryTabs.value[idx] || categoryTabs.value[idx - 1] || null
@@ -1324,31 +1407,46 @@ const hoveredSymbol = ref<string | null>(null)
 type ScaleMode = 'same' | 'percent' | 'scale' | 'pane'
 const seriesScales = ref<Record<string, ScaleMode>>({})
 
+function addPaneForSymbol(symbol: string) {
+  const activeId = activeCategoryTabId.value
+  if (!activeId) return
+  const panes = extraPanesByTab.value[activeId] || []
+  const cleaned = panes
+    .map((pane) => ({ ...pane, symbols: pane.symbols.filter((s) => s !== symbol) }))
+    .filter((pane) => pane.symbols.length > 0)
+  const newPane: PaneState = { id: `pane-${Date.now()}`, symbols: [symbol] }
+  extraPanesByTab.value = { ...extraPanesByTab.value, [activeId]: [...cleaned, newPane] }
+}
+
 // Select symbol with scale option
 function selectSymbolWithScale(sym: SymbolItem, scaleMode: ScaleMode) {
   // Check max series limit
-  if (selectedSymbols.value.length >= maxSeries.value) {
+  if (allPaneSymbols.value.length >= maxSeries.value) {
     alert(`Maximum ${maxSeries.value} series sudah terpilih. Hapus salah satu series atau ubah max series di dropdown.`)
     return
   }
 
   // If no tabs yet, create a default tab before inserting data
   const insertSymbol = () => {
+    seriesScales.value[sym.symbol] = scaleMode
+
+    if (scaleMode === 'pane') {
+      if (selectedSymbols.value.includes(sym.symbol)) {
+        selectedSymbols.value = selectedSymbols.value.filter((s) => s !== sym.symbol)
+      }
+      removeSymbolFromExtraPanes(sym.symbol)
+      addPaneForSymbol(sym.symbol)
+      return
+    }
+
     if (!selectedSymbols.value.includes(sym.symbol)) {
       selectedSymbols.value.push(sym.symbol)
-      seriesScales.value[sym.symbol] = scaleMode
-      
-      // Apply scale mode effects
-      if (scaleMode === 'percent') {
-        // TODO: Enable normalize mode for this series
-        console.log(`Added ${sym.symbol} with Same % scale (normalized)`)
-      } else if (scaleMode === 'scale') {
-        // TODO: Add separate Y-axis for this series
-        console.log(`Added ${sym.symbol} with New price scale`)
-      } else if (scaleMode === 'pane') {
-        // TODO: Create new pane for this series
-        console.log(`Added ${sym.symbol} with New pane`)
-      }
+    }
+
+    if (scaleMode === 'percent') {
+      console.log(`Added ${sym.symbol} with Same % scale (normalized)`)
+    } else if (scaleMode === 'scale') {
+      console.log(`Added ${sym.symbol} with New price scale`)
     }
   }
 
@@ -1391,11 +1489,23 @@ function toggleSymbol(symbol: string) {
     selectedSymbols.value.splice(idx, 1)
   } else {
     // Check max series limit
-    if (selectedSymbols.value.length >= maxSeries.value) {
+    if (allPaneSymbols.value.length >= maxSeries.value) {
       alert(`Maximum ${maxSeries.value} series sudah terpilih. Hapus salah satu series atau ubah max series di dropdown.`)
       return
     }
     selectedSymbols.value.push(symbol)
+  }
+}
+
+function removeSymbolFromExtraPanes(symbol: string) {
+  const activeId = activeCategoryTabId.value
+  if (!activeId) return
+  const panes = extraPanesByTab.value[activeId] || []
+  const nextPanes = panes
+    .map((pane) => ({ ...pane, symbols: pane.symbols.filter((s) => s !== symbol) }))
+    .filter((pane) => pane.symbols.length > 0)
+  if (nextPanes.length !== panes.length || panes.some((pane, idx) => pane.symbols.length !== nextPanes[idx]?.symbols.length)) {
+    extraPanesByTab.value = { ...extraPanesByTab.value, [activeId]: nextPanes }
   }
 }
 
@@ -1405,6 +1515,7 @@ function removeSymbol(symbol: string) {
   if (idx >= 0) {
     selectedSymbols.value.splice(idx, 1)
   }
+  removeSymbolFromExtraPanes(symbol)
   if (hiddenSeries.value.has(symbol)) {
     const newSet = new Set(hiddenSeries.value)
     newSet.delete(symbol)
@@ -1412,8 +1523,12 @@ function removeSymbol(symbol: string) {
   }
   if (summaryData.value) {
     const nextSeries = summaryData.value.series.filter((s) => s.symbol !== symbol)
-    const totalAll = nextSeries.reduce((sum, s) => sum + s.total, 0)
-    summaryData.value = nextSeries.length ? { totalAll, series: nextSeries } : null
+    const totalByUnit: Record<string, number> = {}
+    nextSeries.forEach((s) => { totalByUnit[s.unit] = (totalByUnit[s.unit] || 0) + s.total })
+    const units = Object.keys(totalByUnit)
+    const unit = units.length === 1 ? units[0] : null
+    const totalAll = unit ? totalByUnit[unit] : 0
+    summaryData.value = nextSeries.length ? { totalAll, unit, totalByUnit, series: nextSeries } : null
   }
   if (legendColors.value[symbol]) {
     const next = { ...legendColors.value }
@@ -1571,6 +1686,18 @@ function onDataLoaded(data: Record<string, any[]>) {
   summaryData.value = seriesSummaries.length ? { totalAll, unit, totalByUnit, series: seriesSummaries } : null
 }
 
+function onPaneDataLoaded(paneId: string, data: Record<string, any[]>) {
+  if (paneId === 'main') {
+    onDataLoaded(data)
+  }
+}
+
+function onPaneError(paneId: string, msg: string) {
+  if (paneId === 'main') {
+    onChartError(msg)
+  }
+}
+
 // Handle chart error
 function onChartError(msg: string) {
   console.error('Chart error:', msg)
@@ -1606,7 +1733,16 @@ function formatValue(val: number | undefined, unit: string): string {
 // Handle resize
 function updateChartViewport() {
   if (chartScrollRef.value) {
-    chartViewportHeight.value = chartScrollRef.value.clientHeight
+    if (viewportUpdatePending) return
+    viewportUpdatePending = true
+    requestAnimationFrame(() => {
+      viewportUpdatePending = false
+      if (!chartScrollRef.value) return
+      const nextHeight = chartScrollRef.value.clientHeight
+      if (chartViewportHeight.value !== nextHeight) {
+        chartViewportHeight.value = nextHeight
+      }
+    })
   }
 }
 
@@ -1658,7 +1794,7 @@ function onChartPointerDown(event: PointerEvent) {
 function onChartPointerMove(event: PointerEvent) {
   if (!isPanning.value) return
   const dx = event.clientX - panStart.value.x
-  chartRef.value?.panByPixels?.(dx)
+  applyToCharts((chart) => chart.panByPixels?.(dx))
 }
 
 function onChartPointerUp(event: PointerEvent) {
@@ -1670,15 +1806,15 @@ function onChartPointerUp(event: PointerEvent) {
 
 function onChartWheel(event: WheelEvent) {
   if (event.shiftKey && event.deltaY !== 0) {
-    chartRef.value?.panByPixels?.(event.deltaY)
+    applyToCharts((chart) => chart.panByPixels?.(event.deltaY))
     return
   }
   if (event.deltaX !== 0) {
-    chartRef.value?.panByPixels?.(event.deltaX)
+    applyToCharts((chart) => chart.panByPixels?.(event.deltaX))
     return
   }
   if (event.deltaY !== 0) {
-    chartRef.value?.panByPixels?.(event.deltaY)
+    applyToCharts((chart) => chart.panByPixels?.(event.deltaY))
   }
 }
 
@@ -1722,11 +1858,12 @@ function saveState() {
       activeCategoryTabId: activeCategoryTabId.value,
       selectedSymbolsByTab: selectedSymbolsByTab.value,
       hiddenSeriesByTab: hiddenSeriesByTab.value,
-      legendColorsByTab: legendColorsByTab.value,
-      legendNamesByTab: legendNamesByTab.value,
-      yAxisOverrideByTab: yAxisOverrideByTab.value,
-      yAxisBySymbolOverrideByTab: yAxisBySymbolOverrideByTab.value,
-      selectedSymbols: selectedSymbols.value,
+        legendColorsByTab: legendColorsByTab.value,
+        legendNamesByTab: legendNamesByTab.value,
+        yAxisOverrideByTab: yAxisOverrideByTab.value,
+        yAxisBySymbolOverrideByTab: yAxisBySymbolOverrideByTab.value,
+        extraPanesByTab: extraPanesByTab.value,
+        selectedSymbols: selectedSymbols.value,
       chartType: chartType.value,
       periodType: periodType.value,
       year: year.value,
@@ -1752,11 +1889,12 @@ function restoreState() {
       if (state.activeCategoryTabId !== undefined) activeCategoryTabId.value = state.activeCategoryTabId
       if (state.selectedSymbolsByTab) selectedSymbolsByTab.value = state.selectedSymbolsByTab
       if (state.hiddenSeriesByTab) hiddenSeriesByTab.value = state.hiddenSeriesByTab
-      if (state.legendColorsByTab) legendColorsByTab.value = state.legendColorsByTab
-      if (state.legendNamesByTab) legendNamesByTab.value = state.legendNamesByTab
-      if (state.yAxisOverrideByTab) yAxisOverrideByTab.value = state.yAxisOverrideByTab
-      if (state.yAxisBySymbolOverrideByTab) yAxisBySymbolOverrideByTab.value = state.yAxisBySymbolOverrideByTab
-      if (state.selectedSymbols) selectedSymbols.value = state.selectedSymbols
+        if (state.legendColorsByTab) legendColorsByTab.value = state.legendColorsByTab
+        if (state.legendNamesByTab) legendNamesByTab.value = state.legendNamesByTab
+        if (state.yAxisOverrideByTab) yAxisOverrideByTab.value = state.yAxisOverrideByTab
+        if (state.yAxisBySymbolOverrideByTab) yAxisBySymbolOverrideByTab.value = state.yAxisBySymbolOverrideByTab
+        if (state.extraPanesByTab) extraPanesByTab.value = state.extraPanesByTab
+        if (state.selectedSymbols) selectedSymbols.value = state.selectedSymbols
       if (state.chartType) chartType.value = state.chartType
       if (state.periodType) periodType.value = state.periodType
       if (state.year) year.value = state.year
@@ -1775,7 +1913,7 @@ function restoreState() {
 }
 
 // Watch for state changes and save
-watch([categoryTabs, activeCategoryTabId, selectedSymbolsByTab, hiddenSeriesByTab, legendColorsByTab, legendNamesByTab, yAxisOverrideByTab, yAxisBySymbolOverrideByTab, selectedSymbols, chartType, periodType, year, normalize, logScale, rawMode, cumulative, singleScale, scaleSide, sumberDana, kategoriPlant], saveState, { deep: true })
+watch([categoryTabs, activeCategoryTabId, selectedSymbolsByTab, hiddenSeriesByTab, legendColorsByTab, legendNamesByTab, yAxisOverrideByTab, yAxisBySymbolOverrideByTab, extraPanesByTab, selectedSymbols, chartType, periodType, year, normalize, logScale, rawMode, cumulative, singleScale, scaleSide, sumberDana, kategoriPlant], saveState, { deep: true })
 watch([showObjectTree, showLayersPanel], async () => {
   await nextTick()
   updatePanelPositions()
@@ -2229,6 +2367,17 @@ onUnmounted(() => {
   font-size: 0.8rem;
   cursor: pointer;
   border-radius: 4px;
+  transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.tv-header .tv-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+}
+
+.tv-header .tv-btn:active {
+  transform: translateY(0);
+  box-shadow: none;
 }
 
 .tv-btn:hover {
@@ -2270,6 +2419,7 @@ onUnmounted(() => {
   font-size: 0.8rem;
   border-radius: 4px;
   cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
@@ -2278,6 +2428,16 @@ onUnmounted(() => {
   background-position: right 4px center;
   background-size: 14px;
   padding-right: 22px;
+}
+
+.tv-header .tv-select:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+}
+
+.tv-header .tv-select:active {
+  transform: translateY(0);
+  box-shadow: none;
 }
 
 .tv-select:hover {
@@ -2579,12 +2739,19 @@ onUnmounted(() => {
   box-sizing: border-box;
   width: 100%;
   height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .tv-chart-frame {
   position: relative;
   width: 100%;
   height: 100%;
+  flex: 0 0 auto;
+}
+
+.tv-chart-pane.is-subpane {
+  border-top: 1px solid var(--stroke);
 }
 
 .tv-empty-tabs {
