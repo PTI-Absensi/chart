@@ -1470,7 +1470,7 @@ function selectSymbolWithScale(sym: SymbolItem, scaleMode: ScaleMode) {
 async function loadSymbols() {
   loadingSymbols.value = true
   try {
-    const res = await authFetch('/api/procurement/symbols')
+    const res = await authFetch('/procurement/symbols')
     const json = await res.json()
     if (json.status === 'success') {
       allSymbols.value = json.data || []
