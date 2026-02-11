@@ -506,9 +506,12 @@ async function fetchSymbolData(symbol: string) {
     if (props.sumberDana) params.set('sumber_dana', props.sumberDana)
     if (props.kategoriPlant) params.set('kategori_plant', props.kategoriPlant)
     
-    const url = `/procurement/data/${symbol}?${params}`
+    const url = `/api/procurement/data/${symbol}?${params}`
     console.log('Fetching:', url)
     const res = await authFetch(url)
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`)
+    }
     const json = await res.json()
     console.log('Response for', symbol, ':', json)
     if (json.status === 'success' && json.data) {

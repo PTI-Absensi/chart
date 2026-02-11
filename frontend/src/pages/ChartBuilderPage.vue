@@ -92,13 +92,13 @@ const form = ref({
 })
 
 const loadSources = async () => {
-  const res = await apiFetch('/sources')
+  const res = await apiFetch('/api/sources')
   const json = await res.json()
   sources.value = json.data || []
 }
 
 const loadCharts = async () => {
-  const res = await apiFetch('/charts')
+  const res = await apiFetch('/api/charts')
   const json = await res.json()
   charts.value = json.data || []
 }

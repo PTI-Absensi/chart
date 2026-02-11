@@ -37,13 +37,13 @@ const roles = ref<string[]>([])
 const users = ref<User[]>([])
 
 const loadRoles = async () => {
-  const res = await apiFetch('/permissions/roles')
+  const res = await apiFetch('/api/permissions/roles')
   const json = await res.json()
   roles.value = json.data || []
 }
 
 const loadUsers = async () => {
-  const res = await apiFetch('/permissions/users')
+  const res = await apiFetch('/api/permissions/users')
   const json = await res.json()
   users.value = json.data || []
 }

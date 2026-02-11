@@ -46,14 +46,14 @@ const newName = ref('')
 const formatDate = (value: string) => new Date(value).toLocaleString()
 
 const loadTemplates = async () => {
-  const res = await apiFetch('/templates')
+  const res = await apiFetch('/api/templates')
   const json = await res.json()
   templates.value = json.data || []
 }
 
 const createTemplate = async () => {
   if (!newName.value.trim()) return
-  const res = await apiFetch('/templates', {
+  const res = await apiFetch('/api/templates', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name: newName.value.trim(), content: {} })

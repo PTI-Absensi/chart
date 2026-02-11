@@ -33,7 +33,7 @@ const error = ref('')
 const submit = async () => {
   error.value = ''
   try {
-    const res = await apiFetch('/auth/login', {
+    const res = await apiFetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: username.value, password: password.value })
