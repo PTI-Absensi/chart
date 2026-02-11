@@ -14,7 +14,7 @@ export const config = {
     password: process.env.DB_PASSWORD || ''
   },
   auth: {
-    enabled: process.env.AUTH_ENABLED ? process.env.AUTH_ENABLED === 'true' : true,
+    enabled: process.env.AUTH_ENABLED ? process.env.AUTH_ENABLED === 'true' : false,
     jwtSecret: process.env.JWT_SECRET || 'change-this-secret',
     usersPath: process.env.AUTH_USERS_PATH || path.resolve(process.cwd(), 'config', 'users.json')
   }

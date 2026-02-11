@@ -188,7 +188,7 @@ Service ini harus jalan untuk menyediakan API data.
 cd chart/backend-node
 npm install
 npm run dev
-# Running on http://localhost:3000
+# Running on http://localhost:8000
 ```
 
 ### Frontend
@@ -201,5 +201,5 @@ npm run dev
 ```
 
 ### Cek Kesehatan Sistem
-Buka browser: `http://localhost:3000/health`
+Buka browser: `http://localhost:8000/health`
 Response: `{"status":"healthy","app":"chart-backend-node"}`

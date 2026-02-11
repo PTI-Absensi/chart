@@ -264,11 +264,11 @@
         >
           <div class="tv-chart-scroll-inner">
             <div
-              v-for="pane in paneLayout"
+              v-for="(pane, paneIndex) in paneLayout"
               :key="pane.id"
               class="tv-chart-frame tv-chart-pane"
-              :class="{ 'is-subpane': !pane.isMain }"
-              :style="{ height: pane.height + 'px' }"
+              :class="{ 'is-subpane': !pane.isMain, 'is-resizing': resizePaneId === pane.id }"
+              :style="{ height: pane.height + 'px', position: 'relative' }"
             >
               <ProcurementChart
                 :ref="setPaneChartRef(pane.id)"
@@ -305,6 +305,23 @@
               :class="{ 'is-interactive': drawingOverlayInteractive, 'is-drawing-tool': activeDrawingTool !== 'select' }"
               @selection="onDrawingSelection"
             />
+            <!-- Resize Handle - only show if not the last pane -->
+            <div
+              v-if="paneIndex < paneLayout.length - 1"
+              class="tv-pane-resize-handle"
+              :class="{ 'is-active': resizePaneId === pane.id }"
+              @mousedown="startResize($event, pane.id)"
+              @touchstart="startResize($event as any, pane.id)"
+              @dblclick.stop="resetPaneHeights"
+              title="Drag to resize (double-click to reset)"
+            >
+              <div class="tv-pane-resize-line"></div>
+              <div class="tv-pane-resize-grip">
+                <svg width="14" height="10" viewBox="0 0 12 8" fill="none">
+                  <path d="M2 3h8M2 5h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -713,13 +730,15 @@
           </button>
           
           <!-- Scale Options (shown on hover) -->
-          <div class="scale-options" v-if="hoveredSymbol === sym.symbol && !allPaneSymbolsSet.has(sym.symbol)">
+          <div class="scale-options" v-if="hoveredSymbol === sym.symbol">
             <button 
+              v-if="!allPaneSymbolsSet.has(sym.symbol)"
               class="scale-btn" 
               title="Same % scale (normalized)"
               @click.stop="selectSymbolWithScale(sym, 'percent')"
             >Same %</button>
             <button 
+              v-if="!allPaneSymbolsSet.has(sym.symbol)"
               class="scale-btn" 
               title="New price scale (separate Y-axis)"
               @click.stop="selectSymbolWithScale(sym, 'scale')"
@@ -728,7 +747,7 @@
               class="scale-btn" 
               title="New pane (separate chart)"
               @click.stop="selectSymbolWithScale(sym, 'pane')"
-            >New pane</button>
+            >{{ allPaneSymbolsSet.has(sym.symbol) ? 'Move to new pane' : 'New pane' }}</button>
           </div>
         </div>
       </div>
@@ -1013,6 +1032,17 @@ const activeLegendSettings = ref<string | null>(null)
 const extraPanesByTab = ref<Record<string, PaneState[]>>({})
 const emptyHiddenSet = new Set<string>()
 
+// ===== RESIZABLE PANES STATE =====
+// Store pane heights by tab and pane id: { [tabId]: { [paneId]: height } }
+const paneHeightsByTab = ref<Record<string, Record<string, number>>>({})
+const isResizing = ref(false)
+const resizePaneId = ref<string | null>(null)
+const resizeStartY = ref(0)
+const resizeStartHeight = ref(0)
+const resizeNextPaneId = ref<string | null>(null)
+const resizeNextStartHeight = ref(0)
+const MIN_PANE_HEIGHT = 100 // Minimum height for a pane in pixels
+
 const activeExtraPanes = computed(() => {
   const id = activeCategoryTabId.value
   return id ? extraPanesByTab.value[id] || [] : []
@@ -1056,22 +1086,260 @@ const isPanning = ref(false)
 const panStart = ref({ x: 0, y: 0, left: 0, top: 0 })
 
 const paneLayout = computed(() => {
-  const panes: (PaneState & { isMain: boolean })[] = [
-    { id: 'main', symbols: selectedSymbols.value, isMain: true }
+  const panes: (PaneState & { isMain: boolean; height: number })[] = [
+    { id: 'main', symbols: selectedSymbols.value, isMain: true, height: 0 }
   ]
-  activeExtraPanes.value.forEach((pane) => panes.push({ ...pane, isMain: false }))
+  activeExtraPanes.value.forEach((pane) => panes.push({ ...pane, isMain: false, height: 0 }))
 
-  const totalHeight = Math.max(0, chartViewportHeight.value)
+  let totalHeight = Math.max(0, chartViewportHeight.value)
   const count = Math.max(1, panes.length)
-  const base = Math.floor(totalHeight / count)
-  let remainder = totalHeight - base * count
-
+  const activeId = activeCategoryTabId.value
+  
+  // Fallback: if viewport height is 0 (not measured yet), use default height
+  if (totalHeight === 0) {
+    totalHeight = 450 // Default chart area height
+  }
+  
+  // Get stored heights for current tab
+  const storedHeights = activeId ? paneHeightsByTab.value[activeId] : undefined
+  
+  if (storedHeights && count > 1) {
+    // Calculate total stored height for panes that have stored heights
+    const storedPaneIds = panes.filter(p => storedHeights[p.id] !== undefined).map(p => p.id)
+    
+    if (storedPaneIds.length > 0) {
+      // Check if all panes have stored heights
+      const allHaveHeights = panes.every(p => storedHeights[p.id] !== undefined)
+      
+      if (allHaveHeights) {
+        // Use stored heights directly
+        return panes.map((pane) => ({
+          ...pane,
+          height: Math.max(MIN_PANE_HEIGHT, storedHeights[pane.id])
+        }))
+      } else {
+        // Some panes don't have heights - distribute remaining space
+        const usedHeight = storedPaneIds.reduce((sum, id) => sum + storedHeights[id], 0)
+        const remainingPanes = panes.filter(p => storedHeights[p.id] === undefined)
+        const remainingHeight = Math.max(0, totalHeight - usedHeight)
+        const heightPerRemaining = remainingPanes.length > 0 
+          ? Math.max(MIN_PANE_HEIGHT, Math.floor(remainingHeight / remainingPanes.length))
+          : MIN_PANE_HEIGHT
+        
+        return panes.map((pane) => ({
+          ...pane,
+          height: storedHeights[pane.id] !== undefined 
+            ? Math.max(MIN_PANE_HEIGHT, storedHeights[pane.id])
+            : heightPerRemaining
+        }))
+      }
+    }
+  }
+  
+  // Default: equal distribution
+  const base = Math.max(MIN_PANE_HEIGHT, Math.floor(totalHeight / count))
+  let remainder = Math.max(0, totalHeight - base * count)
+  
   return panes.map((pane) => {
     const height = base + (remainder > 0 ? 1 : 0)
     if (remainder > 0) remainder -= 1
     return { ...pane, height }
   })
 })
+
+// Initialize pane heights when tab or pane count changes
+function initializePaneHeights() {
+  const activeId = activeCategoryTabId.value
+  if (!activeId) return
+  
+  let totalHeight = Math.max(0, chartViewportHeight.value)
+  // Fallback: if viewport height is 0 (not measured yet), use default height
+  if (totalHeight === 0) {
+    totalHeight = 450
+  }
+  
+  const panes = paneLayout.value
+  const count = panes.length
+  
+  if (count === 0) return
+  
+  // Check if we need to initialize
+  const currentHeights = paneHeightsByTab.value[activeId] || {}
+  const hasAllHeights = panes.every(pane => currentHeights[pane.id] !== undefined)
+  
+  if (!hasAllHeights) {
+    // Calculate how much height is already used by panes with stored heights
+    const storedPanes = panes.filter(p => currentHeights[p.id] !== undefined)
+    const usedHeight = storedPanes.reduce((sum, p) => sum + currentHeights[p.id], 0)
+    
+    // Distribute remaining height among new panes
+    const newPanes = panes.filter(p => currentHeights[p.id] === undefined)
+    const remainingHeight = Math.max(0, totalHeight - usedHeight)
+    const heightForNew = newPanes.length > 0 
+      ? Math.max(MIN_PANE_HEIGHT, Math.floor(remainingHeight / newPanes.length))
+      : MIN_PANE_HEIGHT
+    
+    const newHeights: Record<string, number> = { ...currentHeights }
+    
+    // If this is the first initialization (no stored heights), distribute equally
+    if (storedPanes.length === 0) {
+      const baseHeight = Math.max(MIN_PANE_HEIGHT, Math.floor(totalHeight / count))
+      panes.forEach((pane) => {
+        newHeights[pane.id] = baseHeight
+      })
+    } else {
+      // Only set heights for new panes
+      newPanes.forEach((pane) => {
+        newHeights[pane.id] = heightForNew
+      })
+    }
+    
+    paneHeightsByTab.value = {
+      ...paneHeightsByTab.value,
+      [activeId]: newHeights
+    }
+  }
+}
+
+// Get client Y from mouse or touch event
+function getClientY(event: MouseEvent | TouchEvent): number {
+  if ('touches' in event) {
+    return event.touches[0]?.clientY ?? event.changedTouches[0]?.clientY ?? 0
+  }
+  return (event as MouseEvent).clientY
+}
+
+// Start resizing a pane
+function startResize(event: MouseEvent | TouchEvent, paneId: string) {
+  console.log('[startResize] paneId:', paneId)
+  event.preventDefault()
+  event.stopPropagation()
+  
+  const activeId = activeCategoryTabId.value
+  if (!activeId) {
+    console.log('[startResize] No active tab')
+    return
+  }
+  
+  const panes = paneLayout.value
+  const paneIndex = panes.findIndex(p => p.id === paneId)
+  console.log('[startResize] paneIndex:', paneIndex, 'total panes:', panes.length)
+  
+  if (paneIndex === -1 || paneIndex >= panes.length - 1) {
+    console.log('[startResize] Invalid pane index')
+    return
+  }
+  
+  const nextPane = panes[paneIndex + 1]
+  const currentHeights = paneHeightsByTab.value[activeId] || {}
+  
+  isResizing.value = true
+  resizePaneId.value = paneId
+  resizeStartY.value = getClientY(event)
+  resizeStartHeight.value = currentHeights[paneId] || panes[paneIndex].height
+  resizeNextPaneId.value = nextPane.id
+  resizeNextStartHeight.value = currentHeights[nextPane.id] || nextPane.height
+  
+  console.log('[startResize] Starting resize - pane:', paneId, 'height:', resizeStartHeight.value, 'nextPane:', nextPane.id, 'nextHeight:', resizeNextStartHeight.value)
+  
+  // Add resize cursor to body
+  document.body.style.cursor = 'ns-resize'
+  document.body.style.userSelect = 'none'
+  
+  // Disable pointer events on iframes/elements during resize
+  document.body.classList.add('is-resizing-panes')
+}
+
+// Handle resize move
+function onResizeMove(event: MouseEvent | TouchEvent) {
+  if (!isResizing.value || !resizePaneId.value || !resizeNextPaneId.value) return
+  
+  const activeId = activeCategoryTabId.value
+  if (!activeId) return
+  
+  const clientY = getClientY(event)
+  const deltaY = clientY - resizeStartY.value
+  const newHeight = resizeStartHeight.value + deltaY
+  const newNextHeight = resizeNextStartHeight.value - deltaY
+  
+  console.log('[onResizeMove] deltaY:', deltaY, 'newHeight:', newHeight, 'newNextHeight:', newNextHeight)
+  
+  // Enforce minimum heights
+  if (newHeight < MIN_PANE_HEIGHT || newNextHeight < MIN_PANE_HEIGHT) {
+    console.log('[onResizeMove] Below minimum height, skipping')
+    return
+  }
+  
+  const currentHeights = paneHeightsByTab.value[activeId] || {}
+  
+  // Direct update without requestAnimationFrame for better responsiveness
+  paneHeightsByTab.value = {
+    ...paneHeightsByTab.value,
+    [activeId]: {
+      ...currentHeights,
+      [resizePaneId.value!]: newHeight,
+      [resizeNextPaneId.value!]: newNextHeight
+    }
+  }
+}
+
+// Stop resizing
+function stopResize() {
+  console.log('[stopResize] Stopping resize')
+  if (isResizing.value) {
+    isResizing.value = false
+    resizePaneId.value = null
+    resizeNextPaneId.value = null
+    document.body.style.cursor = ''
+    document.body.style.userSelect = ''
+    document.body.classList.remove('is-resizing-panes')
+  }
+}
+
+// Get resize handle style (visible when hovering over pane boundary)
+function getResizeHandleStyle(paneId: string): Record<string, string> {
+  return {
+    position: 'absolute',
+    left: '0',
+    right: '0',
+    bottom: '-4px',
+    height: '8px',
+    cursor: 'ns-resize',
+    zIndex: '100',
+    backgroundColor: isResizing.value && resizePaneId.value === paneId ? 'var(--accent)' : 'transparent'
+  }
+}
+
+// Reset all pane heights to equal distribution (double-click on resize handle)
+function resetPaneHeights() {
+  const activeId = activeCategoryTabId.value
+  if (!activeId) return
+  
+  const panes = paneLayout.value
+  let totalHeight = Math.max(0, chartViewportHeight.value)
+  // Fallback: if viewport height is 0 (not measured yet), use default height
+  if (totalHeight === 0) {
+    totalHeight = 450
+  }
+  
+  const count = panes.length
+  
+  if (count <= 1) return
+  
+  const baseHeight = Math.max(MIN_PANE_HEIGHT, Math.floor(totalHeight / count))
+  let remainder = Math.max(0, totalHeight - baseHeight * count)
+  
+  const newHeights: Record<string, number> = {}
+  panes.forEach((pane) => {
+    newHeights[pane.id] = baseHeight + (remainder > 0 ? 1 : 0)
+    if (remainder > 0) remainder -= 1
+  })
+  
+  paneHeightsByTab.value = {
+    ...paneHeightsByTab.value,
+    [activeId]: newHeights
+  }
+}
 
 // Search modal state
 const searchModalOpen = ref(false)
@@ -1104,6 +1372,9 @@ function goToPage(page: string) {
 
 // Summary data
 const summaryData = ref<SummaryData | null>(null)
+
+// Data from all panes (for combined summary)
+const paneDataById = ref<Record<string, Record<string, any[]>>>({})
 
 // Toggle series visibility
 function toggleSeriesVisibility(symbol: string) {
@@ -1216,6 +1487,15 @@ const tabSettingsName = ref('')
 
 watch(activeCategoryTabId, (next, prev) => {
   switchingTab.value = true
+  
+  // Clear pane data when switching tabs
+  paneDataById.value = {}
+  summaryData.value = null
+  
+  // Initialize pane heights for the new tab
+  nextTick(() => {
+    initializePaneHeights()
+  })
   if (prev) {
     selectedSymbolsByTab.value = {
       ...selectedSymbolsByTab.value,
@@ -1300,6 +1580,13 @@ watch(legendNames, (val) => {
 watch([periodType, year, rawMode, cumulative, sumberDana, kategoriPlant, normalize, logScale], () => {
   clearYAxisOverrides()
 })
+
+// Watch for pane changes and initialize heights
+watch([activeCategoryTabId, () => activeExtraPanes.value.length], () => {
+  nextTick(() => {
+    initializePaneHeights()
+  })
+}, { immediate: true })
 
 function addCategoryTab(category: CategoryValue, openSearch = false) {
   const nextIndex = categoryTabs.value.length + 1
@@ -1410,12 +1697,36 @@ const seriesScales = ref<Record<string, ScaleMode>>({})
 function addPaneForSymbol(symbol: string) {
   const activeId = activeCategoryTabId.value
   if (!activeId) return
+  
   const panes = extraPanesByTab.value[activeId] || []
   const cleaned = panes
     .map((pane) => ({ ...pane, symbols: pane.symbols.filter((s) => s !== symbol) }))
     .filter((pane) => pane.symbols.length > 0)
   const newPane: PaneState = { id: `pane-${Date.now()}`, symbols: [symbol] }
+  
+  // Calculate total pane count: main (1) + existing extra panes (cleaned) + new pane (1)
+  const totalPaneCount = 1 + cleaned.length + 1
+  const totalHeight = Math.max(450, chartViewportHeight.value)
+  const heightPerPane = Math.max(MIN_PANE_HEIGHT, Math.floor(totalHeight / totalPaneCount))
+  
+  // Prepare new heights for all panes
+  const currentHeights = paneHeightsByTab.value[activeId] || {}
+  const newHeights: Record<string, number> = { ...currentHeights }
+  
+  // Set height for main pane
+  newHeights['main'] = heightPerPane
+  
+  // Set heights for existing extra panes
+  cleaned.forEach((pane) => {
+    newHeights[pane.id] = heightPerPane
+  })
+  
+  // Set height for new pane
+  newHeights[newPane.id] = heightPerPane
+  
+  // Update both the panes and heights in a single operation
   extraPanesByTab.value = { ...extraPanesByTab.value, [activeId]: [...cleaned, newPane] }
+  paneHeightsByTab.value = { ...paneHeightsByTab.value, [activeId]: newHeights }
 }
 
 // Select symbol with scale option
@@ -1543,6 +1854,12 @@ function removeSymbol(symbol: string) {
   if (activeLegendSettings.value === symbol) {
     activeLegendSettings.value = null
   }
+  
+  // Clear y-axis overrides so they're recalculated for remaining symbols
+  const activeId = activeCategoryTabId.value
+  if (activeId) {
+    clearYAxisOverrides(activeId)
+  }
 }
 
 // Open search modal
@@ -1651,7 +1968,10 @@ function onDataLoaded(data: Record<string, any[]>) {
   const seriesSummaries: SummarySeries[] = []
   const totalByUnit: Record<string, number> = {}
 
-  selectedSymbols.value.forEach((symbol, index) => {
+  // Get all symbols from the data (includes all panes)
+  const allSymbols = Object.keys(data)
+  
+  allSymbols.forEach((symbol, index) => {
     if (hiddenSeries.value.has(symbol)) return
     const values = data[symbol] || []
     if (!values.length) return
@@ -1687,9 +2007,26 @@ function onDataLoaded(data: Record<string, any[]>) {
 }
 
 function onPaneDataLoaded(paneId: string, data: Record<string, any[]>) {
-  if (paneId === 'main') {
-    onDataLoaded(data)
+  // Store data for this pane
+  paneDataById.value[paneId] = data
+  
+  // Combine all pane data for summary
+  const allData: Record<string, any[]> = {}
+  
+  // Add main pane data
+  if (paneDataById.value['main']) {
+    Object.assign(allData, paneDataById.value['main'])
   }
+  
+  // Add extra panes data
+  activeExtraPanes.value.forEach((pane) => {
+    if (paneDataById.value[pane.id]) {
+      Object.assign(allData, paneDataById.value[pane.id])
+    }
+  })
+  
+  // Update summary with combined data
+  onDataLoaded(allData)
 }
 
 function onPaneError(paneId: string, msg: string) {
@@ -1863,6 +2200,7 @@ function saveState() {
         yAxisOverrideByTab: yAxisOverrideByTab.value,
         yAxisBySymbolOverrideByTab: yAxisBySymbolOverrideByTab.value,
         extraPanesByTab: extraPanesByTab.value,
+        paneHeightsByTab: paneHeightsByTab.value,
         selectedSymbols: selectedSymbols.value,
       chartType: chartType.value,
       periodType: periodType.value,
@@ -1894,6 +2232,7 @@ function restoreState() {
         if (state.yAxisOverrideByTab) yAxisOverrideByTab.value = state.yAxisOverrideByTab
         if (state.yAxisBySymbolOverrideByTab) yAxisBySymbolOverrideByTab.value = state.yAxisBySymbolOverrideByTab
         if (state.extraPanesByTab) extraPanesByTab.value = state.extraPanesByTab
+        if (state.paneHeightsByTab) paneHeightsByTab.value = state.paneHeightsByTab
         if (state.selectedSymbols) selectedSymbols.value = state.selectedSymbols
       if (state.chartType) chartType.value = state.chartType
       if (state.periodType) periodType.value = state.periodType
@@ -1913,7 +2252,7 @@ function restoreState() {
 }
 
 // Watch for state changes and save
-watch([categoryTabs, activeCategoryTabId, selectedSymbolsByTab, hiddenSeriesByTab, legendColorsByTab, legendNamesByTab, yAxisOverrideByTab, yAxisBySymbolOverrideByTab, extraPanesByTab, selectedSymbols, chartType, periodType, year, normalize, logScale, rawMode, cumulative, singleScale, scaleSide, sumberDana, kategoriPlant], saveState, { deep: true })
+watch([categoryTabs, activeCategoryTabId, selectedSymbolsByTab, hiddenSeriesByTab, legendColorsByTab, legendNamesByTab, yAxisOverrideByTab, yAxisBySymbolOverrideByTab, extraPanesByTab, paneHeightsByTab, selectedSymbols, chartType, periodType, year, normalize, logScale, rawMode, cumulative, singleScale, scaleSide, sumberDana, kategoriPlant], saveState, { deep: true })
 watch([showObjectTree, showLayersPanel], async () => {
   await nextTick()
   updatePanelPositions()
@@ -1925,9 +2264,15 @@ onMounted(() => {
   loadSymbols()
   nextTick(updateChartViewport)
   nextTick(updatePanelPositions)
+  nextTick(() => initializePaneHeights())
   window.addEventListener('resize', handleResize)
   window.addEventListener('keydown', handleGlobalShortcuts)
   document.addEventListener('click', handleDocumentClick)
+  // Global resize events (mouse + touch)
+  document.addEventListener('mousemove', onResizeMove)
+  document.addEventListener('mouseup', stopResize)
+  document.addEventListener('touchmove', onResizeMove as any, { passive: false })
+  document.addEventListener('touchend', stopResize)
   if (chartScrollRef.value) {
     chartResizeObserver = new ResizeObserver(updateChartViewport)
     chartResizeObserver.observe(chartScrollRef.value)
@@ -1938,6 +2283,10 @@ onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
   window.removeEventListener('keydown', handleGlobalShortcuts)
   document.removeEventListener('click', handleDocumentClick)
+  document.removeEventListener('mousemove', onResizeMove)
+  document.removeEventListener('mouseup', stopResize)
+  document.removeEventListener('touchmove', onResizeMove as any)
+  document.removeEventListener('touchend', stopResize)
   if (chartResizeObserver && chartScrollRef.value) {
     chartResizeObserver.unobserve(chartScrollRef.value)
     chartResizeObserver = null
@@ -2741,17 +3090,129 @@ onUnmounted(() => {
   height: 100%;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+}
+
+/* Global body resize state */
+:global(body.is-resizing-panes) {
+  cursor: ns-resize !important;
+  user-select: none !important;
+}
+
+:global(body.is-resizing-panes *) {
+  cursor: ns-resize !important;
+}
+
+/* Hide chart tooltips during resize */
+:global(body.is-resizing-panes .apexcharts-tooltip) {
+  display: none !important;
 }
 
 .tv-chart-frame {
   position: relative;
   width: 100%;
-  height: 100%;
   flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 100px; /* Minimum pane height */
+}
+
+/* Ensure chart wrapper doesn't block resize handle */
+.tv-chart-frame :deep(.chart-wrapper) {
+  position: relative;
+  z-index: 1;
 }
 
 .tv-chart-pane.is-subpane {
   border-top: 1px solid var(--stroke);
+}
+
+/* ===== TradingView-style Pane Resize Handle ===== */
+.tv-pane-resize-handle {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -8px;
+  height: 16px;
+  cursor: ns-resize;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  transition: background-color 0.15s ease;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.tv-pane-resize-handle:hover,
+.tv-pane-resize-handle.is-active {
+  background: rgba(41, 98, 255, 0.12);
+}
+
+.tv-pane-resize-line {
+  position: absolute;
+  left: 5%;
+  right: 5%;
+  height: 3px;
+  background: var(--stroke);
+  border-radius: 2px;
+  transition: all 0.15s ease;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.tv-pane-resize-handle:hover .tv-pane-resize-line,
+.tv-pane-resize-handle.is-active .tv-pane-resize-line {
+  background: var(--accent);
+  height: 3px;
+  left: 10%;
+  right: 10%;
+}
+
+.tv-pane-resize-grip {
+  position: relative;
+  z-index: 1001;
+  width: 48px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  border: 2px solid var(--stroke);
+  border-radius: 6px;
+  color: var(--muted);
+  opacity: 0.5;
+  transition: all 0.15s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+}
+
+.tv-pane-resize-handle:hover .tv-pane-resize-grip,
+.tv-pane-resize-handle.is-active .tv-pane-resize-grip {
+  opacity: 1;
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--surface);
+  transform: scale(1.05);
+}
+
+/* Show grip on pane hover too */
+.tv-chart-pane:hover .tv-pane-resize-grip {
+  opacity: 0.7;
+}
+
+/* Resize active state for pane */
+.tv-chart-pane.is-resizing {
+  user-select: none;
+}
+
+.tv-chart-pane.is-resizing::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(41, 98, 255, 0.04);
+  pointer-events: none;
 }
 
 .tv-empty-tabs {

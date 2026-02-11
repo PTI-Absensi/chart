@@ -1,5 +1,5 @@
 // Test script to check fact_value_weekly table structure
-import { query } from './src/db/pgClient.js'
+import { query } from './src/db.js'
 
 async function checkTable() {
     try {

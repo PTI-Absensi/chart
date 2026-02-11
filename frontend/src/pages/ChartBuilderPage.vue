@@ -1,4 +1,4 @@
-3<template>
+<template>
   <div class="page animate-in">
     <header class="page-header">
       <div>
