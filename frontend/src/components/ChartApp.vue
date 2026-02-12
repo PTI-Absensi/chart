@@ -310,8 +310,7 @@
               v-if="paneIndex < paneLayout.length - 1"
               class="tv-pane-resize-handle"
               :class="{ 'is-active': resizePaneId === pane.id }"
-              @mousedown="startResize($event, pane.id)"
-              @touchstart="startResize($event as any, pane.id)"
+              @pointerdown="startResize($event, pane.id)"
               @dblclick.stop="resetPaneHeights"
               title="Drag to resize (double-click to reset)"
             >
@@ -1210,10 +1209,18 @@ function getClientY(event: MouseEvent | TouchEvent): number {
 }
 
 // Start resizing a pane
-function startResize(event: MouseEvent | TouchEvent, paneId: string) {
+function startResize(event: PointerEvent, paneId: string) {
   console.log('[startResize] paneId:', paneId)
+  
+  // Capture pointer for better tracking across the entire resize operation
+  if (event.target && 'setPointerCapture' in event.target) {
+    (event.target as Element).setPointerCapture(event.pointerId)
+  }
+  
+  // Prevent default to avoid text selection and scrolling
   event.preventDefault()
   event.stopPropagation()
+  event.stopImmediatePropagation()
   
   const activeId = activeCategoryTabId.value
   if (!activeId) {
@@ -1235,7 +1242,7 @@ function startResize(event: MouseEvent | TouchEvent, paneId: string) {
   
   isResizing.value = true
   resizePaneId.value = paneId
-  resizeStartY.value = getClientY(event)
+  resizeStartY.value = event.clientY
   resizeStartHeight.value = currentHeights[paneId] || panes[paneIndex].height
   resizeNextPaneId.value = nextPane.id
   resizeNextStartHeight.value = currentHeights[nextPane.id] || nextPane.height
@@ -1252,7 +1259,13 @@ function startResize(event: MouseEvent | TouchEvent, paneId: string) {
 
 // Handle resize move
 function onResizeMove(event: MouseEvent | TouchEvent) {
-  if (!isResizing.value || !resizePaneId.value || !resizeNextPaneId.value) return
+  if (!isResizing.value || !resizePaneId.value || !resizeNextPaneId.value) {
+    return
+  }
+  
+  // Prevent default to stop scrolling on touch devices and text selection
+  event.preventDefault()
+  event.stopPropagation()
   
   const activeId = activeCategoryTabId.value
   if (!activeId) return
@@ -3096,7 +3109,7 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-/* Global body resize state */
+/* Global body resize state - disable interactions during resize */
 :global(body.is-resizing-panes) {
   cursor: ns-resize !important;
   user-select: none !important;
@@ -3104,6 +3117,13 @@ onUnmounted(() => {
 
 :global(body.is-resizing-panes *) {
   cursor: ns-resize !important;
+  pointer-events: none !important;
+}
+
+/* Keep resize handle interactive during resize */
+:global(body.is-resizing-panes .tv-pane-resize-handle),
+:global(body.is-resizing-panes .tv-pane-resize-handle *) {
+  pointer-events: auto !important;
 }
 
 /* Hide chart tooltips during resize */
@@ -3138,7 +3158,8 @@ onUnmounted(() => {
   bottom: -8px;
   height: 16px;
   cursor: ns-resize;
-  z-index: 1000;
+  /* Higher z-index to stay above chart elements */
+  z-index: 1000 !important;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3146,6 +3167,8 @@ onUnmounted(() => {
   transition: background-color 0.15s ease;
   pointer-events: auto;
   touch-action: none;
+  /* Ensure minimum touch target size */
+  min-height: 16px;
 }
 
 .tv-pane-resize-handle:hover,

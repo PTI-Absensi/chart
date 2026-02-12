@@ -179,7 +179,7 @@ export async function getKategoriSymbols() {
   }
   const sql = `
     SELECT DISTINCT kategori_plant
-    FROM fact_value_weekly
+    FROM v_fact_value_weekly_by_analitic_dense
     WHERE kategori_plant IS NOT NULL
     ORDER BY kategori_plant
   `
@@ -262,7 +262,8 @@ export async function getAllSymbols() {
       COALESCE(status, 'metric') as category,
       COALESCE("desc", nama_dokumen) as description,
       COALESCE(sumber_dana, '') as sumber_dana,
-      COALESCE(kategori_plant, '') as kategori_plant
+      COALESCE(kategori_plant, '') as kategori_plant,
+      COALESCE(is_value_applicable, false) as is_value_applicable
     FROM analitic
     ORDER BY kode_data
   `
@@ -284,22 +285,24 @@ export async function getAllSymbols() {
         category: row.category,
         description,
         unit: 'Dokumen',
-        symbolType: 'dokumen',  // NEW: type field
+        symbolType: 'dokumen',
         sumber_dana: row.sumber_dana,
-        kategori_plant: row.kategori_plant
+        kategori_plant: row.kategori_plant,
+        is_value_applicable: row.is_value_applicable
       })
 
-      // Nilai variant (with -N suffix)
+      // Nilai variant (with -N suffix) - always create, even if no value data
       symbols.push({
         symbol: `${row.symbol}-N`,
         name: `${row.name} (Nilai)`,
         category: row.category,
         description: `${description} - Nilai Rupiah`,
         unit: 'Rp',
-        symbolType: 'nilai',  // NEW: type field
+        symbolType: 'nilai',
         sumber_dana: row.sumber_dana,
         kategori_plant: row.kategori_plant,
-        baseSymbol: row.symbol  // Reference to original symbol
+        baseSymbol: row.symbol,
+        is_value_applicable: row.is_value_applicable  // Can be false for PR
       })
     })
 
@@ -366,7 +369,21 @@ async function fetchMetricData(metricInfo, timeframe, limit, plantFilter, sumber
   const whereClauses = []
   const params = []
 
-  if (metricFilter) {
+  // For value metrics using KPI view, map column to kpi_code
+  const isValueMetric = table === 'fact_value_weekly'
+  const kpiCodeMap = {
+    'total_nilai': 'V001',
+    'anggaran': 'V002',
+    'hps': 'V003',
+    'realisasi': 'V004',
+    'saving_nilai': 'V005'
+  }
+  const kpiCode = kpiCodeMap[column]
+
+  if (isValueMetric && kpiCode) {
+    whereClauses.push('kpi_code = $' + (params.length + 1))
+    params.push(kpiCode)
+  } else if (metricFilter) {
     whereClauses.push(metricFilter)
   }
   if (year) {
@@ -388,14 +405,18 @@ async function fetchMetricData(metricInfo, timeframe, limit, plantFilter, sumber
 
   const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : ''
 
+  // Use dense KPI view for value metrics
+  const viewName = isValueMetric ? 'v_fact_value_weekly_dense_kpi' : format.ident(table)
+  const valueColumn = isValueMetric ? 'kpi_value' : format.ident(column)
+
   const sql = `
     SELECT
       DATE_TRUNC('${timeTrunc}', week_start) as period,
-      SUM(${format.ident(column)}) as total_value,
-      MIN(${format.ident(column)}) as min_value,
-      MAX(${format.ident(column)}) as max_value,
-      AVG(${format.ident(column)}) as avg_value
-    FROM ${format.ident(table)}
+      SUM(${valueColumn}) as total_value,
+      MIN(${valueColumn}) as min_value,
+      MAX(${valueColumn}) as max_value,
+      AVG(${valueColumn}) as avg_value
+    FROM ${viewName}
     ${whereSql}
     GROUP BY DATE_TRUNC('${timeTrunc}', week_start)
     ORDER BY period DESC
@@ -499,24 +520,23 @@ export async function fetchTimeSeries(symbol, timeframe = '1W', limit = 500, pla
 
 // Fetch time series data by kode_data from fact_doc_weekly
 async function fetchByKodeData(kodeData, timeframe = '1W', limit = 500, year = null, periodType = null, raw = false, sumberDana = null, kategoriPlant = null, cumulative = false) {
-  // Case-insensitive matching for kode_data
   const whereClauses = ['LOWER(kode_data) = LOWER($1)']
   const params = [kodeData]
 
   if (year) {
-    whereClauses.push('period_year = $' + (params.length + 1))
+    whereClauses.push('f.period_year = $' + (params.length + 1))
     params.push(year)
   }
   if (periodType) {
-    whereClauses.push('period_type = $' + (params.length + 1))
+    whereClauses.push('f.period_type = $' + (params.length + 1))
     params.push(periodType)
   }
   if (sumberDana) {
-    whereClauses.push('LOWER(sumber_dana) = LOWER($' + (params.length + 1) + ')')
+    whereClauses.push('LOWER(f.sumber_dana) = LOWER($' + (params.length + 1) + ')')
     params.push(sumberDana)
   }
   if (kategoriPlant) {
-    whereClauses.push('LOWER(kategori_plant) = LOWER($' + (params.length + 1) + ')')
+    whereClauses.push('LOWER(f.kategori_plant) = LOWER($' + (params.length + 1) + ')')
     params.push(kategoriPlant)
   }
 
@@ -524,60 +544,39 @@ async function fetchByKodeData(kodeData, timeframe = '1W', limit = 500, year = n
 
   let sql
   if (raw) {
-    // Raw mode: return individual rows without aggregation
     sql = `
       SELECT
-        week_start as period,
-        count_doc as value,
-        kategori_plant,
-        sumber_dana
-      FROM fact_doc_weekly
+        f.week_start as period,
+        f.count_doc as value,
+        f.kategori_plant,
+        f.sumber_dana
+      FROM v_fact_doc_weekly_dense f
       ${whereSql}
-      ORDER BY week_start DESC
+      ORDER BY f.week_start DESC
       LIMIT $${params.length + 1}
     `
   } else if (cumulative) {
-    // Cumulative mode: use window function for running total
-    let timeTrunc = 'week'
-    if (timeframe === '1D') timeTrunc = 'day'
-    if (timeframe === '1M') timeTrunc = 'month'
-    if (timeframe === '1Y') timeTrunc = year ? 'month' : 'year'
-
     sql = `
-      WITH weekly_data AS (
-        SELECT
-          DATE_TRUNC('${timeTrunc}', week_start) as period,
-          SUM(count_doc) as weekly_value
-        FROM fact_doc_weekly
-        ${whereSql}
-        GROUP BY DATE_TRUNC('${timeTrunc}', week_start)
-      )
       SELECT
-        period,
-        weekly_value,
-        SUM(weekly_value) OVER (ORDER BY period) as cum_value
-      FROM weekly_data
-      ORDER BY period DESC
+        f.week_start as period,
+        f.count_doc as weekly_value,
+        f.cum_count_doc as cum_value
+      FROM v_fact_doc_weekly_dense_cum f
+      ${whereSql}
+      ORDER BY f.week_start DESC
       LIMIT $${params.length + 1}
     `
   } else {
-    // Aggregated mode (default)
-    let timeTrunc = 'week'
-    if (timeframe === '1D') timeTrunc = 'day'
-    if (timeframe === '1M') timeTrunc = 'month'
-    if (timeframe === '1Y') timeTrunc = year ? 'month' : 'year'
-
     sql = `
       SELECT
-        DATE_TRUNC('${timeTrunc}', week_start) as period,
-        SUM(count_doc) as total_value,
-        MIN(count_doc) as min_value,
-        MAX(count_doc) as max_value,
-        AVG(count_doc) as avg_value
-      FROM fact_doc_weekly
+        f.week_start as period,
+        f.count_doc as total_value,
+        f.count_doc as min_value,
+        f.count_doc as max_value,
+        f.count_doc as avg_value
+      FROM v_fact_doc_weekly_dense f
       ${whereSql}
-      GROUP BY DATE_TRUNC('${timeTrunc}', week_start)
-      ORDER BY period DESC
+      ORDER BY f.week_start DESC
       LIMIT $${params.length + 1}
     `
   }
@@ -643,14 +642,16 @@ async function fetchByKodeData(kodeData, timeframe = '1W', limit = 500, year = n
   }
 }
 
+
 // Fetch time series NILAI (rupiah) data by kode_data
 // This is used for symbols ending with -N suffix
-// Strategy: Look up sumber_dana and kategori_plant from analitic table,
-// then query fact_value_weekly with those filters
+// Strategy: 
+// 1. First try v_fact_value_weekly_by_analitic_dense (for codes with specific values)
+// 2. If no data, fallback to fact_value_weekly using sumber_dana/kategori_plant from analitic
 async function fetchByKodeDataNilai(kodeData, timeframe = '1W', limit = 500, year = null, periodType = null, raw = false, sumberDana = null, kategoriPlant = null, cumulative = false) {
   // First, lookup the sumber_dana and kategori_plant from analitic table
   const lookupSql = `
-    SELECT sumber_dana, kategori_plant 
+    SELECT sumber_dana, kategori_plant, is_value_applicable
     FROM analitic 
     WHERE LOWER(kode_data) = LOWER($1)
     LIMIT 1
@@ -658,126 +659,187 @@ async function fetchByKodeDataNilai(kodeData, timeframe = '1W', limit = 500, yea
 
   try {
     const lookupResult = await query(lookupSql, [kodeData])
-
+    
     if (!lookupResult.rows.length) {
       console.warn('No analitic entry found for kode_data:', kodeData)
       return []
     }
 
     const analitic = lookupResult.rows[0]
-    const sd = analitic.sumber_dana || sumberDana
-    const kp = analitic.kategori_plant || kategoriPlant
+    const sd = sumberDana || analitic.sumber_dana
+    const kp = kategoriPlant || analitic.kategori_plant
+    const hasSpecificValue = analitic.is_value_applicable
 
-    // Build where clauses for fact_value_weekly
-    const whereClauses = []
-    const params = []
-
-    if (sd) {
-      whereClauses.push('LOWER(sumber_dana) = LOWER($' + (params.length + 1) + ')')
-      params.push(sd)
-    }
-    if (kp) {
-      whereClauses.push('LOWER(kategori_plant) = LOWER($' + (params.length + 1) + ')')
-      params.push(kp)
-    }
-    if (year) {
-      whereClauses.push('period_year = $' + (params.length + 1))
-      params.push(year)
-    }
-    if (periodType) {
-      whereClauses.push('period_type = $' + (params.length + 1))
-      params.push(periodType)
+    // Try view per analitic first (for codes like B100, C001, etc)
+    if (hasSpecificValue) {
+      const viewResult = await fetchFromValueView(kodeData, timeframe, limit, year, periodType, raw, sd, kp, cumulative)
+      if (viewResult.length > 0) {
+        return viewResult
+      }
     }
 
-    // If no filters at all, we can't query - return empty
-    if (whereClauses.length === 0) {
-      console.warn('No filters available to query fact_value_weekly for:', kodeData)
-      return []
-    }
+    // Fallback to global fact_value_weekly (for PR and codes without specific value)
+    // This returns total value of all documents (PK+PP+HPS+SPPBJ) for the dimension
+    return await fetchFromGlobalValue(sd, kp, timeframe, limit, year, periodType, raw, cumulative)
 
-    const whereSql = 'WHERE ' + whereClauses.join(' AND ')
+  } catch (err) {
+    console.error('Error fetching nilai by kode_data:', kodeData, err)
+    return []
+  }
+}
 
-    let timeTrunc = 'week'
-    if (timeframe === '1D') timeTrunc = 'day'
-    if (timeframe === '1M') timeTrunc = 'month'
-    if (timeframe === '1Y') timeTrunc = year ? 'month' : 'year'
+// Helper: Query from v_fact_value_weekly_by_analitic_dense
+async function fetchFromValueView(kodeData, timeframe, limit, year, periodType, raw, sumberDana, kategoriPlant, cumulative) {
+  const whereClauses = ['LOWER(kode_data) = LOWER($1)']
+  const params = [kodeData]
 
-    let sql
-    if (cumulative) {
-      // Cumulative mode with running total for nilai
-      sql = `
-      WITH weekly_data AS (
-        SELECT
-          DATE_TRUNC('${timeTrunc}', week_start) as period,
-          SUM(total_nilai) as weekly_value
-        FROM fact_value_weekly
-        ${whereSql}
-        GROUP BY DATE_TRUNC('${timeTrunc}', week_start)
-      )
+  if (year) {
+    whereClauses.push('period_year = $' + (params.length + 1))
+    params.push(year)
+  }
+  if (periodType) {
+    whereClauses.push('period_type = $' + (params.length + 1))
+    params.push(periodType)
+  }
+  if (sumberDana) {
+    whereClauses.push('LOWER(sumber_dana) = LOWER($' + (params.length + 1) + ')')
+    params.push(sumberDana)
+  }
+  if (kategoriPlant) {
+    whereClauses.push('LOWER(kategori_plant) = LOWER($' + (params.length + 1) + ')')
+    params.push(kategoriPlant)
+  }
+
+  const whereSql = 'WHERE ' + whereClauses.join(' AND ')
+
+  let sql
+  if (cumulative) {
+    sql = `
       SELECT
-        period,
-        weekly_value,
-        SUM(weekly_value) OVER (ORDER BY period) as cum_value
-      FROM weekly_data
-      ORDER BY period DESC
+        week_start as period,
+        SUM(cum_value_amount) as cum_value,
+        SUM(value_amount) as weekly_value
+      FROM v_fact_value_weekly_by_analitic_dense_cum
+      ${whereSql}
+      GROUP BY week_start
+      ORDER BY week_start DESC
       LIMIT $${params.length + 1}
     `
-    } else {
-      // Aggregated mode for nilai (default)
-      sql = `
+  } else {
+    sql = `
       SELECT
-        DATE_TRUNC('${timeTrunc}', week_start) as period,
+        week_start as period,
+        SUM(value_amount) as total_value,
+        MIN(value_amount) as min_value,
+        MAX(value_amount) as max_value,
+        AVG(value_amount) as avg_value
+      FROM v_fact_value_weekly_by_analitic_dense
+      ${whereSql}
+      GROUP BY week_start
+      ORDER BY week_start DESC
+      LIMIT $${params.length + 1}
+    `
+  }
+  params.push(limit)
+
+  const result = await query(sql, params)
+  return formatValueResult(result.rows, cumulative)
+}
+
+// Helper: Query from global fact_value_weekly (for PR and fallback)
+async function fetchFromGlobalValue(sumberDana, kategoriPlant, timeframe, limit, year, periodType, raw, cumulative) {
+  const whereClauses = []
+  const params = []
+
+  if (year) {
+    whereClauses.push('period_year = $' + (params.length + 1))
+    params.push(year)
+  }
+  if (periodType) {
+    whereClauses.push('period_type = $' + (params.length + 1))
+    params.push(periodType)
+  }
+  if (sumberDana) {
+    whereClauses.push('LOWER(sumber_dana) = LOWER($' + (params.length + 1) + ')')
+    params.push(sumberDana)
+  }
+  if (kategoriPlant) {
+    whereClauses.push('LOWER(kategori_plant) = LOWER($' + (params.length + 1) + ')')
+    params.push(kategoriPlant)
+  }
+
+  const whereSql = whereClauses.length ? 'WHERE ' + whereClauses.join(' AND ') : ''
+
+  let sql
+  if (cumulative) {
+    // Use cumulative view for global values
+    sql = `
+      SELECT
+        week_start as period,
+        SUM(cum_total_nilai) as cum_value,
+        SUM(total_nilai) as weekly_value
+      FROM v_fact_value_weekly_dense_cum
+      ${whereSql}
+      GROUP BY week_start
+      ORDER BY week_start DESC
+      LIMIT $${params.length + 1}
+    `
+  } else {
+    // Use regular table for non-cumulative
+    sql = `
+      SELECT
+        week_start as period,
         SUM(total_nilai) as total_value,
         MIN(total_nilai) as min_value,
         MAX(total_nilai) as max_value,
         AVG(total_nilai) as avg_value
       FROM fact_value_weekly
       ${whereSql}
-      GROUP BY DATE_TRUNC('${timeTrunc}', week_start)
-      ORDER BY period DESC
+      GROUP BY week_start
+      ORDER BY week_start DESC
       LIMIT $${params.length + 1}
     `
-    }
-    params.push(limit)
+  }
+  params.push(limit)
 
-    const result = await query(sql, params)
-    const rows = result.rows || []
-    if (!rows.length) return []
+  const result = await query(sql, params)
+  return formatValueResult(result.rows, cumulative)
+}
 
-    if (cumulative) {
-      return rows.reverse().map((row) => {
-        const cumValue = Number(row.cum_value || 0)
-        const weeklyValue = Number(row.weekly_value || 0)
-        const timestamp = row.period ? Math.floor(new Date(row.period).getTime() / 1000) : 0
-        return {
-          time: timestamp,
-          open: cumValue - weeklyValue,
-          high: cumValue,
-          low: cumValue - weeklyValue,
-          close: cumValue,
-          volume: weeklyValue
-        }
-      })
-    } else {
-      return rows.reverse().map((row) => {
-        const value = Number(row.total_value || 0)
-        const minVal = Number(row.min_value || value)
-        const maxVal = Number(row.max_value || value)
-        const avgVal = Number(row.avg_value || value)
-        const timestamp = row.period ? Math.floor(new Date(row.period).getTime() / 1000) : 0
-        return {
-          time: timestamp,
-          open: minVal,
-          high: maxVal,
-          low: minVal,
-          close: avgVal,
-          volume: value
-        }
-      })
-    }
-  } catch (err) {
-    console.error('Error fetching nilai by kode_data:', kodeData, err)
-    return []
+// Helper: Format query result to chart data
+function formatValueResult(rows, cumulative) {
+  if (!rows || !rows.length) return []
+  
+  if (cumulative) {
+    return rows.reverse().map((row) => {
+      const cumValue = Number(row.cum_value || 0)
+      const weeklyValue = Number(row.weekly_value || 0)
+      const timestamp = row.period ? Math.floor(new Date(row.period).getTime() / 1000) : 0
+      return {
+        time: timestamp,
+        open: cumValue - weeklyValue,
+        high: cumValue,
+        low: cumValue - weeklyValue,
+        close: cumValue,
+        volume: weeklyValue
+      }
+    })
+  } else {
+    return rows.reverse().map((row) => {
+      const value = Number(row.total_value || 0)
+      const minVal = Number(row.min_value || value)
+      const maxVal = Number(row.max_value || value)
+      const avgVal = Number(row.avg_value || value)
+      const timestamp = row.period ? Math.floor(new Date(row.period).getTime() / 1000) : 0
+      return {
+        time: timestamp,
+        open: minVal,
+        high: maxVal,
+        low: minVal,
+        close: avgVal,
+        volume: value
+      }
+    })
   }
 }
 
