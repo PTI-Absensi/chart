@@ -1424,7 +1424,7 @@ function getLegendName(symbol: string): string {
 }
 
 function formatLegendText(symbol: string): string {
-  const rawDesc = selectedSymbolMeta.value?.[symbol]?.description || ''
+  const rawDesc = String(selectedSymbolMeta.value?.[symbol]?.description || '')
   const desc = rawDesc.replace(/nilai rupiah/gi, '').trim()
   if (!desc) return symbol
   return `${symbol} - ${desc}`.replace(/\s*-\s*$/, '')

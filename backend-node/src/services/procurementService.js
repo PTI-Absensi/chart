@@ -321,6 +321,29 @@ export async function getAllSymbols() {
       })
     })
 
+    // Add V001-V007 KPI codes from v_fact_value_weekly_dense_kpi
+    const vKpiCodes = [
+      { code: 'V001', label: 'total_nilai', unit: 'Rp' },
+      { code: 'V002', label: 'anggaran', unit: 'Rp' },
+      { code: 'V003', label: 'hps', unit: 'Rp' },
+      { code: 'V004', label: 'realisasi', unit: 'Rp' },
+      { code: 'V005', label: 'saving_nilai', unit: 'Rp' },
+      { code: 'V006', label: 'saving_pct_anggaran', unit: '%' },
+      { code: 'V007', label: 'saving_pct_hps', unit: '%' }
+    ]
+    vKpiCodes.forEach(kpi => {
+      symbols.push({
+        symbol: kpi.code,
+        name: kpi.label,
+        category: 'kpi',
+        description: kpi.label,
+        unit: kpi.unit,
+        symbolType: 'nilai',
+        sumber_dana: '',
+        kategori_plant: ''
+      })
+    })
+
     return symbols
   } catch (err) {
     console.error('Error fetching symbols from analitic:', err)
@@ -504,6 +527,11 @@ export async function fetchTimeSeries(symbol, timeframe = '1W', limit = 500, pla
       year,
       periodType
     )
+  }
+
+  // Handle V001-V007 KPI codes from v_fact_value_weekly_dense_kpi
+  if (symbol.match(/^V[0-9]{3}$/)) {
+    return fetchVKpiData(symbol, timeframe, limit, year, periodType, raw, sumberDana, kategoriPlant, cumulative)
   }
 
   // Handle -N suffix for nilai (rupiah) data
@@ -841,6 +869,62 @@ function formatValueResult(rows, cumulative) {
       }
     })
   }
+}
+
+// Fetch V001-V007 KPI data from v_fact_value_weekly_dense_kpi
+async function fetchVKpiData(kpiCode, timeframe = '1W', limit = 500, year = null, periodType = null, raw = false, sumberDana = null, kategoriPlant = null, cumulative = false) {
+  const whereClauses = ['kpi_code = $1']
+  const params = [kpiCode]
+
+  if (year) {
+    whereClauses.push('period_year = $' + (params.length + 1))
+    params.push(year)
+  }
+  if (periodType) {
+    whereClauses.push('period_type = $' + (params.length + 1))
+    params.push(periodType)
+  }
+  if (sumberDana) {
+    whereClauses.push('LOWER(sumber_dana) = LOWER($' + (params.length + 1) + ')')
+    params.push(sumberDana)
+  }
+  if (kategoriPlant) {
+    whereClauses.push('LOWER(kategori_plant) = LOWER($' + (params.length + 1) + ')')
+    params.push(kategoriPlant)
+  }
+
+  const whereSql = 'WHERE ' + whereClauses.join(' AND ')
+
+  const sql = `
+    SELECT
+      week_start as period,
+      kpi_value as total_value,
+      kpi_value as min_value,
+      kpi_value as max_value,
+      kpi_value as avg_value
+    FROM v_fact_value_weekly_dense_kpi
+    ${whereSql}
+    ORDER BY week_start DESC
+    LIMIT $${params.length + 1}
+  `
+  params.push(limit)
+
+  const result = await query(sql, params)
+  const rows = result.rows || []
+  if (!rows.length) return []
+
+  return rows.reverse().map((row) => {
+    const value = Number(row.total_value || 0)
+    const timestamp = row.period ? Math.floor(new Date(row.period).getTime() / 1000) : 0
+    return {
+      time: timestamp,
+      open: value,
+      high: value,
+      low: value,
+      close: value,
+      volume: value
+    }
+  })
 }
 
 export async function getLatestValue(symbol) {
