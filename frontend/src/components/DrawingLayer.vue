@@ -400,28 +400,54 @@ function redo() {
 }
 
 // Resize handler
+let resizeObserver: ResizeObserver | null = null
+
 function handleResize() {
   if (!canvasRef.value || !containerRef.value) return
   
   const parent = containerRef.value.parentElement
   if (!parent) return
 
-  canvasRef.value.width = parent.clientWidth
-  canvasRef.value.height = parent.clientHeight
-  ctx = canvasRef.value.getContext('2d')
-  redraw()
+  const newWidth = parent.clientWidth
+  const newHeight = parent.clientHeight
+  
+  // Only update if size actually changed
+  if (canvasRef.value.width !== newWidth || canvasRef.value.height !== newHeight) {
+    canvasRef.value.width = newWidth
+    canvasRef.value.height = newHeight
+    ctx = canvasRef.value.getContext('2d')
+    redraw()
+    console.log('Canvas resized to:', newWidth, 'x', newHeight)
+  }
 }
 
 // Lifecycle
 onMounted(() => {
   setTimeout(() => {
     initCanvas()
-    window.addEventListener('resize', handleResize)
-  }, 100)
+    
+    // Use ResizeObserver if available (more reliable than window resize)
+    if (ResizeObserver && containerRef.value?.parentElement) {
+      resizeObserver = new ResizeObserver(() => {
+        handleResize()
+      })
+      resizeObserver.observe(containerRef.value.parentElement)
+    } else {
+      // Fallback to window resize
+      window.addEventListener('resize', handleResize)
+    }
+  }, 200)
 })
 
 onUnmounted(() => {
+  // Cleanup ResizeObserver
+  if (resizeObserver) {
+    resizeObserver.disconnect()
+    resizeObserver = null
+  }
   window.removeEventListener('resize', handleResize)
+  
+  // Cleanup canvas listeners
   if (canvasRef.value) {
     canvasRef.value.removeEventListener('mousedown', handleMouseDown)
     canvasRef.value.removeEventListener('mousemove', handleMouseMove)

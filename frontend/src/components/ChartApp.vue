@@ -110,6 +110,12 @@
     </div>
     
     <div class="tv-header-right">
+      <PdfExportButton 
+        :year="year"
+        :period-type="periodType"
+        :sumber-dana="sumberDana"
+        :kategori-plant="kategoriPlant"
+      />
       <button class="tv-btn icon" title="Undo (Ctrl/Cmd+Z)" @click="drawingRef?.undo?.()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
           <path d="M3 12a9 9 0 1 0 3-6.7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -206,6 +212,10 @@
           <a class="tv-nav-item" href="/dashboards" target="_blank" @click="navMenuOpen = false">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 4h7v7H4zM13 4h7v5h-7zM13 11h7v9h-7zM4 13h7v7H4z" stroke="currentColor" stroke-width="2"/></svg>
             <span>Dashboards</span>
+          </a>
+          <a class="tv-nav-item" href="/dashboard-report" target="_blank" @click="navMenuOpen = false">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M3 5h18v16H3z" stroke="currentColor" stroke-width="2"/><path d="M8 10h8M8 14h6M8 18h4" stroke="currentColor" stroke-width="2"/><circle cx="6" cy="10" r="1" fill="currentColor"/><circle cx="6" cy="14" r="1" fill="currentColor"/><circle cx="6" cy="18" r="1" fill="currentColor"/></svg>
+            <span>Laporan</span>
           </a>
           <a class="tv-nav-item" href="/templates" target="_blank" @click="navMenuOpen = false">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 4h9l3 3v13H6z" stroke="currentColor" stroke-width="2"/><path d="M9 10h6M9 13h6M9 16h4" stroke="currentColor" stroke-width="2"/></svg>
@@ -759,6 +769,7 @@ import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { authFetch } from '../utils/auth'
 import ProcurementChart from './ProcurementChart.vue'
 import DrawingLayer from './DrawingLayer.vue'
+import PdfExportButton from './PdfExportButton.vue'
 
 // Types
 interface SymbolItem {

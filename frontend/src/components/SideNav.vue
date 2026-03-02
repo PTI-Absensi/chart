@@ -59,6 +59,18 @@
         </span>
         <span class="side-nav-text">Dashboards</span>
       </RouterLink>
+      <RouterLink class="side-nav-item" to="/dashboard-report" exact-active-class="is-active">
+        <span class="side-nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M3 5h18v16H3z" fill="none" stroke="currentColor" stroke-width="2"/>
+            <path d="M8 10h8M8 14h6M8 18h4" fill="none" stroke="currentColor" stroke-width="2"/>
+            <circle cx="6" cy="10" r="1" fill="currentColor"/>
+            <circle cx="6" cy="14" r="1" fill="currentColor"/>
+            <circle cx="6" cy="18" r="1" fill="currentColor"/>
+          </svg>
+        </span>
+        <span class="side-nav-text">Laporan</span>
+      </RouterLink>
       <RouterLink class="side-nav-item" to="/templates" exact-active-class="is-active">
         <span class="side-nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">
