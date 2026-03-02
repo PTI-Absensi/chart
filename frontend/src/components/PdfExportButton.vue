@@ -7,6 +7,7 @@ interface Props {
   periodType?: string
   sumberDana?: string
   kategoriPlant?: string
+  reportType?: 'dashboard' | 'chart'
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -14,10 +15,39 @@ const props = withDefaults(defineProps<Props>(), {
   year: 2025,
   periodType: 'calendar',
   sumberDana: '',
-  kategoriPlant: ''
+  kategoriPlant: '',
+  reportType: 'dashboard'
 })
 
 const isGenerating = ref(false)
+
+// Helper to parse error response
+async function parseErrorResponse(response: Response): Promise<string> {
+  const contentType = response.headers.get('content-type') || ''
+  
+  // If HTML response, return status text
+  if (contentType.includes('text/html')) {
+    return `Server error: ${response.status} ${response.statusText}`
+  }
+  
+  // If JSON response, parse it
+  if (contentType.includes('application/json')) {
+    try {
+      const error = await response.json()
+      return error.message || error.detail || `Error: ${response.status}`
+    } catch {
+      return `Error: ${response.status} ${response.statusText}`
+    }
+  }
+  
+  // Default: try to get text
+  try {
+    const text = await response.text()
+    return text || `Error: ${response.status} ${response.statusText}`
+  } catch {
+    return `Error: ${response.status} ${response.statusText}`
+  }
+}
 
 async function generatePDF() {
   isGenerating.value = true
@@ -37,17 +67,24 @@ async function generatePDF() {
         filters: {
           sumberDana: props.sumberDana || undefined,
           kategoriPlant: props.kategoriPlant || undefined
-        }
+        },
+        reportType: props.reportType
       })
     })
 
     if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.message || 'Failed to generate PDF')
+      const errorMsg = await parseErrorResponse(response)
+      throw new Error(errorMsg)
     }
 
     // Download PDF
     const blob = await response.blob()
+    
+    // Check if it's actually a PDF
+    if (blob.type.includes('html') || blob.size < 100) {
+      throw new Error('Server returned invalid PDF. Please check server logs.')
+    }
+    
     const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
@@ -87,12 +124,18 @@ async function captureDashboard() {
     })
 
     if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.message || 'Failed to capture dashboard')
+      const errorMsg = await parseErrorResponse(response)
+      throw new Error(errorMsg)
     }
 
     // Download PDF
     const blob = await response.blob()
+    
+    // Check if it's actually a PDF
+    if (blob.type.includes('html') || blob.size < 100) {
+      throw new Error('Server returned invalid PDF. Puppeteer may not be installed.')
+    }
+    
     const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url

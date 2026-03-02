@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <!-- Compact TradingView-style Header -->
   <header class="tv-header">
     <div class="tv-header-left">
@@ -73,7 +73,7 @@
         
         <!-- Mode Buttons -->
         <button :class="['tv-btn', { active: rawMode }]" @click="rawMode = !rawMode" title="Raw data">Raw</button>
-        <button :class="['tv-btn', { active: cumulative }]" @click="cumulative = !cumulative" title="Kumulatif">Σ</button>
+        <button :class="['tv-btn', { active: cumulative }]" @click="cumulative = !cumulative" title="Kumulatif">Î£</button>
         <button :class="['tv-btn', { active: singleScale }]" @click="singleScale = !singleScale" title="Single Y scale">1 Skala</button>
         <button class="tv-btn" @click="scaleSide = scaleSide === 'left' ? 'right' : 'left'" title="Posisi Skala">
           {{ scaleSide === 'left' ? 'Skala Kiri' : 'Skala Kanan' }}
@@ -115,6 +115,7 @@
         :period-type="periodType"
         :sumber-dana="sumberDana"
         :kategori-plant="kategoriPlant"
+        report-type="chart"
       />
       <button class="tv-btn icon" title="Undo (Ctrl/Cmd+Z)" @click="drawingRef?.undo?.()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -194,7 +195,7 @@
       <div v-if="navMenuOpen" class="tv-nav-popup">
         <div class="tv-nav-header">
           <span>Apps</span>
-          <button @click="navMenuOpen = false">×</button>
+          <button @click="navMenuOpen = false">Ã—</button>
         </div>
         <div class="tv-nav-items">
           <a class="tv-nav-item" href="/" target="_blank" @click="navMenuOpen = false">
@@ -307,13 +308,14 @@
               <!-- Drawing Layer Overlay (canvas only, no toolbar) -->
             <DrawingLayer 
               v-if="pane.isMain"
-              ref="drawingRef" 
+              :ref="(el) => { if (el) drawingRef = el }"
               :height="pane.height" 
               :show-toolbar="false"
               :active-tool="activeDrawingTool"
               class="tv-drawing-overlay"
               :class="{ 'is-interactive': drawingOverlayInteractive, 'is-drawing-tool': activeDrawingTool !== 'select' }"
               @selection="onDrawingSelection"
+              @drawings-changed="onDrawingsChanged"
             />
             <!-- Resize Handle - only show if not the last pane -->
             <div
@@ -473,7 +475,7 @@
                   </svg>
                 </button>
                 <button class="tv-category-close" type="button" title="Close tab" @click.stop="closeCategoryTab(tab.id)">
-                  ×
+                  Ã—
                 </button>
                 <div
                   v-if="activeTabSettingsId === tab.id"
@@ -505,22 +507,22 @@
       <div class="tv-panel tv-object-tree" v-if="showObjectTree" :style="objectTreePanelStyle">
         <div class="tv-panel-header">
           <span>Drawing Objects</span>
-          <button class="tv-panel-close" @click="showObjectTree = false">×</button>
+          <button class="tv-panel-close" @click="showObjectTree = false">Ã—</button>
         </div>
         <div class="tv-panel-body">
           <div v-if="drawingRef" class="tv-object-list">
-            <div class="tv-object-empty" v-if="!drawingRef.drawings?.length">
+            <div class="tv-object-empty" v-if="drawingCount === 0">
               No drawings yet
             </div>
             <template v-else>
               <div 
-                v-for="(drawing, idx) in drawingRef.drawings" 
+                v-for="(drawing, idx) in drawingList" 
                 :key="idx"
                 class="tv-object-item"
               >
                 <span class="tv-object-color" :style="{ backgroundColor: drawing.color }"></span>
                 <span class="tv-object-name">{{ drawing.type }}</span>
-                <button class="tv-object-delete" @click="deleteDrawing(idx)">×</button>
+                <button class="tv-object-delete" @click="deleteDrawing(idx)">Ã—</button>
               </div>
             </template>
           </div>
@@ -531,7 +533,7 @@
       <div class="tv-panel tv-layers-panel" :class="{ 'is-shifted': showObjectTree }" v-if="showLayersPanel" :style="layersPanelStyle">
         <div class="tv-panel-header">
           <span>Layers</span>
-          <button class="tv-panel-close" @click="showLayersPanel = false">×</button>
+          <button class="tv-panel-close" @click="showLayersPanel = false">Ã—</button>
         </div>
         <div class="tv-panel-body">
           <div class="tv-layer-section">
@@ -542,20 +544,20 @@
                 :key="symbol"
                 class="tv-layer-item tv-layer-item-interactive"
               >
-              <span class="tv-layer-icon">📊</span>
+              <span class="tv-layer-icon">ðŸ“Š</span>
               <span class="tv-layer-name">{{ symbol }}</span>
-              <button class="tv-layer-delete" @click="removeSymbol(symbol)" title="Remove series">×</button>
+              <button class="tv-layer-delete" @click="removeSymbol(symbol)" title="Remove series">Ã—</button>
             </div>
           </div>
           <div class="tv-layer-section">
             <div class="tv-layer-title">Drawings</div>
             <div 
               class="tv-layer-item tv-layer-item-interactive" 
-              v-if="drawingRef?.drawings?.length"
+              v-if="drawingCount > 0"
               @click="clearDrawings"
             >
-              <span class="tv-layer-icon">✏️</span>
-              <span class="tv-layer-name">Drawing Layer ({{ drawingRef.drawings.length }} objects)</span>
+              <span class="tv-layer-icon">âœï¸</span>
+              <span class="tv-layer-name">Drawing Layer ({{ drawingCount }} objects)</span>
               <span class="tv-layer-action">Clear</span>
             </div>
             <div class="tv-layer-empty" v-else>No drawings</div>
@@ -585,7 +587,7 @@
             >
               <span class="tv-summary-dot" :style="{ backgroundColor: series.color }"></span>
               <span class="tv-summary-series-name">{{ getLegendName(series.symbol) }}</span>
-              <span class="tv-summary-series-metric">Σ {{ formatValue(series.total, series.unit) }} <span v-if="series.unit !== 'Rp'">{{ series.unit }}</span></span>
+              <span class="tv-summary-series-metric">Î£ {{ formatValue(series.total, series.unit) }} <span v-if="series.unit !== 'Rp'">{{ series.unit }}</span></span>
               <span class="tv-summary-series-metric">Terakhir {{ formatValue(series.latest, series.unit) }} <span v-if="series.unit !== 'Rp'">{{ series.unit }}</span></span>
               <span class="tv-summary-date">{{ series.latestDate || '' }}</span>
             </div>
@@ -603,7 +605,7 @@
       <!-- Right Sidebar: Drawing Properties (only when selected) -->
       <aside class="tv-sidebar tv-drawing-sidebar" v-if="selectedDrawing">
         <button class="tv-drawing-close" type="button" title="Close properties" @click="clearSelectedDrawing">
-          ×
+          Ã—
         </button>
         <div class="tv-drawing-prop">
           <div class="tv-drawing-label">Line</div>
@@ -672,7 +674,7 @@
     <div class="search-modal-panel" role="dialog" aria-modal="true" aria-label="Kode Data Search">
       <div class="search-modal-header">
         <div class="search-modal-title">Symbol Search</div>
-        <button type="button" class="search-modal-close" @click="closeSearchModal" aria-label="Close">×</button>
+        <button type="button" class="search-modal-close" @click="closeSearchModal" aria-label="Close">Ã—</button>
       </div>
       
       <!-- Search Input -->
@@ -845,8 +847,11 @@ function setDrawingTool(toolId: string) {
 }
 
 function clearDrawings() {
-  if (drawingRef.value) {
-    drawingRef.value.clearAll()
+  console.log('[ChartApp] clearDrawings called, drawingRef:', drawingRef)
+  if (drawingRef && typeof drawingRef?.clearAll === 'function') {
+    drawingRef?.clearAll()
+  } else {
+    console.warn('[ChartApp] clearAll not available on drawingRef')
   }
 }
 
@@ -882,13 +887,23 @@ function zoomAllOut() {
 function refreshAllCharts() {
   applyToCharts((chart) => chart.refresh?.())
 }
-const drawingRef = ref<InstanceType<typeof DrawingLayer> | null>(null)
+let drawingRef: InstanceType<typeof DrawingLayer> | null = null
 const selectedDrawing = ref<{ type: string; points: number[]; color: string; name?: string } | null>(null)
 const selectedDrawingIndex = ref<number | null>(null)
 const selectedDrawingName = ref('')
+
+// Computed properties for drawings to ensure reactivity
+const drawingList = computed(() => {
+  return drawingRef?.drawings || []
+})
+
+const drawingCount = computed(() => {
+  return drawingRef?.drawings?.length || 0
+})
+
 const drawingOverlayInteractive = computed(() => {
   if (activeDrawingTool.value !== 'select') return true
-  return (drawingRef.value?.drawings?.length || 0) > 0
+  return drawingCount.value > 0
 })
 
 // Panel visibility state
@@ -914,23 +929,10 @@ function getSymbolValue(symbol: string): number | undefined {
 
 // Delete drawing by index
 function deleteDrawing(idx: number) {
-  if (drawingRef.value?.drawings) {
-    drawingRef.value.pushHistory?.()
-    drawingRef.value.drawings.splice(idx, 1)
-    drawingRef.value.redraw?.()
-    if (selectedDrawingIndex.value !== null) {
-      if (!drawingRef.value.drawings.length) {
-        selectedDrawing.value = null
-        selectedDrawingIndex.value = null
-        selectedDrawingName.value = ''
-      } else if (idx === selectedDrawingIndex.value) {
-        selectedDrawing.value = null
-        selectedDrawingIndex.value = null
-        selectedDrawingName.value = ''
-      } else if (idx < selectedDrawingIndex.value) {
-        selectedDrawingIndex.value -= 1
-      }
-    }
+  if (drawingRef?.deleteDrawing) {
+    drawingRef?.deleteDrawing(idx)
+    // The drawingRef's deleteDrawing will emit drawingsChanged event
+    // which triggers onDrawingsChanged to update selection state
   }
 }
 
@@ -940,27 +942,43 @@ function onDrawingSelection(payload: { drawing: { type: string; points: number[]
   selectedDrawingName.value = payload?.drawing?.name || ''
 }
 
+// Handler for when drawings change (added/deleted)
+function onDrawingsChanged(count: number) {
+  console.log('Drawings changed, count:', count)
+  // If no drawings left, clear selection
+  if (count === 0) {
+    selectedDrawing.value = null
+    selectedDrawingIndex.value = null
+    selectedDrawingName.value = ''
+  } else if (selectedDrawingIndex.value !== null && selectedDrawingIndex.value >= count) {
+    // Selected index is now out of bounds, clear it
+    selectedDrawing.value = null
+    selectedDrawingIndex.value = null
+    selectedDrawingName.value = ''
+  }
+}
+
 function commitSelectedDrawingName() {
-  if (!drawingRef.value || !selectedDrawing.value) return
-  const drawings = drawingRef.value.drawings
+  if (!drawingRef || !selectedDrawing.value) return
+  const drawings = drawingRef?.drawings
   if (selectedDrawingIndex.value === null) return
   const matchIndex = selectedDrawingIndex.value
   const nextName = selectedDrawingName.value.trim()
-  drawingRef.value.pushHistory?.()
+  drawingRef?.pushHistory?.()
   drawings[matchIndex].name = nextName || undefined
   selectedDrawing.value = { ...drawings[matchIndex] }
-  drawingRef.value.redraw?.()
+  drawingRef?.redraw?.()
 }
 
 function updateSelectedDrawingColor(nextColor: string) {
-  if (!drawingRef.value || !selectedDrawing.value) return
+  if (!drawingRef || !selectedDrawing.value) return
   if (selectedDrawingIndex.value === null) return
-  const drawings = drawingRef.value.drawings
+  const drawings = drawingRef?.drawings
   const matchIndex = selectedDrawingIndex.value
-  drawingRef.value.pushHistory?.()
+  drawingRef?.pushHistory?.()
   drawings[matchIndex].color = nextColor
   selectedDrawing.value = { ...drawings[matchIndex] }
-  drawingRef.value.redraw?.()
+  drawingRef?.redraw?.()
 }
 
 function clearYAxisOverrides(tabId?: string) {
@@ -2198,17 +2216,17 @@ function handleGlobalShortcuts(event: KeyboardEvent) {
   const key = event.key.toLowerCase()
   if (key === 'z' && event.shiftKey) {
     event.preventDefault()
-    drawingRef.value?.redo?.()
+    drawingRef?.redo?.()
     return
   }
   if (key === 'z') {
     event.preventDefault()
-    drawingRef.value?.undo?.()
+    drawingRef?.undo?.()
     return
   }
   if (key === 'y') {
     event.preventDefault()
-    drawingRef.value?.redo?.()
+    drawingRef?.redo?.()
   }
 }
 

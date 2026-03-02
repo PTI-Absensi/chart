@@ -27,6 +27,7 @@
             :period-type="filters.periodType"
             :sumber-dana="filters.sumberDana"
             title="Laporan Pengadaan SGN"
+            report-type="dashboard"
           />
         </div>
       </div>

@@ -24,25 +24,32 @@ function isPdfAvailable() {
 /**
  * Generate PDF Report from Dashboard Data
  * POST /api/pdf/report
+ * Body: { title, period, filters, reportType: 'dashboard' | 'chart' }
  */
 router.post('/report', async (req, res) => {
   const { 
     title = 'Laporan Pengadaan SGN',
     period = { year: 2026, type: 'fiscal' },
-    filters = {}
+    filters = {},
+    reportType = 'dashboard'  // 'dashboard' or 'chart'
   } = req.body
 
   // Check if puppeteer is available
   if (!isPdfAvailable()) {
     console.log('[PDF] Puppeteer not available, using HTML fallback')
-    return generateHtmlFallback(res, title, period, filters)
+    return generateHtmlFallback(res, title, period, filters, reportType)
   }
 
   let browser = null
 
   try {
-    // Fetch data from database
-    const reportData = await fetchReportData(period, filters)
+    // Fetch data based on report type
+    let reportData
+    if (reportType === 'chart') {
+      reportData = await fetchChartReportData(period, filters)
+    } else {
+      reportData = await fetchReportData(period, filters)
+    }
 
     // Launch puppeteer
     browser = await puppeteer.launch({
@@ -58,18 +65,23 @@ router.post('/report', async (req, res) => {
 
     const page = await browser.newPage()
 
-    // Generate HTML content
-    const htmlContent = generateCorporateReportHTML(reportData, title, period)
+    // Generate HTML content based on report type
+    let htmlContent
+    if (reportType === 'chart') {
+      htmlContent = generateChartReportHTML(reportData, title, period)
+    } else {
+      htmlContent = generateCorporateReportHTML(reportData, title, period)
+    }
     
     await page.setContent(htmlContent, { 
       waitUntil: 'networkidle0',
       timeout: 30000 
     })
 
-    // Generate PDF with corporate styling
+    // Generate PDF
     const pdfBuffer = await page.pdf({
       format: 'A4',
-      landscape: true,
+      landscape: reportType === 'chart', // Chart needs landscape
       printBackground: true,
       margin: {
         top: '80px',
@@ -91,8 +103,21 @@ router.post('/report', async (req, res) => {
 
   } catch (error) {
     console.error('[PDF] Report generation error:', error)
-    // Fallback to HTML if PDF fails
-    return generateHtmlFallback(res, title, period, filters)
+    
+    if (res.headersSent) {
+      return
+    }
+    
+    try {
+      return generateHtmlFallback(res, title, period, filters, reportType)
+    } catch (fallbackError) {
+      console.error('[PDF] Fallback also failed:', fallbackError)
+      return res.status(500).json({
+        status: 'error',
+        message: 'PDF generation failed',
+        detail: error.message
+      })
+    }
   } finally {
     if (browser) {
       try {
@@ -123,6 +148,131 @@ async function generateHtmlFallback(res, title, period, filters) {
       detail: error.message
     })
   }
+}
+
+// Fetch chart time series data for Procurement Chart PDF
+async function fetchChartReportData(period, filters) {
+  const year = period.year || 2026
+  const periodType = period.type || 'fiscal'
+  
+  const data = {
+    period: `${year} (${periodType === 'fiscal' ? 'Tahun Anggaran' : 'Tahun Kalender'})`,
+    year,
+    summary: {
+      totalPR: 0,
+      totalPK: 0,
+      totalPP: 0,
+      totalSPPBJ: 0
+    },
+    timeSeries: [],
+    series: []
+  }
+
+  try {
+    // Build WHERE clause
+    let whereClause = 'WHERE period_year = $1 AND period_type = $2'
+    const params = [year, periodType]
+    if (filters.sumberDana) {
+      whereClause += ` AND sumber_dana = $${params.length + 1}`
+      params.push(filters.sumberDana)
+    }
+    if (filters.kategoriPlant) {
+      whereClause += ` AND kategori_plant = $${params.length + 1}`
+      params.push(filters.kategoriPlant)
+    }
+
+    // Fetch weekly time series data for PR, PK, PP, SPPBJ
+    const timeSeriesQuery = `
+      SELECT 
+        week_number,
+        week_start,
+        week_end,
+        kode_data,
+        SUM(count_doc) as total
+      FROM v_fact_doc_weekly_dense
+      ${whereClause}
+        AND kode_data IN ('A001', 'B001', 'D001', 'E001')
+      GROUP BY week_number, week_start, week_end, kode_data
+      ORDER BY week_number
+    `
+    
+    const timeSeriesResult = await query(timeSeriesQuery, params)
+    
+    // Group by week
+    const weekMap = new Map()
+    timeSeriesResult.rows.forEach(row => {
+      const weekNum = row.week_number
+      if (!weekMap.has(weekNum)) {
+        weekMap.set(weekNum, {
+          week: weekNum,
+          period: `${new Date(row.week_start).toLocaleDateString('id-ID')} - ${new Date(row.week_end).toLocaleDateString('id-ID')}`,
+          pr: 0,
+          pk: 0,
+          pp: 0,
+          sppbj: 0
+        })
+      }
+      const week = weekMap.get(weekNum)
+      const count = parseInt(row.total || 0)
+      
+      if (row.kode_data.startsWith('A')) week.pr += count
+      else if (row.kode_data.startsWith('B')) week.pk += count
+      else if (row.kode_data.startsWith('D')) week.pp += count
+      else if (row.kode_data.startsWith('E')) week.sppbj += count
+    })
+    
+    data.timeSeries = Array.from(weekMap.values())
+
+    // Calculate totals
+    data.summary.totalPR = data.timeSeries.reduce((sum, w) => sum + w.pr, 0)
+    data.summary.totalPK = data.timeSeries.reduce((sum, w) => sum + w.pk, 0)
+    data.summary.totalPP = data.timeSeries.reduce((sum, w) => sum + w.pp, 0)
+    data.summary.totalSPPBJ = data.timeSeries.reduce((sum, w) => sum + w.sppbj, 0)
+
+    // Series info
+    data.series = [
+      { code: 'A001', name: 'PR (Pengadaan)', color: '#3b82f6' },
+      { code: 'B001', name: 'PK (Paket Kegiatan)', color: '#10b981' },
+      { code: 'D001', name: 'PP (Pemilihan Penyedia)', color: '#f59e0b' },
+      { code: 'E001', name: 'SPPBJ', color: '#ef4444' }
+    ]
+
+  } catch (error) {
+    console.error('[PDF] Chart data query error:', error)
+    // Generate mock time series data
+    data.timeSeries = generateMockTimeSeries(year)
+    data.summary = {
+      totalPR: 622,
+      totalPK: 534,
+      totalPP: 276,
+      totalSPPBJ: 227
+    }
+    data.series = [
+      { code: 'A001', name: 'PR (Pengadaan)', color: '#3b82f6' },
+      { code: 'B001', name: 'PK (Paket Kegiatan)', color: '#10b981' },
+      { code: 'D001', name: 'PP (Pemilihan Penyedia)', color: '#f59e0b' },
+      { code: 'E001', name: 'SPPBJ', color: '#ef4444' }
+    ]
+  }
+
+  return data
+}
+
+function generateMockTimeSeries(year) {
+  const weeks = []
+  const baseValues = { pr: 15, pk: 12, pp: 8, sppbj: 6 }
+  
+  for (let i = 1; i <= 52; i++) {
+    weeks.push({
+      week: i,
+      period: `Minggu ${i}`,
+      pr: Math.floor(baseValues.pr + Math.random() * 20),
+      pk: Math.floor(baseValues.pk + Math.random() * 15),
+      pp: Math.floor(baseValues.pp + Math.random() * 10),
+      sppbj: Math.floor(baseValues.sppbj + Math.random() * 8)
+    })
+  }
+  return weeks
 }
 
 // Fetch report data from database
@@ -294,6 +444,251 @@ function generateMockPlants() {
     nilai_realisasi: p.nilai || 0,
     saving_percent: Math.random() * 10
   }))
+}
+
+// Helper: Generate Chart Time Series Report HTML
+function generateChartReportHTML(data, title, period) {
+  const styles = `
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body {
+        font-family: 'Segoe UI', Arial, sans-serif;
+        font-size: 9px;
+        line-height: 1.4;
+        color: #2d3748;
+        padding: 15px;
+        background: #f8fafc;
+      }
+      .header {
+        text-align: center;
+        margin-bottom: 20px;
+        padding: 15px;
+        background: white;
+        border-radius: 8px;
+        border-bottom: 3px solid #1a365d;
+      }
+      .company-name {
+        font-size: 18px;
+        font-weight: bold;
+        color: #1a365d;
+        margin-bottom: 4px;
+      }
+      .report-title {
+        font-size: 14px;
+        font-weight: bold;
+        color: #2d3748;
+        margin-bottom: 6px;
+      }
+      .meta {
+        font-size: 9px;
+        color: #718096;
+      }
+      .section {
+        margin-bottom: 15px;
+        background: white;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      }
+      .section-title {
+        font-size: 12px;
+        font-weight: bold;
+        color: #1a365d;
+        margin-bottom: 12px;
+        padding-bottom: 6px;
+        border-bottom: 2px solid #e2e8f0;
+      }
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        margin-bottom: 15px;
+      }
+      .summary-box {
+        background: linear-gradient(135deg, #1a365d 0%, #2c5282 100%);
+        color: white;
+        padding: 12px;
+        border-radius: 6px;
+        text-align: center;
+      }
+      .summary-value {
+        font-size: 18px;
+        font-weight: bold;
+        margin-bottom: 2px;
+      }
+      .summary-label {
+        font-size: 8px;
+        opacity: 0.9;
+        text-transform: uppercase;
+      }
+      .series-legend {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 15px;
+        flex-wrap: wrap;
+      }
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .legend-color {
+        width: 12px;
+        height: 12px;
+        border-radius: 3px;
+      }
+      .legend-text {
+        font-size: 9px;
+        font-weight: 600;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 8px;
+      }
+      th {
+        background: #1a365d;
+        color: white;
+        padding: 8px;
+        font-size: 8px;
+        font-weight: bold;
+        text-align: center;
+        position: sticky;
+        top: 0;
+      }
+      td {
+        padding: 6px 8px;
+        border-bottom: 1px solid #e2e8f0;
+        text-align: center;
+      }
+      tr:nth-child(even) {
+        background: #f8fafc;
+      }
+      .text-right { text-align: right; }
+      .total-row {
+        background: #1e293b !important;
+        color: white;
+        font-weight: bold;
+      }
+      .page-break {
+        page-break-after: always;
+      }
+      .chart-desc {
+        font-size: 9px;
+        color: #64748b;
+        margin-top: 10px;
+        font-style: italic;
+      }
+    </style>
+  `
+
+  // Summary boxes
+  const summaryHtml = `
+    <div class="summary-grid">
+      <div class="summary-box">
+        <div class="summary-value">${formatNumber(data.summary.totalPR)}</div>
+        <div class="summary-label">Total PR</div>
+      </div>
+      <div class="summary-box">
+        <div class="summary-value">${formatNumber(data.summary.totalPK)}</div>
+        <div class="summary-label">Total PK</div>
+      </div>
+      <div class="summary-box">
+        <div class="summary-value">${formatNumber(data.summary.totalPP)}</div>
+        <div class="summary-label">Total PP</div>
+      </div>
+      <div class="summary-box">
+        <div class="summary-value">${formatNumber(data.summary.totalSPPBJ)}</div>
+        <div class="summary-label">Total SPPBJ</div>
+      </div>
+    </div>
+  `
+
+  // Series legend
+  const legendHtml = `
+    <div class="series-legend">
+      ${data.series.map(s => `
+        <div class="legend-item">
+          <div class="legend-color" style="background-color: ${s.color}"></div>
+          <span class="legend-text">${s.name}</span>
+        </div>
+      `).join('')}
+    </div>
+  `
+
+  // Time series table
+  const tableRows = data.timeSeries.map((week, idx) => `
+    <tr>
+      <td>${week.week}</td>
+      <td class="text-right">${formatNumber(week.pr)}</td>
+      <td class="text-right">${formatNumber(week.pk)}</td>
+      <td class="text-right">${formatNumber(week.pp)}</td>
+      <td class="text-right">${formatNumber(week.sppbj)}</td>
+      <td class="text-right">${formatNumber(week.pr + week.pk + week.pp + week.sppbj)}</td>
+    </tr>
+  `).join('')
+
+  const content = `
+    <div class="header">
+      <div class="company-name">PT. SURYA GANDA NUSANTARA</div>
+      <div class="report-title">${title}</div>
+      <div class="meta">
+        Periode: ${data.period} | Generated: ${new Date().toLocaleString('id-ID')}
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Ringkasan Total Dokumen</div>
+      ${summaryHtml}
+    </div>
+
+    <div class="section">
+      <div class="section-title">Data Time Series (Mingguan)</div>
+      ${legendHtml}
+      <table>
+        <thead>
+          <tr>
+            <th>Minggu</th>
+            <th class="text-right">PR</th>
+            <th class="text-right">PK</th>
+            <th class="text-right">PP</th>
+            <th class="text-right">SPPBJ</th>
+            <th class="text-right">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tableRows}
+        </tbody>
+        <tfoot>
+          <tr class="total-row">
+            <td><strong>TOTAL</strong></td>
+            <td class="text-right"><strong>${formatNumber(data.summary.totalPR)}</strong></td>
+            <td class="text-right"><strong>${formatNumber(data.summary.totalPK)}</strong></td>
+            <td class="text-right"><strong>${formatNumber(data.summary.totalPP)}</strong></td>
+            <td class="text-right"><strong>${formatNumber(data.summary.totalSPPBJ)}</strong></td>
+            <td class="text-right"><strong>${formatNumber(data.summary.totalPR + data.summary.totalPK + data.summary.totalPP + data.summary.totalSPPBJ)}</strong></td>
+          </tr>
+        </tfoot>
+      </table>
+      <p class="chart-desc">
+        * Data menunjukkan jumlah dokumen pengadaan per minggu untuk periode ${data.period}.
+      </p>
+    </div>
+  `
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <title>${title}</title>
+      ${styles}
+    </head>
+    <body>
+      ${content}
+    </body>
+    </html>
+  `
 }
 
 // Helper: Generate HTML report

@@ -64,7 +64,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed, nextTick } from 'vue'
 
 // Props
 const props = withDefaults(defineProps<{
@@ -90,6 +90,7 @@ let ctx: CanvasRenderingContext2D | null = null
 // Emits
 const emit = defineEmits<{
   (e: 'selection', payload: { drawing: { type: string; points: number[]; color: string; name?: string }; index: number } | null): void
+  (e: 'drawingsChanged', count: number): void
 }>()
 
 // State - use prop if provided, otherwise local state
@@ -265,6 +266,7 @@ function handleMouseUp(e: MouseEvent) {
   redraw()
 
   console.log('Drawing added, total:', drawings.value.length)
+  emit('drawingsChanged', drawings.value.length)
 }
 
 function getNextLineName() {
@@ -356,7 +358,8 @@ function setTool(toolId: string) {
 }
 
 // Clear all drawings
-function clearAll() {
+const clearAll = () => {
+  console.log('[DrawingLayer] clearAll called')
   if (drawings.value.length) {
     pushHistory()
   }
@@ -364,7 +367,8 @@ function clearAll() {
   selectedIndex.value = null
   emitSelection()
   redraw()
-  console.log('Canvas cleared')
+  emit('drawingsChanged', 0)
+  console.log('[DrawingLayer] Canvas cleared')
 }
 
 function pushHistory() {
@@ -456,15 +460,42 @@ onUnmounted(() => {
   }
 })
 
+// Drawing list getter for parent component
+const getDrawings = () => drawings.value
+const getDrawingCount = () => drawings.value.length
+
+// Delete drawing by index
+function deleteDrawing(idx: number) {
+  if (idx >= 0 && idx < drawings.value.length) {
+    pushHistory()
+    drawings.value.splice(idx, 1)
+    if (selectedIndex.value === idx) {
+      selectedIndex.value = null
+      emitSelection()
+    } else if (selectedIndex.value !== null && selectedIndex.value > idx) {
+      selectedIndex.value--
+    }
+    nextTick(() => {
+      redraw()
+      emit('drawingsChanged', drawings.value.length)
+    })
+    return true
+  }
+  return false
+}
+
 // Expose methods and state
 defineExpose({
   clearAll,
   setTool,
   drawings,
+  getDrawings,
+  getDrawingCount,
   redraw,
   pushHistory,
   undo,
-  redo
+  redo,
+  deleteDrawing
 })
 </script>
 
