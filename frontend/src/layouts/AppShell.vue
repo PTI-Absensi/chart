@@ -8,7 +8,7 @@
       @toggle="navCollapsed = !navCollapsed"
       @theme="toggleTheme"
     />
-    <div class="page" :class="{ 'page-fullwidth': isChartingPage }">
+    <div class="page" :class="{ 'page-fullwidth': isFullWidth }">
       <slot />
     </div>
   </div>
@@ -25,8 +25,10 @@ const route = useRoute()
 const theme = ref<Theme>('dark')
 const navCollapsed = ref(false)
 
-// Check if current route is the charting page
+// Only hide sidebar for the main charting page (has its own embedded tools)
 const isChartingPage = computed(() => route.path === '/')
+// Remove outer page gutter for pages that manage their own padding
+const isFullWidth = computed(() => route.path === '/' || route.path === '/dashboard-report')
 
 const toggleTheme = () => {
   theme.value = theme.value === 'dark' ? 'light' : 'dark'

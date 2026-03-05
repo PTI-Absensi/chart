@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 :root {
   --bg: #f5f7fa;
   --bg-2: #e8ecf0;
@@ -81,185 +83,142 @@ body {
   min-height: 100vh;
 }
 
+/* ═══════════════════════════════════════
+   Paperpillar Icon-Only Sidebar
+   ═══════════════════════════════════════ */
 .side-nav {
   position: sticky;
   top: 0;
   height: 100vh;
-  width: 260px;
-  background: linear-gradient(180deg, var(--nav-bg), var(--nav-bg-2));
-  color: var(--nav-text);
+  width: 68px;
   display: flex;
   flex-direction: column;
-  padding: 14px 10px;
-  gap: 12px;
-  box-shadow: 0 0 0 1px var(--nav-border);
-  overflow: hidden;
-  transition: width 220ms ease;
-}
-
-.side-nav.is-collapsed {
-  width: 72px;
-}
-
-.side-nav-header {
-  display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 4px 6px;
+  padding: 16px 8px;
+  gap: 4px;
+  z-index: 10;
+  background: var(--nav-bg);
 }
 
-.side-nav-toggle {
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
-  border: 1px solid var(--nav-border);
-  background: var(--nav-surface);
-  color: var(--nav-text);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: transform 120ms ease, background 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
-}
-
-.side-nav-toggle:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 16px rgba(15, 46, 35, 0.12);
-  border-color: color-mix(in srgb, var(--accent) 40%, var(--nav-border));
-}
-
-.side-nav-toggle:active {
-  transform: translateY(0) scale(0.98);
-  box-shadow: none;
-}
-
-.side-nav-toggle:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
-  outline-offset: 2px;
-}
-
-.side-nav-title {
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  font-size: 0.75rem;
-  color: var(--nav-muted);
-}
-
-.side-nav-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.side-nav-label {
-  padding: 8px 12px;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.2em;
-  color: var(--nav-muted);
-}
-
-.side-nav-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  color: var(--nav-text);
-  text-decoration: none;
+/* ── Theme toggle button (top) ── */
+.sn-theme-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  border: none;
   background: transparent;
-  position: relative;
-  transition: transform 160ms ease, background 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
-}
-
-.side-nav-item:hover {
-  background: rgba(15, 118, 110, 0.12);
-  transform: translateY(-1px);
-  box-shadow: 0 8px 16px rgba(15, 46, 35, 0.12);
-}
-
-.side-nav-item.is-active {
-  background: var(--nav-active);
-  box-shadow: inset 0 0 0 1px var(--nav-border);
-}
-
-.side-nav-item:active {
-  transform: translateY(0) scale(0.99);
-}
-
-.side-nav-item:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
-  outline-offset: 2px;
-}
-
-.side-nav-icon {
-  width: 32px;
-  height: 32px;
-  display: inline-flex;
+  color: var(--nav-text);
+  display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
-  background: rgba(15, 118, 110, 0.12);
-  font-size: 1rem;
+  cursor: pointer;
+  margin-bottom: 12px;
+  transition: background 0.15s, color 0.15s;
 }
 
-.side-nav.is-collapsed .side-nav-title,
-.side-nav.is-collapsed .side-nav-text,
-.side-nav.is-collapsed .side-nav-label {
-  display: none;
+.sn-theme-btn:hover {
+  background: var(--nav-active);
 }
 
-.side-nav.is-collapsed .side-nav-item {
-  justify-content: center;
-}
-
-.side-nav .side-nav-title,
-.side-nav .side-nav-text,
-.side-nav .side-nav-label {
-  transition: opacity 160ms ease;
-}
-
-.side-nav.is-collapsed .side-nav-title,
-.side-nav.is-collapsed .side-nav-text,
-.side-nav.is-collapsed .side-nav-label {
-  opacity: 0;
-}
-
-.side-nav.is-collapsed .side-nav-header {
+/* ── Navigation links pill container ── */
+.sn-links {
+  background: var(--nav-bg);
+  border-radius: 999px;
+  padding: 8px;
+  display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-}
-
-.side-nav.is-collapsed .theme-toggle {
-  margin-left: 0;
-  width: 36px;
-  padding: 0;
-  justify-content: center;
-}
-
-.theme-toggle {
-  margin-left: auto;
-  height: 36px;
-  border-radius: 12px;
+  gap: 2px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
   border: 1px solid var(--nav-border);
-  background: var(--nav-surface);
-  color: var(--nav-text);
-  display: inline-flex;
+}
+
+body[data-theme="dark"] .sn-links {
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* ── Individual nav link ── */
+.sn-link {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 10px;
+  justify-content: center;
+  color: var(--nav-muted);
+  text-decoration: none;
+  border: none;
+  background: transparent;
   cursor: pointer;
+  transition: background 0.18s, color 0.18s, transform 0.12s;
+  position: relative;
 }
 
-.theme-toggle svg {
-  width: 16px;
-  height: 16px;
+.sn-link svg {
+  width: 20px;
+  height: 20px;
 }
 
-.side-nav.is-collapsed .theme-toggle span {
-  display: none;
+.sn-link:hover {
+  color: var(--nav-text);
+  background: var(--nav-active);
+  transform: scale(1.05);
+}
+
+.sn-link.is-active {
+  background: var(--ink);
+  color: var(--surface);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+body[data-theme="dark"] .sn-link.is-active {
+  background: #e8ece8;
+  color: #1a1d1a;
+}
+
+/* ── Divider ── */
+.sn-divider {
+  width: 24px;
+  height: 1px;
+  background: var(--nav-border);
+  margin: 6px 0;
+}
+
+/* ── Bottom section ── */
+.sn-bottom {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.sn-logout {
+  color: var(--nav-muted);
+}
+
+.sn-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #a88b61, #5b7553);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  margin-top: 8px;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+
+.sn-avatar:hover {
+  transform: scale(1.08);
+}
+
+/* ── Collapsed state ── */
+.side-nav.is-collapsed {
+  width: 68px;
 }
 
 body[data-theme="dark"] .page::before {

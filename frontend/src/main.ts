@@ -4,6 +4,7 @@ import VueApexCharts from 'vue3-apexcharts'
 import App from './App.vue'
 import routes from './router'
 import './styles/app.css'
+import './styles/dashboard-modern.css'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
