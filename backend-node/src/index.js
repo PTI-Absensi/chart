@@ -222,10 +222,13 @@ app.get('/api/procurement/plants', authMiddleware, async (_req, res) => {
 })
 
 // Dashboard Summary Endpoint
-app.get('/api/dashboard/summary', authMiddleware, async (req, res) => {
+// Dashboard summary - public endpoint (no auth required for viewing)
+app.get('/api/dashboard/summary', async (req, res) => {
   const year = Number(req.query.year || new Date().getFullYear())
   const periodType = String(req.query.period_type || 'calendar')
   const sumberDana = req.query.sumber_dana ? String(req.query.sumber_dana) : null
+
+  console.log(`[Dashboard] Request: year=${year}, periodType=${periodType}, sumberDana=${sumberDana}`)
 
   try {
     // Build WHERE clause
@@ -235,6 +238,11 @@ app.get('/api/dashboard/summary', authMiddleware, async (req, res) => {
       whereClause += ` AND sumber_dana = $${params.length + 1}`
       params.push(sumberDana)
     }
+
+    // Debug: Check data distribution per year
+    const debugQuery = `SELECT period_year, COUNT(*) as rows, SUM(count_doc) as total_docs FROM v_fact_doc_weekly_dense WHERE period_type = $1 AND kode_data LIKE 'A%' GROUP BY period_year ORDER BY period_year`
+    const debugResult = await query(debugQuery, [periodType])
+    console.log('[Dashboard] PR Data per year:', debugResult.rows)
 
     // Fetch PR count (A codes)
     const prQuery = `SELECT COALESCE(SUM(count_doc), 0) as total FROM v_fact_doc_weekly_dense ${whereClause} AND kode_data LIKE 'A%'`
@@ -313,6 +321,26 @@ app.get('/api/dashboard/summary', authMiddleware, async (req, res) => {
     // Calculate average saving
     const avgSaving = plants.reduce((sum, p) => sum + (p.saving_percent || 0), 0) / plants.length
 
+    // Fetch realisasi time series (monthly)
+    const realisasiQuery = `
+      SELECT 
+        EXTRACT(MONTH FROM week_start) as month,
+        SUM(CASE WHEN kode_data LIKE 'B%' THEN count_doc END) as pk_count,
+        SUM(CASE WHEN kode_data LIKE 'E%' THEN count_doc END) as sppbj_count
+      FROM v_fact_doc_weekly_dense
+      WHERE period_year = $1 AND period_type = $2
+      GROUP BY EXTRACT(MONTH FROM week_start)
+      ORDER BY month
+    `
+    const realisasiResult = await query(realisasiQuery, [year, periodType])
+    const realisasi = realisasiResult.rows.map(r => ({
+      month: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Des'][Math.floor(r.month) - 1],
+      realisasi: parseInt(r.sppbj_count || 0),
+      pk: parseInt(r.pk_count || 0)
+    }))
+
+    console.log(`[Dashboard] Success: PR=${totalPR}, PK=${totalPK}, PP=${totalPP}, Nilai=${totalNilai}, Plants=${plants.length}, Realisasi=${realisasi.length} months`)
+
     res.json({
       status: 'success',
       data: {
@@ -332,6 +360,7 @@ app.get('/api/dashboard/summary', authMiddleware, async (req, res) => {
         savings,
         metodePemilihan,
         plants,
+        realisasi,
         lastUpdate: new Date().toLocaleString('id-ID')
       }
     })
