@@ -130,6 +130,107 @@ router.post('/report', async (req, res) => {
 })
 
 /**
+ * Capture Dashboard Screenshot as PDF
+ * POST /api/pdf/dashboard
+ * Body: { url, filters, title }
+ */
+router.post('/dashboard', async (req, res) => {
+  const { 
+    url = 'http://localhost:5173',
+    filters = {},
+    title = 'Dashboard Procurement Report'
+  } = req.body
+
+  // Check if puppeteer is available
+  if (!isPdfAvailable()) {
+    console.log('[PDF] Puppeteer not available for dashboard capture')
+    return res.status(503).json({
+      status: 'error',
+      message: 'Dashboard capture requires Puppeteer. Please install Chrome or use Export PDF instead.'
+    })
+  }
+
+  let browser = null
+
+  try {
+    // Launch puppeteer
+    browser = await puppeteer.launch({
+      headless: 'new',
+      args: [
+        '--no-sandbox', 
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--disable-gpu'
+      ]
+    })
+
+    const page = await browser.newPage()
+    
+    // Set viewport to capture full dashboard
+    await page.setViewport({
+      width: 1920,
+      height: 1080,
+      deviceScaleFactor: 2
+    })
+
+    // Navigate to the URL
+    const targetUrl = `${url}/dashboard-report?year=${filters.year || 2026}&periodType=${filters.periodType || 'fiscal'}&sumberDana=${filters.sumberDana || ''}&kategoriPlant=${filters.kategoriPlant || ''}&capture=true`
+    
+    console.log('[PDF] Capturing dashboard at:', targetUrl)
+    
+    await page.goto(targetUrl, { 
+      waitUntil: 'networkidle0',
+      timeout: 60000 
+    })
+
+    // Wait for charts to render
+    await page.waitForTimeout(3000)
+
+    // Generate PDF
+    const pdfBuffer = await page.pdf({
+      format: 'A4',
+      landscape: true,
+      printBackground: true,
+      margin: {
+        top: '40px',
+        right: '30px',
+        bottom: '40px',
+        left: '30px'
+      }
+    })
+
+    // Set response headers
+    res.setHeader('Content-Type', 'application/pdf')
+    res.setHeader('Content-Disposition', `attachment; filename="Dashboard_Capture_${new Date().toISOString().split('T')[0]}.pdf"`)
+    res.setHeader('Content-Length', pdfBuffer.length)
+
+    res.send(pdfBuffer)
+
+  } catch (error) {
+    console.error('[PDF] Dashboard capture error:', error)
+    
+    if (res.headersSent) {
+      return
+    }
+    
+    res.status(500).json({
+      status: 'error',
+      message: 'Dashboard capture failed',
+      detail: error.message
+    })
+  } finally {
+    if (browser) {
+      try {
+        await browser.close()
+      } catch (e) {
+        console.warn('[PDF] Error closing browser:', e.message)
+      }
+    }
+  }
+})
+
+/**
  * Generate HTML fallback when PDF is not available
  */
 async function generateHtmlFallback(res, title, period, filters) {

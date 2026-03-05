@@ -35,13 +35,23 @@
             <option value="BUMN">BUMN</option>
           </select>
           <!-- Export Buttons -->
-          <button class="pp-pg-btn bg-[#b91c1c] text-white" @click="exportPDF">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-            Export Report PDF
+          <button 
+            class="pp-pg-btn bg-[#b91c1c] text-white disabled:opacity-50 disabled:cursor-not-allowed" 
+            @click="exportPDF"
+            :disabled="isExporting"
+          >
+            <svg v-if="!isExporting" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <svg v-else class="animate-spin" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" stroke-dasharray="60" stroke-dashoffset="20"/></svg>
+            {{ isExporting ? 'Generating...' : 'Export Report PDF' }}
           </button>
-          <button class="pp-pg-btn bg-[#1e3a2f] text-white" @click="captureDashboard">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-            Capture Dashboard
+          <button 
+            class="pp-pg-btn bg-[#1e3a2f] text-white disabled:opacity-50 disabled:cursor-not-allowed" 
+            @click="captureDashboard"
+            :disabled="isExporting"
+          >
+            <svg v-if="!isExporting" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            <svg v-else class="animate-spin" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" stroke-dasharray="60" stroke-dashoffset="20"/></svg>
+            {{ isExporting ? 'Capturing...' : 'Capture Dashboard' }}
           </button>
         </div>
       </div>
@@ -377,9 +387,101 @@ const donutOptions = computed(() => ({
   tooltip: { theme: currentTheme.value }
 }))
 
-// ── Export stubs ──
-function exportPDF() { console.log('Export PDF') }
-function captureDashboard() { console.log('Capture Dashboard') }
+// ── Export Functions ──
+const isExporting = ref(false)
+
+async function exportPDF() {
+  if (isExporting.value) return
+  isExporting.value = true
+  
+  try {
+    const response = await fetch('/api/pdf/report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: 'Laporan Pengadaan SGN',
+        period: { year: filters.year, type: filters.periodType },
+        filters: {
+          sumberDana: filters.sumberDana || undefined,
+          kategoriPlant: filters.plant !== 'All' ? filters.plant : undefined
+        },
+        reportType: 'dashboard'
+      })
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(errorText || `HTTP ${response.status}`)
+    }
+
+    const blob = await response.blob()
+    if (blob.type.includes('html') || blob.size < 100) {
+      throw new Error('Server returned invalid PDF')
+    }
+    
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `Laporan_Pengadaan_${filters.year}_${new Date().toISOString().split('T')[0]}.pdf`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+
+  } catch (error) {
+    console.error('PDF export error:', error)
+    alert('Gagal export PDF: ' + (error as Error).message)
+  } finally {
+    isExporting.value = false
+  }
+}
+
+async function captureDashboard() {
+  if (isExporting.value) return
+  isExporting.value = true
+  
+  try {
+    const response = await fetch('/api/pdf/dashboard', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url: window.location.origin,
+        filters: {
+          year: filters.year,
+          periodType: filters.periodType,
+          sumberDana: filters.sumberDana,
+          kategoriPlant: filters.plant !== 'All' ? filters.plant : undefined
+        },
+        title: 'Dashboard Procurement Report'
+      })
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(errorText || `HTTP ${response.status}`)
+    }
+
+    const blob = await response.blob()
+    if (blob.type.includes('html') || blob.size < 100) {
+      throw new Error('Server returned invalid PDF. Puppeteer may not be installed.')
+    }
+    
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `Dashboard_Procurement_${new Date().toISOString().split('T')[0]}.pdf`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+
+  } catch (error) {
+    console.error('Dashboard capture error:', error)
+    alert('Gagal capture dashboard: ' + (error as Error).message)
+  } finally {
+    isExporting.value = false
+  }
+}
 </script>
 
 <style scoped>
