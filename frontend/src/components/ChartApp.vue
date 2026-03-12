@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <!-- Compact TradingView-style Header -->
   <header class="tv-header">
     <div class="tv-header-left">
@@ -73,7 +73,7 @@
         
         <!-- Mode Buttons -->
         <button :class="['tv-btn', { active: rawMode }]" @click="rawMode = !rawMode" title="Raw data">Raw</button>
-        <button :class="['tv-btn', { active: cumulative }]" @click="cumulative = !cumulative" title="Kumulatif">Î£</button>
+        <button :class="['tv-btn', { active: cumulative }]" @click="cumulative = !cumulative" title="Kumulatif">Σ</button>
         <button :class="['tv-btn', { active: singleScale }]" @click="singleScale = !singleScale" title="Single Y scale">1 Skala</button>
         <button class="tv-btn" @click="scaleSide = scaleSide === 'left' ? 'right' : 'left'" title="Posisi Skala">
           {{ scaleSide === 'left' ? 'Skala Kiri' : 'Skala Kanan' }}
@@ -195,7 +195,7 @@
       <div v-if="navMenuOpen" class="tv-nav-popup">
         <div class="tv-nav-header">
           <span>Apps</span>
-          <button @click="navMenuOpen = false">Ã—</button>
+          <button @click="navMenuOpen = false">?</button>
         </div>
         <div class="tv-nav-items">
           <a class="tv-nav-item" href="/" target="_blank" @click="navMenuOpen = false">
@@ -475,7 +475,7 @@
                   </svg>
                 </button>
                 <button class="tv-category-close" type="button" title="Close tab" @click.stop="closeCategoryTab(tab.id)">
-                  Ã—
+                  ?
                 </button>
                 <div
                   v-if="activeTabSettingsId === tab.id"
@@ -507,7 +507,7 @@
       <div class="tv-panel tv-object-tree" v-if="showObjectTree" :style="objectTreePanelStyle">
         <div class="tv-panel-header">
           <span>Drawing Objects</span>
-          <button class="tv-panel-close" @click="showObjectTree = false">Ã—</button>
+          <button class="tv-panel-close" @click="showObjectTree = false">?</button>
         </div>
         <div class="tv-panel-body">
           <div v-if="drawingRef" class="tv-object-list">
@@ -522,7 +522,7 @@
               >
                 <span class="tv-object-color" :style="{ backgroundColor: drawing.color }"></span>
                 <span class="tv-object-name">{{ drawing.type }}</span>
-                <button class="tv-object-delete" @click="deleteDrawing(idx)">Ã—</button>
+                <button class="tv-object-delete" @click="deleteDrawing(idx)">?</button>
               </div>
             </template>
           </div>
@@ -533,7 +533,7 @@
       <div class="tv-panel tv-layers-panel" :class="{ 'is-shifted': showObjectTree }" v-if="showLayersPanel" :style="layersPanelStyle">
         <div class="tv-panel-header">
           <span>Layers</span>
-          <button class="tv-panel-close" @click="showLayersPanel = false">Ã—</button>
+          <button class="tv-panel-close" @click="showLayersPanel = false">?</button>
         </div>
         <div class="tv-panel-body">
           <div class="tv-layer-section">
@@ -544,9 +544,9 @@
                 :key="symbol"
                 class="tv-layer-item tv-layer-item-interactive"
               >
-              <span class="tv-layer-icon">ðŸ“Š</span>
+              <span class="tv-layer-icon">📊</span>
               <span class="tv-layer-name">{{ symbol }}</span>
-              <button class="tv-layer-delete" @click="removeSymbol(symbol)" title="Remove series">Ã—</button>
+              <button class="tv-layer-delete" @click="removeSymbol(symbol)" title="Remove series">?</button>
             </div>
           </div>
           <div class="tv-layer-section">
@@ -556,7 +556,7 @@
               v-if="drawingCount > 0"
               @click="clearDrawings"
             >
-              <span class="tv-layer-icon">âœï¸</span>
+              <span class="tv-layer-icon">✏️</span>
               <span class="tv-layer-name">Drawing Layer ({{ drawingCount }} objects)</span>
               <span class="tv-layer-action">Clear</span>
             </div>
@@ -587,7 +587,7 @@
             >
               <span class="tv-summary-dot" :style="{ backgroundColor: series.color }"></span>
               <span class="tv-summary-series-name">{{ getLegendName(series.symbol) }}</span>
-              <span class="tv-summary-series-metric">Î£ {{ formatValue(series.total, series.unit) }} <span v-if="series.unit !== 'Rp'">{{ series.unit }}</span></span>
+              <span class="tv-summary-series-metric">Σ {{ formatValue(series.total, series.unit) }} <span v-if="series.unit !== 'Rp'">{{ series.unit }}</span></span>
               <span class="tv-summary-series-metric">Terakhir {{ formatValue(series.latest, series.unit) }} <span v-if="series.unit !== 'Rp'">{{ series.unit }}</span></span>
               <span class="tv-summary-date">{{ series.latestDate || '' }}</span>
             </div>
@@ -605,7 +605,7 @@
       <!-- Right Sidebar: Drawing Properties (only when selected) -->
       <aside class="tv-sidebar tv-drawing-sidebar" v-if="selectedDrawing">
         <button class="tv-drawing-close" type="button" title="Close properties" @click="clearSelectedDrawing">
-          Ã—
+          ?
         </button>
         <div class="tv-drawing-prop">
           <div class="tv-drawing-label">Line</div>
@@ -674,7 +674,7 @@
     <div class="search-modal-panel" role="dialog" aria-modal="true" aria-label="Kode Data Search">
       <div class="search-modal-header">
         <div class="search-modal-title">Symbol Search</div>
-        <button type="button" class="search-modal-close" @click="closeSearchModal" aria-label="Close">Ã—</button>
+        <button type="button" class="search-modal-close" @click="closeSearchModal" aria-label="Close">?</button>
       </div>
       
       <!-- Search Input -->
@@ -2348,11 +2348,14 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   height: 40px;
-  padding: 0 12px;
+  min-height: 40px;
+  padding: 0 10px;
+  flex-shrink: 0;
   background: var(--surface);
   border-bottom: 1px solid var(--stroke);
   position: relative;
-  z-index: 1000;  /* Very high z-index to ensure clickability above ALL chart elements */
+  z-index: 1000;
+  font-size: 13px;
 }
 
 .tv-header-left,
@@ -2360,19 +2363,49 @@ onUnmounted(() => {
 .tv-header-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.tv-header-left {
+  flex: 0 0 auto;
 }
 
 .tv-header-center {
-  flex: 1;
-  justify-content: center;
+  flex: 1 1 auto;
+  justify-content: flex-start;
   min-width: 0;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin-left: 30px;
+}
+
+.tv-header-center::-webkit-scrollbar {
+  display: none;
+}
+
+.tv-header-right {
+  flex: 0 0 auto;
+}
+
+.tv-logo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.tv-logo svg {
+  flex-shrink: 0;
 }
 
 .tv-btn-group-wrap {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .tv-dropdown {
@@ -2384,10 +2417,13 @@ onUnmounted(() => {
 .tv-btn.tv-dropdown-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   background: var(--surface-alt);
   border: 1px solid var(--stroke);
   color: var(--ink);
+  padding: 4px 8px;
+  height: 26px;
+  font-size: 12px;
 }
 
 .tv-btn.tv-dropdown-btn:hover {
@@ -2754,24 +2790,33 @@ onUnmounted(() => {
 
 /* Buttons & Controls */
 .tv-btn {
-  padding: 4px 10px;
+  padding: 5px 10px;
   background: transparent;
   border: none;
   color: var(--muted);
-  font-size: 0.8rem;
+  font-size: 12px;
   cursor: pointer;
   border-radius: 4px;
   transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  line-height: 1;
+}
+
+.tv-header .tv-btn {
+  padding: 4px 8px;
+  height: 26px;
+  font-size: 12px;
 }
 
 .tv-header .tv-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+  background: var(--hover);
 }
 
 .tv-header .tv-btn:active {
   transform: translateY(0);
-  box-shadow: none;
 }
 
 .tv-btn:hover {
