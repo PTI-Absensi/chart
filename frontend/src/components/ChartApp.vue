@@ -3,120 +3,227 @@
   <header class="tv-header">
     <div class="tv-header-left">
       <div class="tv-logo">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-          <path d="M3 17L9 11L13 15L21 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M17 7H21V11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        <span class="tv-title">Procurement</span>
+        <span class="tv-title">Charting</span>
       </div>
-      
-      
     </div>
     
     <div class="tv-header-center">
-      <!-- Period Type -->
-      <div class="tv-btn-group-wrap">
-        <div class="tv-dropdown" ref="periodDropdownRef">
-          <button
-            type="button"
-            class="tv-btn tv-dropdown-btn"
-            :class="{ 'is-open': periodMenuOpen }"
-            @click.stop="togglePeriodMenu"
-          >
-            {{ periodTypeLabel }}
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" :class="{ 'chevron-rotated': periodMenuOpen }">
-              <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
-          <div v-if="periodMenuOpen" class="tv-dropdown-menu" @click.stop>
-            <button
-              v-for="opt in periodOptions"
-              :key="opt.value"
-              type="button"
-              class="tv-dropdown-item"
-              :class="{ active: periodType === opt.value }"
-              @click="selectPeriodType(opt.value)"
-            >
-              {{ opt.label }}
-            </button>
-          </div>
-        </div>
+      <div class="tv-source-switch" role="tablist" aria-label="Data source">
+        <button
+          type="button"
+          class="tv-btn"
+          :class="{ active: sourceMode === 'yahoo' }"
+          @click="sourceMode = 'yahoo'"
+        >
+          Yahoo
+        </button>
+        <button
+          type="button"
+          class="tv-btn"
+          :class="{ active: sourceMode === 'research' }"
+          @click="sourceMode = 'research'"
+        >
+          Research
+        </button>
+        <button
+          type="button"
+          class="tv-btn"
+          :class="{ active: sourceMode === 'economy' }"
+          @click="sourceMode = 'economy'"
+        >
+          Ekonomi
+        </button>
       </div>
-        
-        <!-- Year -->
-        <select v-model="year" class="tv-select">
-          <option :value="2024">2024</option>
-          <option :value="2025">2025</option>
-          <option :value="2026">2026</option>
-        </select>
-        
-        <!-- Filters -->
-        <select v-model="sumberDana" class="tv-select">
-          <option value="">Semua Dana</option>
-          <option value="eksploitasi">Eksploitasi</option>
-          <option value="investasi">Investasi</option>
-        </select>
-        
-        <select v-model="kategoriPlant" class="tv-select">
-          <option value="">Semua Plant</option>
-          <option value="PG">PG</option>
-          <option value="MKSO">MKSO</option>
-          <option value="HO">HO</option>
-        </select>
+
+      <select v-model="timezoneOption" class="tv-select" title="Timezone">
+        <option v-for="tz in timezoneOptions" :key="tz.value" :value="tz.value">
+          {{ tz.label }}
+        </option>
+      </select>
         
         <!-- Max Series Limit -->
-        <select v-model="maxSeries" class="tv-select" title="Maximum series to display">
+        <select v-if="sourceMode === 'yahoo'" v-model="maxSeries" class="tv-select" title="Maximum series to display">
           <option :value="3">Max 3</option>
           <option :value="5">Max 5</option>
           <option :value="10">Max 10</option>
         </select>
         
         <!-- Mode Buttons -->
-        <button :class="['tv-btn', { active: rawMode }]" @click="rawMode = !rawMode" title="Raw data">Raw</button>
-        <button :class="['tv-btn', { active: cumulative }]" @click="cumulative = !cumulative" title="Kumulatif">Σ</button>
+        <button v-if="sourceMode === 'yahoo'" :class="['tv-btn', { active: rawMode }]" @click="rawMode = !rawMode" title="Raw data">Raw</button>
+        <button v-if="sourceMode === 'yahoo'" :class="['tv-btn', { active: cumulative }]" @click="cumulative = !cumulative" title="Kumulatif">Σ</button>
         <button :class="['tv-btn', { active: singleScale }]" @click="singleScale = !singleScale" title="Single Y scale">1 Skala</button>
         <button class="tv-btn" @click="scaleSide = scaleSide === 'left' ? 'right' : 'left'" title="Posisi Skala">
           {{ scaleSide === 'left' ? 'Skala Kiri' : 'Skala Kanan' }}
         </button>
         
-      <!-- Chart Type (tanpa candlestick) -->
-      <div class="tv-btn-group-wrap">
-        <div class="tv-dropdown" ref="chartTypeDropdownRef">
-          <button
-            type="button"
-            class="tv-btn tv-dropdown-btn"
-            :class="{ 'is-open': chartTypeMenuOpen }"
-            @click.stop="toggleChartTypeMenu"
-          >
-            {{ chartTypeLabel }}
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" :class="{ 'chevron-rotated': chartTypeMenuOpen }">
-              <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
-          <div v-if="chartTypeMenuOpen" class="tv-dropdown-menu" @click.stop>
-            <button
-              v-for="type in chartTypes"
-              :key="type.value"
-              type="button"
-              class="tv-dropdown-item"
-              :class="{ active: chartType === type.value }"
-              @click="selectChartType(type.value)"
-            >
-              {{ type.label }}
+      <!-- Chart Type -->
+      <select v-if="sourceMode !== 'research'" v-model="chartType" class="tv-select" title="Chart type">
+        <option
+          v-for="type in chartTypes"
+          :key="type.value"
+          :value="type.value"
+        >
+          {{ type.label }}
+        </option>
+      </select>
+      <div v-else class="tv-chart-type-lock" title="Research mode uses candlestick chart">
+        Candle
+      </div>
+
+      <div class="tv-indicator-wrap">
+        <button ref="indicatorButtonRef" class="tv-btn" type="button" @click="toggleIndicatorMenu">Indicators</button>
+        <div v-if="indicatorMenuOpen" class="tv-indicator-menu" :style="indicatorMenuStyle" @click.stop>
+          <div class="tv-indicator-head">
+            <span class="tv-indicator-storage">Pane presets saved on server</span>
+            <button class="tv-indicator-add-btn" type="button" @click="showIndicatorCreateForm = !showIndicatorCreateForm">
+              {{ showIndicatorCreateForm ? 'Close' : 'New Pane Custom' }}
             </button>
           </div>
+
+          <div v-if="indicatorRegistryError" class="tv-indicator-error">{{ indicatorRegistryError }}</div>
+          <div v-else-if="indicatorRegistryLoading" class="tv-indicator-loading">Loading indicators...</div>
+          <template v-else>
+            <div class="tv-indicator-title">Overlay</div>
+            <div
+              v-for="item in technicalOverlayIndicators"
+              :key="item.id"
+              class="tv-indicator-item"
+              :class="{ active: activeOverlayIndicatorIds.includes(item.id) }"
+              @click="selectOverlayIndicator(item.id)"
+            >
+              <span class="tv-indicator-item-main">
+                <span>{{ item.label }}</span>
+                <span
+                  v-if="item.engine !== 'none' && activeOverlayIndicatorIds.includes(item.id)"
+                  class="tv-indicator-meta"
+                >
+                  {{ getOverlayIndicatorSettings(item).period }} / {{ getOverlayIndicatorSettings(item).sourceField }}
+                </span>
+              </span>
+              <span class="tv-indicator-actions">
+                <button
+                  v-if="['sma', 'ema'].includes(item.engine) && activeOverlayIndicatorIds.includes(item.id)"
+                  class="tv-indicator-settings"
+                  type="button"
+                  title="Indicator settings"
+                  @click.stop="toggleOverlaySettings(item.id)"
+                >
+                  ⚙
+                </button>
+                <button
+                  v-if="item.source === 'user'"
+                  class="tv-indicator-delete"
+                  type="button"
+                  title="Delete custom indicator"
+                  @click.stop="deleteIndicator(item.id)"
+                >
+                  ×
+                </button>
+              </span>
+            </div>
+            <template v-if="sourceMode === 'research' && predictionOverlayIndicators.length">
+              <div class="tv-indicator-title">Prediction</div>
+              <div
+                v-for="item in predictionOverlayIndicators"
+                :key="item.id"
+                class="tv-indicator-item"
+                :class="{ active: activeOverlayIndicatorIds.includes(item.id) }"
+                @click="selectOverlayIndicator(item.id)"
+              >
+                <span class="tv-indicator-item-main">
+                  <span class="tv-indicator-label">
+                    <span class="tv-indicator-badge" :style="{ background: getPredictionIndicatorColor(item.engine) }"></span>
+                    <span>{{ item.label }}</span>
+                  </span>
+                  <span
+                    v-if="activeOverlayIndicatorIds.includes(item.id)"
+                    class="tv-indicator-meta"
+                  >
+                    {{ getPredictionIndicatorNote(item.engine) }}
+                  </span>
+                </span>
+              </div>
+            </template>
+            <div
+              v-if="activeOverlaySettingsId && overlayIndicators.some((item) => item.id === activeOverlaySettingsId && ['sma', 'ema'].includes(item.engine))"
+              class="tv-indicator-settings-panel"
+            >
+              <div class="tv-indicator-title">Overlay Settings</div>
+              <div
+                v-for="item in overlayIndicators.filter((entry) => entry.id === activeOverlaySettingsId && ['sma', 'ema'].includes(entry.engine))"
+                :key="`${item.id}-settings`"
+                class="tv-indicator-settings-grid"
+              >
+                <label class="tv-indicator-field">
+                  <span>Length</span>
+                  <input
+                    class="tv-indicator-input"
+                    type="number"
+                    min="2"
+                    max="500"
+                    :value="getOverlayIndicatorSettings(item).period"
+                    @input="updateOverlayIndicatorPeriod(item.id, Number(($event.target as HTMLInputElement).value))"
+                  />
+                </label>
+                <label class="tv-indicator-field">
+                  <span>Source</span>
+                  <select
+                    class="tv-select tv-select-compact"
+                    :value="getOverlayIndicatorSettings(item).sourceField"
+                    @change="updateOverlayIndicatorSource(item.id, ($event.target as HTMLSelectElement).value as PriceSource)"
+                  >
+                    <option v-for="option in overlaySourceOptions" :key="option.value" :value="option.value">
+                      {{ option.label }}
+                    </option>
+                  </select>
+                </label>
+              </div>
+            </div>
+
+            <div class="tv-indicator-title">New Pane</div>
+            <div
+              v-for="item in paneIndicators"
+              :key="item.id"
+              class="tv-indicator-item"
+              :class="{ active: activePaneIndicatorIds.includes(item.id) }"
+              @click="togglePaneIndicator(item.id)"
+            >
+              <span>{{ item.label }}</span>
+              <button
+                v-if="item.source === 'user'"
+                class="tv-indicator-delete"
+                type="button"
+                title="Delete custom indicator"
+                @click.stop="deleteIndicator(item.id)"
+              >
+                ×
+              </button>
+            </div>
+          </template>
+
+          <form v-if="showIndicatorCreateForm" class="tv-indicator-form" @submit.prevent="createIndicator">
+            <div class="tv-indicator-title">Add Custom Pane</div>
+            <input v-model="newIndicatorForm.label" class="tv-indicator-input" type="text" placeholder="Name" />
+            <div class="tv-indicator-form-row">
+              <select v-model="newIndicatorForm.engine" class="tv-select tv-select-compact">
+                <option v-for="engine in availableNewIndicatorEngines" :key="engine.value" :value="engine.value">
+                  {{ engine.label }}
+                </option>
+              </select>
+              <input v-model.number="newIndicatorForm.period" class="tv-indicator-input" type="number" min="2" max="500" placeholder="Period" />
+            </div>
+            <div v-if="indicatorCreateError" class="tv-indicator-error">{{ indicatorCreateError }}</div>
+            <div class="tv-indicator-form-actions">
+              <button class="tv-btn" type="submit" :disabled="indicatorCreateSubmitting">
+                {{ indicatorCreateSubmitting ? 'Saving...' : 'Save' }}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </div>
     
     <div class="tv-header-right">
-      <PdfExportButton 
-        :year="year"
-        :period-type="periodType"
-        :sumber-dana="sumberDana"
-        :kategori-plant="kategoriPlant"
-        report-type="chart"
-      />
       <button class="tv-btn icon" title="Undo (Ctrl/Cmd+Z)" @click="drawingRef?.undo?.()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
           <path d="M3 12a9 9 0 1 0 3-6.7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -135,7 +242,7 @@
       <button class="tv-btn icon" title="Zoom Out" @click="zoomAllOut">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M8 11h6M20 20l-4-4" stroke="currentColor" stroke-width="2"/></svg>
       </button>
-      <button class="tv-btn icon" title="Fit" @click="refreshAllCharts">
+      <button class="tv-btn icon" title="Fit" @click="fitAllCharts">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" stroke="currentColor" stroke-width="2"/></svg>
       </button>
       <button class="tv-btn icon" title="Export" @click="chartRef?.exportPng()">
@@ -195,12 +302,16 @@
       <div v-if="navMenuOpen" class="tv-nav-popup">
         <div class="tv-nav-header">
           <span>Apps</span>
-          <button @click="navMenuOpen = false">?</button>
+          <button @click="navMenuOpen = false" aria-label="Close apps menu">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M6 6l12 12M18 6l-12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </button>
         </div>
         <div class="tv-nav-items">
           <a class="tv-nav-item" href="/" target="_blank" @click="navMenuOpen = false">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M3 12h18M12 3c3.5 4 3.5 14 0 18M12 3c-3.5 4-3.5 14 0 18" stroke="currentColor" stroke-width="2"/></svg>
-            <span>Procurement Charting</span>
+            <span>Charting</span>
           </a>
           <a class="tv-nav-item" href="/sources" target="_blank" @click="navMenuOpen = false">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 5h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z" stroke="currentColor" stroke-width="2"/><path d="M8 9h8M8 13h6" stroke="currentColor" stroke-width="2"/></svg>
@@ -267,11 +378,6 @@
         <div
           class="tv-chart-scroll"
           ref="chartScrollRef"
-          @pointerdown="onChartPointerDown"
-          @pointermove="onChartPointerMove"
-          @pointerup="onChartPointerUp"
-          @pointerleave="onChartPointerUp"
-          @wheel.stop.prevent="onChartWheel"
         >
           <div class="tv-chart-scroll-inner">
             <div
@@ -282,16 +388,19 @@
               :style="{ height: pane.height + 'px', position: 'relative' }"
             >
               <ProcurementChart
+                :key="`${pane.id}-${pane.mode || 'main'}-${pane.indicatorId || pane.symbols.join(',')}-${sourceMode}-${timeframe}-${interval}-${chartType}`"
                 :ref="setPaneChartRef(pane.id)"
                 :chart-type="chartType"
+                :data-source="sourceMode"
+                :timeframe="timeframe"
+                :interval="interval"
                 :period-type="periodType"
+                :timezone="timezoneOption"
                 :year="year"
                 :symbols="pane.symbols"
                 :symbol-meta="buildSymbolMeta(pane.symbols)"
                 :hidden-series="pane.isMain ? hiddenSeries : emptyHiddenSet"
                 :color-overrides="pane.isMain ? legendColors : {}"
-                :normalize="normalize"
-          :log-scale="logScale"
           :raw-mode="rawMode"
           :cumulative="cumulative"
           :single-scale="singleScale"
@@ -301,6 +410,11 @@
           :sumber-dana="sumberDana"
           :kategori-plant="kategoriPlant"
           :theme="theme"
+          :hidden-pred-ids="hiddenPredIds"
+          :overlay-indicators="pane.mode === 'indicator' ? [] : overlayIndicatorConfigs"
+          :indicator-pane="pane.mode === 'indicator' && pane.indicatorEngine
+            ? { engine: pane.indicatorEngine, period: pane.indicatorPeriod || 14, id: pane.indicatorId || pane.id }
+            : null"
                 :height="pane.height"
                 @data-loaded="(data) => onPaneDataLoaded(pane.id, data)"
                 @error="(msg) => onPaneError(pane.id, msg)"
@@ -334,6 +448,35 @@
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div class="tv-range-bar">
+        <div class="tv-range-preset">
+          <button
+            v-for="opt in rangeOptions"
+            :key="opt.value"
+            type="button"
+            class="tv-range-btn"
+            :class="{ active: timeframe === opt.value }"
+            @click="applyRangeChange(opt.value)"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
+        <div class="tv-range-interval">
+          <span class="tv-range-label">Interval:</span>
+          <select v-model="interval" class="tv-select tv-select-interval" title="Interval" @change="applyIntervalChange(interval)">
+            <option
+              v-for="opt in effectiveIntervalOptions"
+              :key="opt.value"
+              :value="opt.value"
+            >
+              {{ opt.label }}
+            </option>
+          </select>
+          <button type="button" class="tv-range-btn" @click="resetAllChartsToAutoViewport">Auto</button>
+          <button type="button" class="tv-range-btn" @click="fitAllCharts">Fit</button>
         </div>
       </div>
         
@@ -437,6 +580,46 @@
               <div class="tv-legend-empty" v-if="!allPaneSymbols.length">
                 No series selected
               </div>
+              <div v-if="activePredictionIndicators.length" class="tv-prediction-legend">
+                <div class="tv-prediction-legend-title">Prediction Overlays</div>
+                <div
+                  v-for="item in activePredictionIndicators"
+                  :key="item.id"
+                  class="tv-prediction-legend-row"
+                  :class="{ 'is-hidden': hiddenPredIds.has(item.id) }"
+                >
+                  <span class="tv-prediction-legend-badge" :style="{ background: item.color }"></span>
+                  <span class="tv-prediction-legend-label">{{ item.label }}</span>
+                  <span class="tv-prediction-legend-note">{{ item.note }}</span>
+                  <span class="tv-prediction-legend-actions">
+                    <button
+                      class="tv-legend-action"
+                      type="button"
+                      :title="hiddenPredIds.has(item.id) ? 'Show' : 'Hide'"
+                      @click.stop="toggleHidePred(item.id)"
+                    >
+                      <svg v-if="!hiddenPredIds.has(item.id)" width="13" height="13" viewBox="0 0 24 24" fill="none">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" stroke-width="2"/>
+                        <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
+                      </svg>
+                      <svg v-else width="13" height="13" viewBox="0 0 24 24" fill="none">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <line x1="1" y1="1" x2="23" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                      </svg>
+                    </button>
+                    <button
+                      class="tv-legend-action is-trash"
+                      type="button"
+                      title="Remove overlay"
+                      @click.stop="selectOverlayIndicator(item.id)"
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                        <path d="M6 6l12 12M18 6l-12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                      </svg>
+                    </button>
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
           <div class="tv-category-bar">
@@ -474,8 +657,10 @@
                     <path d="M19.4 15a7.8 7.8 0 0 0 .1-1 7.8 7.8 0 0 0-.1-1l2-1.6-2-3.4-2.4 1a7.6 7.6 0 0 0-1.7-1l-.3-2.6H9l-.3 2.6a7.6 7.6 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.8 7.8 0 0 0-.1 1 7.8 7.8 0 0 0 .1 1l-2 1.6 2 3.4 2.4-1a7.6 7.6 0 0 0 1.7 1l.3 2.6h6l.3-2.6a7.6 7.6 0 0 0 1.7-1l2.4 1 2-3.4-2-1.6z" stroke="currentColor" stroke-width="2"/>
                   </svg>
                 </button>
-                <button class="tv-category-close" type="button" title="Close tab" @click.stop="closeCategoryTab(tab.id)">
-                  ?
+                <button class="tv-category-close" type="button" title="Close tab" @click.stop="closeCategoryTab(tab.id)" aria-label="Close tab">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M6 6l12 12M18 6l-12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  </svg>
                 </button>
                 <div
                   v-if="activeTabSettingsId === tab.id"
@@ -507,7 +692,11 @@
       <div class="tv-panel tv-object-tree" v-if="showObjectTree" :style="objectTreePanelStyle">
         <div class="tv-panel-header">
           <span>Drawing Objects</span>
-          <button class="tv-panel-close" @click="showObjectTree = false">?</button>
+          <button class="tv-panel-close" @click="showObjectTree = false" aria-label="Close drawing objects">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M6 6l12 12M18 6l-12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </button>
         </div>
         <div class="tv-panel-body">
           <div v-if="drawingRef" class="tv-object-list">
@@ -522,7 +711,14 @@
               >
                 <span class="tv-object-color" :style="{ backgroundColor: drawing.color }"></span>
                 <span class="tv-object-name">{{ drawing.type }}</span>
-                <button class="tv-object-delete" @click="deleteDrawing(idx)">?</button>
+                <button class="tv-object-delete" @click="deleteDrawing(idx)" aria-label="Delete drawing">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M3 6h18" stroke="currentColor" stroke-width="2"/>
+                    <path d="M8 6V4h8v2" stroke="currentColor" stroke-width="2"/>
+                    <path d="M6 6l1 14h10l1-14" stroke="currentColor" stroke-width="2"/>
+                    <path d="M10 10v8M14 10v8" stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                </button>
               </div>
             </template>
           </div>
@@ -533,34 +729,148 @@
       <div class="tv-panel tv-layers-panel" :class="{ 'is-shifted': showObjectTree }" v-if="showLayersPanel" :style="layersPanelStyle">
         <div class="tv-panel-header">
           <span>Layers</span>
-          <button class="tv-panel-close" @click="showLayersPanel = false">?</button>
+          <button class="tv-panel-close" @click="showLayersPanel = false" aria-label="Close layers">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M6 6l12 12M18 6l-12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </button>
         </div>
         <div class="tv-panel-body">
-          <div class="tv-layer-section">
-            <div class="tv-layer-title">Data Series</div>
+          <div class="tv-layer-tabs" role="tablist" aria-label="Layer views">
+            <button
+              type="button"
+              class="tv-layer-tab"
+              :class="{ active: activeLayersTab === 'objects' }"
+              @click="activeLayersTab = 'objects'"
+            >
+              Objects
+            </button>
+            <button
+              type="button"
+              class="tv-layer-tab"
+              :class="{ active: activeLayersTab === 'dataWindow' }"
+              @click="activeLayersTab = 'dataWindow'"
+            >
+              Data Window
+            </button>
+          </div>
+
+          <div v-if="activeLayersTab === 'objects'" class="tv-layer-tab-panel">
+            <div class="tv-layer-section">
+              <div class="tv-layer-title">Data Series</div>
               <div class="tv-layer-empty" v-if="!allPaneSymbols.length">No series selected</div>
+              <template v-for="symbol in allPaneSymbols" :key="symbol">
+                <div 
+                  class="tv-layer-item tv-layer-item-interactive"
+                  @click="toggleLayerDetails(symbol)"
+                >
+                  <span class="tv-layer-icon" aria-hidden="true">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                      <path d="M4 19h16" stroke="currentColor" stroke-width="2"/>
+                      <path d="M7 15l3-3 3 2 4-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  </span>
+                  <span class="tv-layer-name">{{ symbol }}</span>
+                  <button class="tv-layer-delete" @click.stop="removeSymbol(symbol)" title="Remove series" aria-label="Remove series">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="M3 6h18" stroke="currentColor" stroke-width="2"/>
+                      <path d="M8 6V4h8v2" stroke="currentColor" stroke-width="2"/>
+                      <path d="M6 6l1 14h10l1-14" stroke="currentColor" stroke-width="2"/>
+                      <path d="M10 10v8M14 10v8" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                  </button>
+                </div>
+              </template>
+            </div>
+            <div class="tv-layer-section">
+              <div class="tv-layer-title">Drawings</div>
               <div 
-                v-for="symbol in allPaneSymbols" 
-                :key="symbol"
-                class="tv-layer-item tv-layer-item-interactive"
+                class="tv-layer-item tv-layer-item-interactive" 
+                v-if="drawingCount > 0"
+                @click="clearDrawings"
               >
-              <span class="tv-layer-icon">📊</span>
-              <span class="tv-layer-name">{{ symbol }}</span>
-              <button class="tv-layer-delete" @click="removeSymbol(symbol)" title="Remove series">?</button>
+                <span class="tv-layer-icon" aria-hidden="true">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <path d="M4 20l4.5-1 9.5-9.5-3.5-3.5L5 15.5 4 20z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                    <path d="M13.5 6.5l3.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  </svg>
+                </span>
+                <span class="tv-layer-name">Drawing Layer ({{ drawingCount }} objects)</span>
+                <span class="tv-layer-action">Clear</span>
+              </div>
+              <div class="tv-layer-empty" v-else>No drawings</div>
             </div>
           </div>
-          <div class="tv-layer-section">
-            <div class="tv-layer-title">Drawings</div>
-            <div 
-              class="tv-layer-item tv-layer-item-interactive" 
-              v-if="drawingCount > 0"
-              @click="clearDrawings"
-            >
-              <span class="tv-layer-icon">✏️</span>
-              <span class="tv-layer-name">Drawing Layer ({{ drawingCount }} objects)</span>
-              <span class="tv-layer-action">Clear</span>
+
+          <div v-else class="tv-layer-tab-panel">
+            <div class="tv-layer-section">
+              <div class="tv-layer-title">Data Window</div>
+              <div class="tv-layer-empty" v-if="!currentLayerSymbol">No series selected</div>
+              <template v-else>
+                <div class="tv-data-window-symbols" v-if="allPaneSymbols.length > 1">
+                  <button
+                    v-for="symbol in allPaneSymbols"
+                    :key="symbol"
+                    type="button"
+                    class="tv-data-window-symbol-btn"
+                    :class="{ active: currentLayerSymbol === symbol }"
+                    @click="activeLayerSymbol = symbol"
+                  >
+                    {{ symbol }}
+                  </button>
+                </div>
+                <div class="tv-data-window-card">
+                  <div class="tv-data-window-row">
+                    <span>Name</span>
+                    <strong>{{ selectedSymbolMeta[currentLayerSymbol]?.name || currentLayerSymbol }}</strong>
+                  </div>
+                  <div class="tv-data-window-row">
+                    <span>Description</span>
+                    <strong>{{ selectedSymbolMeta[currentLayerSymbol]?.description || '-' }}</strong>
+                  </div>
+                  <div class="tv-data-window-row">
+                    <span>Unit</span>
+                    <strong>{{ selectedSymbolMeta[currentLayerSymbol]?.unit || '-' }}</strong>
+                  </div>
+                  <div class="tv-data-window-row">
+                    <span>Open</span>
+                    <strong>{{ getLayerValue(currentLayerSymbol, 'open') }}</strong>
+                  </div>
+                  <div class="tv-data-window-row">
+                    <span>High</span>
+                    <strong>{{ getLayerValue(currentLayerSymbol, 'high') }}</strong>
+                  </div>
+                  <div class="tv-data-window-row">
+                    <span>Low</span>
+                    <strong>{{ getLayerValue(currentLayerSymbol, 'low') }}</strong>
+                  </div>
+                  <div class="tv-data-window-row">
+                    <span>Last</span>
+                    <strong>{{ getLayerLastValue(currentLayerSymbol) }}</strong>
+                  </div>
+                  <div class="tv-data-window-row">
+                    <span>Prev Close</span>
+                    <strong>{{ getLayerValue(currentLayerSymbol, 'previous') }}</strong>
+                  </div>
+                  <div class="tv-data-window-row">
+                    <span>Change</span>
+                    <strong>{{ getLayerValue(currentLayerSymbol, 'change') }}</strong>
+                  </div>
+                  <div class="tv-data-window-row">
+                    <span>Change %</span>
+                    <strong>{{ getLayerValue(currentLayerSymbol, 'changePct') }}</strong>
+                  </div>
+                  <div class="tv-data-window-row">
+                    <span>Volume</span>
+                    <strong>{{ getLayerValue(currentLayerSymbol, 'volume') }}</strong>
+                  </div>
+                  <div class="tv-data-window-row">
+                    <span>Date</span>
+                    <strong>{{ getLayerLastDate(currentLayerSymbol) }}</strong>
+                  </div>
+                </div>
+              </template>
             </div>
-            <div class="tv-layer-empty" v-else>No drawings</div>
           </div>
         </div>
       </div>
@@ -568,16 +878,9 @@
       <!-- Compact Summary Bar - Always visible -->
       <div class="tv-summary-bar">
         <template v-if="summaryData">
-          <div class="tv-summary-item" v-if="summaryData.unit">
-            <span class="tv-summary-label">Total (Gabungan):</span>
-            <span class="tv-summary-value">{{ formatValue(summaryData.totalAll, summaryData.unit) }}</span>
-            <span class="tv-summary-unit" v-if="summaryData.unit !== 'Rp'">{{ summaryData.unit }}</span>
-          </div>
-          <div class="tv-summary-item" v-else>
-            <span class="tv-summary-label">Total Dokumen:</span>
-            <span class="tv-summary-value">{{ formatValue(summaryData.totalByUnit.Dokumen || 0, 'Dokumen') }}</span>
-            <span class="tv-summary-label">Total Rp:</span>
-            <span class="tv-summary-value">{{ formatValue(summaryData.totalByUnit.Rp || 0, 'Rp') }}</span>
+          <div class="tv-summary-item">
+            <span class="tv-summary-label">Watchlist:</span>
+            <span class="tv-summary-value">{{ summaryData.series.length }} symbols</span>
           </div>
           <div class="tv-summary-series">
             <div
@@ -587,8 +890,13 @@
             >
               <span class="tv-summary-dot" :style="{ backgroundColor: series.color }"></span>
               <span class="tv-summary-series-name">{{ getLegendName(series.symbol) }}</span>
-              <span class="tv-summary-series-metric">Σ {{ formatValue(series.total, series.unit) }} <span v-if="series.unit !== 'Rp'">{{ series.unit }}</span></span>
-              <span class="tv-summary-series-metric">Terakhir {{ formatValue(series.latest, series.unit) }} <span v-if="series.unit !== 'Rp'">{{ series.unit }}</span></span>
+              <span class="tv-summary-series-metric">Last {{ formatValue(series.latest, series.unit) }}</span>
+              <span class="tv-summary-series-metric" :class="series.change >= 0 ? 'is-up' : 'is-down'">
+                Chg {{ formatSignedValue(series.change, series.unit) }}
+              </span>
+              <span class="tv-summary-series-metric" :class="series.changePct >= 0 ? 'is-up' : 'is-down'">
+                {{ formatPercent(series.changePct) }}
+              </span>
               <span class="tv-summary-date">{{ series.latestDate || '' }}</span>
             </div>
           </div>
@@ -604,8 +912,10 @@
     <div class="tv-right-stack">
       <!-- Right Sidebar: Drawing Properties (only when selected) -->
       <aside class="tv-sidebar tv-drawing-sidebar" v-if="selectedDrawing">
-        <button class="tv-drawing-close" type="button" title="Close properties" @click="clearSelectedDrawing">
-          ?
+        <button class="tv-drawing-close" type="button" title="Close properties" @click="clearSelectedDrawing" aria-label="Close properties">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M6 6l12 12M18 6l-12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
         </button>
         <div class="tv-drawing-prop">
           <div class="tv-drawing-label">Line</div>
@@ -644,13 +954,6 @@
 
       <!-- Right Navbar -->
       <aside class="tv-sidebar tv-sidebar-right">
-        <button class="tv-sidebar-btn" :class="{ active: logScale }" @click="logScale = !logScale" title="Log Scale">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 19h16M6 16c2-3 4-4 6-4s4 1 6 4" stroke="currentColor" stroke-width="2"/></svg>
-        </button>
-        <button class="tv-sidebar-btn" :class="{ active: normalize }" @click="normalize = !normalize" title="Normalize">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 17h16M7 4v16" stroke="currentColor" stroke-width="2"/></svg>
-        </button>
-        <div class="tv-sidebar-divider"></div>
       <button class="tv-sidebar-btn" ref="objectTreeBtnRef" :class="{ active: showObjectTree }" @click="showObjectTree = !showObjectTree" title="Object Tree">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
             <path d="M3 3h18v18H3z" stroke="currentColor" stroke-width="2"/>
@@ -671,10 +974,14 @@
   <!-- Search Modal with TradingView-style Filters -->
   <div class="search-modal" :class="{ 'is-open': searchModalOpen }" :aria-hidden="!searchModalOpen">
     <div class="search-modal-backdrop" @click="closeSearchModal"></div>
-    <div class="search-modal-panel" role="dialog" aria-modal="true" aria-label="Kode Data Search">
+    <div class="search-modal-panel" role="dialog" aria-modal="true" :aria-label="searchModalLabel">
       <div class="search-modal-header">
-        <div class="search-modal-title">Symbol Search</div>
-        <button type="button" class="search-modal-close" @click="closeSearchModal" aria-label="Close">?</button>
+        <div class="search-modal-title">{{ searchModalLabel }}</div>
+        <button type="button" class="search-modal-close" @click="closeSearchModal" aria-label="Close">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M6 6l12 12M18 6l-12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
       </div>
       
       <!-- Search Input -->
@@ -684,7 +991,7 @@
           v-model="searchQuery" 
           type="text" 
           class="search-input" 
-          placeholder="Cari kode data..." 
+          :placeholder="searchPlaceholder" 
           @input="filterSymbols"
         />
       </div>
@@ -745,9 +1052,9 @@
             <button 
               v-if="!allPaneSymbolsSet.has(sym.symbol)"
               class="scale-btn" 
-              title="Same % scale (normalized)"
+              title="Same scale"
               @click.stop="selectSymbolWithScale(sym, 'percent')"
-            >Same %</button>
+            >Same</button>
             <button 
               v-if="!allPaneSymbolsSet.has(sym.symbol)"
               class="scale-btn" 
@@ -771,7 +1078,6 @@ import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { authFetch } from '../utils/auth'
 import ProcurementChart from './ProcurementChart.vue'
 import DrawingLayer from './DrawingLayer.vue'
-import PdfExportButton from './PdfExportButton.vue'
 
 // Types
 interface SymbolItem {
@@ -784,12 +1090,21 @@ interface SymbolItem {
   baseSymbol?: string  // NEW: reference to original symbol for -N variants
   sumber_dana?: string
   kategori_plant?: string
+  provider?: 'yahoo-finance' | 'research' | 'economy'
 }
 
 interface SummarySeries {
   symbol: string
   total: number
   latest: number
+  previous: number
+  change: number
+  changePct: number
+  open?: number
+  high?: number
+  low?: number
+  volume?: number
+  latestTimestamp?: number
   latestDate?: string
   color: string
   unit: string
@@ -802,16 +1117,66 @@ interface SummaryData {
   series: SummarySeries[]
 }
 
+interface IndicatorDefinition {
+  id: string
+  label: string
+  kind: 'overlay' | 'pane'
+  engine: 'none' | 'sma' | 'ema' | 'atr6' | 'atr12' | 'pred_bilstm' | 'pred_lstm' | 'pred_arima' | 'rsi' | 'macd' | 'stoch' | 'volume'
+  period: number
+  sourceField?: 'open' | 'high' | 'low' | 'close'
+  source: 'system' | 'user'
+  builtin?: boolean
+}
+
+type PriceSource = 'open' | 'high' | 'low' | 'close'
+type DataSourceMode = 'yahoo' | 'research' | 'economy'
+
 // Chart types
 const chartTypes = [
   { value: 'line', label: 'Line' },
   { value: 'area', label: 'Area' },
-  { value: 'bar', label: 'Bar' }
+  { value: 'bar', label: 'Bar' },
+  { value: 'candlestick', label: 'Candle' }
 ] as const
 
-const periodOptions = [
-  { value: 'calendar', label: 'Kalender' },
-  { value: 'fiscal', label: 'Anggaran' }
+const rangeOptions = [
+  { value: '1D', label: '1D' },
+  { value: '5D', label: '5D' },
+  { value: '1M', label: '1M' },
+  { value: '3M', label: '3M' },
+  { value: '6M', label: '6M' },
+  { value: 'YTD', label: 'YTD' },
+  { value: '1Y', label: '1Y' },
+  { value: '2Y', label: '2Y' },
+  { value: '3Y', label: '3Y' },
+  { value: '5Y', label: '5Y' },
+  { value: '72M', label: '6Y' },
+  { value: 'ALL', label: 'ALL' }
+] as const
+
+const intervalOptions = [
+  { value: '15m', label: '15 min' },
+  { value: '30m', label: '30 min' },
+  { value: '1h', label: '1 hour' },
+  { value: '4h', label: '4 hour' },
+  { value: '1D', label: '1 day' },
+  { value: '5D', label: '5 day' },
+  { value: '1W', label: '1 week' },
+  { value: '1M', label: '1 month' },
+  { value: '3M', label: '3 month' }
+] as const
+
+const economyIntervalOptions = [
+  { value: '1Y', label: '1 year' }
+] as const
+
+const timezoneOptions = [
+  { value: 'auto', label: 'TZ Auto' },
+  { value: 'UTC', label: 'UTC' },
+  { value: 'America/New_York', label: 'New York' },
+  { value: 'Asia/Jakarta', label: 'Jakarta' },
+  { value: 'Europe/London', label: 'London' },
+  { value: 'Asia/Tokyo', label: 'Tokyo' }
 ] as const
 
 // Colors for series
@@ -887,6 +1252,23 @@ function zoomAllOut() {
 function refreshAllCharts() {
   applyToCharts((chart) => chart.refresh?.())
 }
+
+function fitAllCharts() {
+  applyToCharts((chart) => chart.fitContent?.())
+}
+
+function resetAllChartsToAutoViewport() {
+  const activeId = activeCategoryTabId.value
+  if (activeId) {
+    clearYAxisOverrides(activeId)
+  }
+  nextTick(() => {
+    applyToCharts((chart) => {
+      chart.resetPriceScale?.()
+      chart.resetViewport?.()
+    })
+  })
+}
 let drawingRef: InstanceType<typeof DrawingLayer> | null = null
 const selectedDrawing = ref<{ type: string; points: number[]; color: string; name?: string } | null>(null)
 const selectedDrawingIndex = ref<number | null>(null)
@@ -909,14 +1291,14 @@ const drawingOverlayInteractive = computed(() => {
 // Panel visibility state
 const showObjectTree = ref(false)
 const showLayersPanel = ref(false)
+const activeLayersTab = ref<'objects' | 'dataWindow'>('objects')
 const legendCollapsed = ref(false)
-const periodMenuOpen = ref(false)
-const chartTypeMenuOpen = ref(false)
-const periodDropdownRef = ref<HTMLElement | null>(null)
-const chartTypeDropdownRef = ref<HTMLElement | null>(null)
+const indicatorMenuOpen = ref(false)
+const indicatorMenuStyle = ref<Record<string, string>>({})
 const chartAreaRef = ref<HTMLElement | null>(null)
 const objectTreeBtnRef = ref<HTMLElement | null>(null)
 const layersBtnRef = ref<HTMLElement | null>(null)
+const indicatorButtonRef = ref<HTMLElement | null>(null)
 const objectTreePanelStyle = ref<Record<string, string>>({})
 const layersPanelStyle = ref<Record<string, string>>({})
 
@@ -1010,39 +1392,13 @@ function clearSelectedDrawing() {
 }
 
 // Chart state
-const chartType = ref<'line' | 'area' | 'bar'>('line')
+const sourceMode = ref<DataSourceMode>('yahoo')
+const chartType = ref<'line' | 'area' | 'bar' | 'candlestick' | 'ohlc'>('line')
+const timeframe = ref<'1D' | '5D' | '1M' | '3M' | '6M' | 'YTD' | '1Y' | '2Y' | '3Y' | '5Y' | '72M' | 'ALL'>('1Y')
+const interval = ref<'15m' | '30m' | '1h' | '4h' | '1D' | '5D' | '1W' | '1M' | '3M' | '1Y'>('1D')
+const timezoneOption = ref<'auto' | 'UTC' | 'America/New_York' | 'Asia/Jakarta' | 'Europe/London' | 'Asia/Tokyo'>('auto')
 const periodType = ref<'calendar' | 'fiscal'>('calendar')
-const periodTypeLabel = computed(() => {
-  const match = periodOptions.find((opt) => opt.value === periodType.value)
-  return match ? match.label : 'Kalender'
-})
-const chartTypeLabel = computed(() => {
-  const match = chartTypes.find((opt) => opt.value === chartType.value)
-  return match ? match.label : String(chartType.value)
-})
-
-function togglePeriodMenu() {
-  periodMenuOpen.value = !periodMenuOpen.value
-  if (periodMenuOpen.value) chartTypeMenuOpen.value = false
-}
-
-function toggleChartTypeMenu() {
-  chartTypeMenuOpen.value = !chartTypeMenuOpen.value
-  if (chartTypeMenuOpen.value) periodMenuOpen.value = false
-}
-
-function selectPeriodType(value: 'calendar' | 'fiscal') {
-  periodType.value = value
-  periodMenuOpen.value = false
-}
-
-function selectChartType(value: 'line' | 'area' | 'bar') {
-  chartType.value = value
-  chartTypeMenuOpen.value = false
-}
 const year = ref(2025)
-const normalize = ref(false)
-const logScale = ref(false)
 const rawMode = ref(false)
 const cumulative = ref(false)
 const singleScale = ref(false)
@@ -1054,11 +1410,479 @@ const selectedSymbols = ref<string[]>([])
 const selectedSymbolsByTab = ref<Record<string, string[]>>({})
 const switchingTab = ref(false)
 const hiddenSeries = ref<Set<string>>(new Set())
+const hiddenPredIds = ref<Set<string>>(new Set())
 const legendColors = ref<Record<string, string>>({})
 const legendNames = ref<Record<string, string>>({})
 const activeLegendSettings = ref<string | null>(null)
 const extraPanesByTab = ref<Record<string, PaneState[]>>({})
+const indicatorRegistry = ref<IndicatorDefinition[]>([])
+const indicatorRegistryLoading = ref(false)
+const indicatorRegistryError = ref('')
+const activeOverlayIndicatorIds = ref<string[]>(['overlay-none'])
+const activePaneIndicatorIds = ref<string[]>([])
+const overlayIndicatorSettingsById = ref<Record<string, { period: number; sourceField: PriceSource }>>({})
+const activeOverlayIndicatorIdsByTab = ref<Record<string, string[]>>({})
+const activePaneIndicatorIdsByTab = ref<Record<string, string[]>>({})
+const overlayIndicatorSettingsByTab = ref<Record<string, Record<string, { period: number; sourceField: PriceSource }>>>({})
+const activeOverlaySettingsId = ref<string | null>(null)
+const showIndicatorCreateForm = ref(false)
+const indicatorCreateSubmitting = ref(false)
+const indicatorCreateError = ref('')
+const newIndicatorForm = ref<{
+  label: string
+  kind: 'pane'
+  engine: 'rsi' | 'stoch'
+  period: number
+  sourceField: PriceSource
+}>({
+  label: '',
+  kind: 'pane',
+  engine: 'rsi',
+  period: 14,
+  sourceField: 'close'
+})
+const activeLayerSymbol = ref<string | null>(null)
 const emptyHiddenSet = new Set<string>()
+const currentLayerSymbol = computed(() => {
+  if (activeLayerSymbol.value && allPaneSymbols.value.includes(activeLayerSymbol.value)) {
+    return activeLayerSymbol.value
+  }
+  return allPaneSymbols.value[0] || null
+})
+
+const overlayIndicators = computed(() => indicatorRegistry.value.filter((item) => item.kind === 'overlay'))
+const technicalOverlayIndicators = computed(() => overlayIndicators.value.filter((item) => !String(item.engine).startsWith('pred_')))
+const predictionOverlayIndicators = computed(() => overlayIndicators.value.filter((item) => String(item.engine).startsWith('pred_')))
+const paneIndicators = computed(() => indicatorRegistry.value.filter((item) => item.kind === 'pane'))
+const predictionIndicatorPalette: Record<'pred_bilstm' | 'pred_lstm' | 'pred_arima', { color: string; note: string }> = {
+  pred_bilstm: { color: 'linear-gradient(135deg, #42a5f5, #90caf9)', note: 'Biru = BiLSTM forecast' },
+  pred_lstm: { color: 'linear-gradient(135deg, #ffb300, #ffd54f)', note: 'Emas = LSTM forecast' },
+  pred_arima: { color: 'linear-gradient(135deg, #66bb6a, #a5d6a7)', note: 'Hijau = ARIMA forecast' }
+}
+const activeOverlayIndicators = computed(() => {
+  const selected = overlayIndicators.value.filter((item) => activeOverlayIndicatorIds.value.includes(item.id))
+  return selected.filter((item) => item.engine !== 'none')
+})
+const activePaneIndicators = computed(() => paneIndicators.value.filter((item) => activePaneIndicatorIds.value.includes(item.id)))
+const activePredictionIndicators = computed(() => {
+  return activeOverlayIndicators.value
+    .filter((item) => String(item.engine).startsWith('pred_'))
+    .map((item) => ({
+      id: item.id,
+      label: item.label,
+      color: getPredictionIndicatorColor(item.engine),
+      note: getPredictionIndicatorNote(item.engine)
+    }))
+})
+
+const overlayIndicatorConfigs = computed(() => activeOverlayIndicators.value.map((item) => {
+  const settings = getOverlayIndicatorSettings(item)
+  return {
+    id: item.id,
+    label: item.label,
+    type: item.engine as 'sma' | 'ema' | 'atr6' | 'atr12' | 'pred_bilstm' | 'pred_lstm' | 'pred_arima',
+    period: settings.period,
+    sourceField: settings.sourceField
+  }
+}))
+
+function getPredictionIndicatorColor(engine: IndicatorDefinition['engine']) {
+  if (engine === 'pred_bilstm' || engine === 'pred_lstm' || engine === 'pred_arima') {
+    return predictionIndicatorPalette[engine].color
+  }
+  return 'linear-gradient(135deg, #64748b, #cbd5e1)'
+}
+
+function getPredictionIndicatorNote(engine: IndicatorDefinition['engine']) {
+  if (engine === 'pred_bilstm' || engine === 'pred_lstm' || engine === 'pred_arima') {
+    return predictionIndicatorPalette[engine].note
+  }
+  return 'Forecast overlay'
+}
+
+const effectiveIntervalOptions = computed(() => {
+  if (sourceMode.value === 'research') {
+    return intervalOptions.filter((option) => ['4h', '1D'].includes(option.value))
+  }
+  if (sourceMode.value === 'economy') {
+    return economyIntervalOptions
+  }
+  return intervalOptions
+})
+
+const validIntervalsByRange: Record<typeof timeframe.value, Array<typeof interval.value>> = {
+  '1D': ['15m', '30m', '1h', '4h', '1D'],
+  '5D': ['15m', '30m', '1h', '4h', '1D'],
+  '1M': ['15m', '30m', '1h', '4h', '1D', '5D'],
+  '3M': ['1h', '4h', '1D', '5D'],
+  '6M': ['1D', '5D', '1W'],
+  'YTD': ['1D', '5D', '1W'],
+  '1Y': ['1D', '5D', '1W', '1Y'],
+  '2Y': ['1D', '5D', '1W', '1M', '1Y'],
+  '3Y': ['1D', '5D', '1W', '1M', '1Y'],
+  '5Y': ['1D', '5D', '1W', '1M', '3M', '1Y'],
+  '72M': ['1D', '5D', '1W', '1M', '3M', '1Y'],
+  'ALL': ['1D', '5D', '1W', '1M', '3M', '1Y']
+}
+
+const defaultIntervalByRange: Record<typeof timeframe.value, typeof interval.value> = {
+  '1D': '15m',
+  '5D': '30m',
+  '1M': '1h',
+  '3M': '1D',
+  '6M': '1D',
+  'YTD': '1D',
+  '1Y': '1D',
+  '2Y': '1D',
+  '3Y': '1W',
+  '5Y': '1W',
+  '72M': '1W',
+  'ALL': '1M'
+}
+
+const defaultRangeByInterval: Record<typeof interval.value, typeof timeframe.value> = {
+  '15m': '1D',
+  '30m': '5D',
+  '1h': '1M',
+  '4h': '1M',
+  '1D': '1Y',
+  '5D': '2Y',
+  '1W': '5Y',
+  '1M': 'ALL',
+  '3M': 'ALL',
+  '1Y': 'ALL'
+}
+
+const overlaySourceOptions: Array<{ value: PriceSource; label: string }> = [
+  { value: 'close', label: 'Close' },
+  { value: 'open', label: 'Open' },
+  { value: 'high', label: 'High' },
+  { value: 'low', label: 'Low' }
+]
+
+function isIntervalValidForRange(rangeValue: typeof timeframe.value, intervalValue: typeof interval.value): boolean {
+  return validIntervalsByRange[rangeValue].includes(intervalValue)
+}
+
+function applyRangeChange(nextRange: typeof timeframe.value) {
+  timeframe.value = nextRange
+  if (sourceMode.value === 'research') return
+  if (sourceMode.value === 'economy') {
+    interval.value = '1Y'
+    return
+  }
+  interval.value = defaultIntervalByRange[nextRange]
+}
+
+function applyIntervalChange(nextInterval: typeof interval.value) {
+  if (sourceMode.value === 'research') {
+    chartType.value = 'candlestick'
+    interval.value = nextInterval
+    return
+  }
+  if (sourceMode.value === 'economy') {
+    interval.value = '1Y'
+    return
+  }
+  if (isIntervalValidForRange(timeframe.value, nextInterval)) {
+    interval.value = nextInterval
+    return
+  }
+  interval.value = nextInterval
+  const nextRange = defaultRangeByInterval[nextInterval]
+  timeframe.value = nextRange
+  if (!isIntervalValidForRange(nextRange, nextInterval)) {
+    interval.value = defaultIntervalByRange[nextRange]
+  }
+}
+
+const availableNewIndicatorEngines = computed(() => [
+  { value: 'rsi' as const, label: 'RSI' },
+  { value: 'stoch' as const, label: 'Stochastic' }
+])
+
+function getOverlayIndicatorSettings(item: IndicatorDefinition): { period: number; sourceField: PriceSource } {
+  if (['atr6', 'atr12', 'pred_bilstm', 'pred_lstm', 'pred_arima'].includes(item.engine)) {
+    return {
+      period: Math.max(1, item.period || 1),
+      sourceField: 'close'
+    }
+  }
+  const current = overlayIndicatorSettingsById.value[item.id]
+  if (current && current.period > 1) return current
+  return {
+    period: item.period > 1 ? item.period : 20,
+    sourceField: (item.sourceField || 'close') as PriceSource
+  }
+}
+
+function ensureOverlayIndicatorSettings(item: IndicatorDefinition) {
+  if (item.engine === 'none') return
+  const current = overlayIndicatorSettingsById.value[item.id]
+  if (current && current.period > 1) return
+  overlayIndicatorSettingsById.value = {
+    ...overlayIndicatorSettingsById.value,
+    [item.id]: getOverlayIndicatorSettings(item)
+  }
+}
+
+function updateOverlayIndicatorPeriod(indicatorId: string, value: number) {
+  const item = overlayIndicators.value.find((entry) => entry.id === indicatorId)
+  if (!item || item.engine === 'none') return
+  const current = getOverlayIndicatorSettings(item)
+  overlayIndicatorSettingsById.value = {
+    ...overlayIndicatorSettingsById.value,
+    [indicatorId]: {
+      ...current,
+      period: Math.min(500, Math.max(2, Math.round(Number(value) || current.period)))
+    }
+  }
+}
+
+function updateOverlayIndicatorSource(indicatorId: string, value: PriceSource) {
+  const item = overlayIndicators.value.find((entry) => entry.id === indicatorId)
+  if (!item || item.engine === 'none') return
+  const current = getOverlayIndicatorSettings(item)
+  overlayIndicatorSettingsById.value = {
+    ...overlayIndicatorSettingsById.value,
+    [indicatorId]: {
+      ...current,
+      sourceField: value
+    }
+  }
+}
+
+function toggleHidePred(predId: string) {
+  const next = new Set(hiddenPredIds.value)
+  if (next.has(predId)) next.delete(predId)
+  else next.add(predId)
+  hiddenPredIds.value = next
+}
+
+function selectOverlayIndicator(indicatorId: string) {
+  if (indicatorId === 'overlay-none') {
+    activeOverlayIndicatorIds.value = ['overlay-none']
+    activeOverlaySettingsId.value = null
+    return
+  }
+  const item = overlayIndicators.value.find((entry) => entry.id === indicatorId)
+  if (item) ensureOverlayIndicatorSettings(item)
+  const predIds = ['overlay-pred-bilstm', 'overlay-pred-lstm', 'overlay-pred-arima']
+  const isPred = predIds.includes(indicatorId)
+  const current = activeOverlayIndicatorIds.value.filter((id) => id !== 'overlay-none')
+  if (isPred) {
+    // radio: toggle off if already active, else activate only this pred (deactivate other preds)
+    if (current.includes(indicatorId)) {
+      const filtered = current.filter((id) => id !== indicatorId)
+      activeOverlayIndicatorIds.value = filtered.length ? filtered : ['overlay-none']
+      if (activeOverlaySettingsId.value === indicatorId) activeOverlaySettingsId.value = null
+    } else {
+      const withoutOtherPreds = current.filter((id) => !predIds.includes(id))
+      activeOverlayIndicatorIds.value = [...withoutOtherPreds, indicatorId]
+    }
+    return
+  }
+  // non-pred: multi-select toggle as before
+  if (current.includes(indicatorId)) {
+    const filtered = current.filter((id) => id !== indicatorId)
+    activeOverlayIndicatorIds.value = filtered.length ? filtered : ['overlay-none']
+    if (activeOverlaySettingsId.value === indicatorId) activeOverlaySettingsId.value = null
+    return
+  }
+  activeOverlayIndicatorIds.value = [...current, indicatorId]
+}
+
+function toggleOverlaySettings(indicatorId: string) {
+  activeOverlaySettingsId.value = activeOverlaySettingsId.value === indicatorId ? null : indicatorId
+}
+
+function togglePaneIndicator(indicatorId: string) {
+  if (activePaneIndicatorIds.value.includes(indicatorId)) {
+    activePaneIndicatorIds.value = activePaneIndicatorIds.value.filter((id) => id !== indicatorId)
+    return
+  }
+  activePaneIndicatorIds.value = [...activePaneIndicatorIds.value, indicatorId]
+}
+
+function isValidRange(value: string): value is typeof timeframe.value {
+  return rangeOptions.some((opt) => opt.value === value)
+}
+
+function isValidInterval(value: string): value is typeof interval.value {
+  return intervalOptions.some((opt) => opt.value === value)
+}
+
+function toggleLayerDetails(symbol: string) {
+  activeLayerSymbol.value = symbol
+}
+
+function updateIndicatorMenuPosition() {
+  const button = indicatorButtonRef.value
+  if (!button) return
+  const rect = button.getBoundingClientRect()
+  const maxWidth = 280
+  const left = Math.min(Math.max(8, rect.left), Math.max(8, window.innerWidth - maxWidth - 8))
+  indicatorMenuStyle.value = {
+    position: 'fixed',
+    top: `${rect.bottom + 6}px`,
+    left: `${left}px`,
+    zIndex: '3000'
+  }
+}
+
+function toggleIndicatorMenu() {
+  indicatorMenuOpen.value = !indicatorMenuOpen.value
+  if (indicatorMenuOpen.value) {
+    nextTick(() => {
+      updateIndicatorMenuPosition()
+    })
+  }
+}
+
+function getLayerLastValue(symbol: string): string {
+  const s = summaryData.value?.series.find((x) => x.symbol === symbol)
+  if (!s) return '--'
+  return Number.isFinite(s.latest) ? formatValue(s.latest, s.unit) : '--'
+}
+
+function getLayerLastDate(symbol: string): string {
+  const s = summaryData.value?.series.find((x) => x.symbol === symbol)
+  return s?.latestDate || '--'
+}
+
+function getLayerSummary(symbol: string): SummarySeries | undefined {
+  return summaryData.value?.series.find((item) => item.symbol === symbol)
+}
+
+function getLayerValue(symbol: string, key: 'open' | 'high' | 'low' | 'volume' | 'previous' | 'change' | 'changePct'): string {
+  const series = getLayerSummary(symbol)
+  if (!series) return '--'
+  if (key === 'changePct') return formatPercent(series.changePct)
+  if (key === 'volume') return Number.isFinite(series.volume) ? new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(series.volume) : '--'
+  const value = series[key]
+  return Number.isFinite(value) ? formatValue(value, series.unit) : '--'
+}
+
+function getDefaultOverlayIndicatorIds(): string[] {
+  return ['overlay-none']
+}
+
+async function loadIndicators() {
+  indicatorRegistryLoading.value = true
+  indicatorRegistryError.value = ''
+  try {
+    const res = await authFetch('/api/indicators')
+    const payload = await res.json()
+    const list = Array.isArray(payload?.data) ? payload.data as IndicatorDefinition[] : []
+    indicatorRegistry.value = list
+    const nextOverlaySettings: Record<string, { period: number; sourceField: PriceSource }> = {}
+    list.forEach((item) => {
+      if (item.kind !== 'overlay' || item.engine === 'none') return
+      nextOverlaySettings[item.id] = overlayIndicatorSettingsById.value[item.id] || getOverlayIndicatorSettings(item)
+    })
+    overlayIndicatorSettingsById.value = nextOverlaySettings
+    const validOverlayIds = new Set(overlayIndicators.value.map((item) => item.id))
+    const nextOverlayIds = activeOverlayIndicatorIds.value.filter((id) => validOverlayIds.has(id))
+    activeOverlayIndicatorIds.value = nextOverlayIds.length ? nextOverlayIds : ['overlay-none']
+
+    const nextOverlayIdsByTab: Record<string, string[]> = {}
+    Object.entries(activeOverlayIndicatorIdsByTab.value).forEach(([tabId, ids]) => {
+      const filtered = ids.filter((id) => validOverlayIds.has(id))
+      nextOverlayIdsByTab[tabId] = filtered.length ? filtered : getDefaultOverlayIndicatorIds()
+    })
+    activeOverlayIndicatorIdsByTab.value = nextOverlayIdsByTab
+
+    const validPaneIds = new Set(paneIndicators.value.map((item) => item.id))
+    activePaneIndicatorIds.value = activePaneIndicatorIds.value.filter((id) => validPaneIds.has(id))
+    const nextPaneIdsByTab: Record<string, string[]> = {}
+    Object.entries(activePaneIndicatorIdsByTab.value).forEach(([tabId, ids]) => {
+      nextPaneIdsByTab[tabId] = ids.filter((id) => validPaneIds.has(id))
+    })
+    activePaneIndicatorIdsByTab.value = nextPaneIdsByTab
+
+    const nextSettingsByTab: Record<string, Record<string, { period: number; sourceField: PriceSource }>> = {}
+    Object.entries(overlayIndicatorSettingsByTab.value).forEach(([tabId, settingsMap]) => {
+      const filteredEntries = Object.entries(settingsMap).filter(([id]) => validOverlayIds.has(id))
+      nextSettingsByTab[tabId] = Object.fromEntries(filteredEntries)
+    })
+    overlayIndicatorSettingsByTab.value = nextSettingsByTab
+    syncIndicatorPanesForActiveTab()
+  } catch (err) {
+    indicatorRegistryError.value = err instanceof Error ? err.message : 'Failed to load indicators'
+  } finally {
+    indicatorRegistryLoading.value = false
+  }
+}
+
+async function createIndicator() {
+  indicatorCreateSubmitting.value = true
+  indicatorCreateError.value = ''
+  try {
+    const payload = {
+      label: newIndicatorForm.value.label.trim(),
+      kind: newIndicatorForm.value.kind,
+      engine: newIndicatorForm.value.engine,
+      period: Number(newIndicatorForm.value.period),
+      sourceField: newIndicatorForm.value.sourceField
+    }
+    const res = await authFetch('/api/indicators', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    const json = await res.json()
+    if (!res.ok) throw new Error(json?.detail || 'Failed to save indicator')
+
+    const created = json?.data as IndicatorDefinition
+    indicatorRegistry.value = [...indicatorRegistry.value, created]
+    if (created.kind === 'overlay') {
+      ensureOverlayIndicatorSettings(created)
+      activeOverlayIndicatorIds.value = [
+        ...activeOverlayIndicatorIds.value.filter((id) => id !== 'overlay-none'),
+        created.id
+      ]
+    } else {
+      activePaneIndicatorIds.value = [...activePaneIndicatorIds.value, created.id]
+    }
+    newIndicatorForm.value = {
+      label: '',
+      kind: 'pane',
+      engine: 'rsi',
+      period: 14,
+      sourceField: 'close'
+    }
+    showIndicatorCreateForm.value = false
+  } catch (err) {
+    indicatorCreateError.value = err instanceof Error ? err.message : 'Failed to save indicator'
+  } finally {
+    indicatorCreateSubmitting.value = false
+  }
+}
+
+async function deleteIndicator(indicatorId: string) {
+  try {
+    const res = await authFetch(`/api/indicators/${encodeURIComponent(indicatorId)}`, { method: 'DELETE' })
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}))
+      throw new Error(json?.detail || 'Failed to delete indicator')
+    }
+    indicatorRegistry.value = indicatorRegistry.value.filter((item) => item.id !== indicatorId)
+    if (overlayIndicatorSettingsById.value[indicatorId]) {
+      const nextSettings = { ...overlayIndicatorSettingsById.value }
+      delete nextSettings[indicatorId]
+      overlayIndicatorSettingsById.value = nextSettings
+    }
+    if (activeOverlayIndicatorIds.value.includes(indicatorId)) {
+      const next = activeOverlayIndicatorIds.value.filter((id) => id !== indicatorId)
+      activeOverlayIndicatorIds.value = next.length ? next : ['overlay-none']
+    }
+    if (activePaneIndicatorIds.value.includes(indicatorId)) {
+      activePaneIndicatorIds.value = activePaneIndicatorIds.value.filter((id) => id !== indicatorId)
+    }
+  } catch (err) {
+    indicatorRegistryError.value = err instanceof Error ? err.message : 'Failed to delete indicator'
+  }
+}
 
 // ===== RESIZABLE PANES STATE =====
 // Store pane heights by tab and pane id: { [tabId]: { [paneId]: height } }
@@ -1390,6 +2214,20 @@ const searchInput = ref<HTMLInputElement | null>(null)
 const allSymbols = ref<SymbolItem[]>([])
 const loadingSymbols = ref(false)
 const symbolMetaLookup = computed(() => new Map(allSymbols.value.map((s) => [s.symbol, s])))
+let symbolSearchTimer: ReturnType<typeof window.setTimeout> | null = null
+const yahooModeSnapshot = ref<null | {
+  selectedSymbols: string[]
+  extraPanes: PaneState[]
+  hiddenSeries: string[]
+  legendColors: Record<string, string>
+  legendNames: Record<string, string>
+  activeOverlayIndicatorIds: string[]
+  activePaneIndicatorIds: string[]
+  overlayIndicatorSettings: Record<string, { period: number; sourceField: PriceSource }>
+  timeframe: typeof timeframe.value
+  interval: typeof interval.value
+  chartType: typeof chartType.value
+}>(null)
 
 function buildSymbolMeta(symbols: string[]) {
   const meta: Record<string, { name: string; description: string; unit?: string }> = {}
@@ -1403,6 +2241,97 @@ function buildSymbolMeta(symbols: string[]) {
 }
 
 const selectedSymbolMeta = computed(() => buildSymbolMeta(allPaneSymbols.value))
+const searchModalLabel = computed(() => {
+  if (sourceMode.value === 'research') return 'Research Symbol Search'
+  if (sourceMode.value === 'economy') return 'Economic Data Search'
+  return 'Yahoo Symbol Search'
+})
+const searchPlaceholder = computed(() => {
+  if (sourceMode.value === 'research') return 'Cari dataset research, contoh EURUSD...'
+  if (sourceMode.value === 'economy') return 'Cari data ekonomi, contoh JTRGDPGFY, JTCS, JTUFY...'
+  return 'Cari ticker Yahoo, contoh BBCA.JK, AAPL, BTC-USD...'
+})
+
+function captureYahooModeSnapshot() {
+  yahooModeSnapshot.value = {
+    selectedSymbols: [...selectedSymbols.value],
+    extraPanes: activeExtraPanes.value.map((pane) => ({ ...pane, symbols: [...pane.symbols] })),
+    hiddenSeries: Array.from(hiddenSeries.value),
+    legendColors: { ...legendColors.value },
+    legendNames: { ...legendNames.value },
+    activeOverlayIndicatorIds: [...activeOverlayIndicatorIds.value],
+    activePaneIndicatorIds: [...activePaneIndicatorIds.value],
+    overlayIndicatorSettings: { ...overlayIndicatorSettingsById.value },
+    timeframe: timeframe.value,
+    interval: interval.value,
+    chartType: chartType.value
+  }
+}
+
+function applyResearchModeDefaults() {
+  if (!categoryTabs.value.length) {
+    addCategoryTab('all', false)
+  }
+  selectedSymbols.value = ['EURUSD']
+  hiddenSeries.value = new Set()
+  legendColors.value = {}
+  legendNames.value = {}
+  activeOverlayIndicatorIds.value = ['overlay-pred-lstm']
+  activePaneIndicatorIds.value = []
+  overlayIndicatorSettingsById.value = {}
+  chartType.value = 'candlestick'
+  timeframe.value = '6M'
+  interval.value = '4h'
+
+  const activeId = activeCategoryTabId.value
+  if (activeId) {
+    extraPanesByTab.value = { ...extraPanesByTab.value, [activeId]: [] }
+  }
+}
+
+function applyEconomyModeDefaults() {
+  if (!categoryTabs.value.length) {
+    addCategoryTab('all', false)
+  }
+  selectedSymbols.value = ['JTRGDPGFY']
+  hiddenSeries.value = new Set()
+  legendColors.value = {}
+  legendNames.value = {}
+  activeOverlayIndicatorIds.value = ['overlay-none']
+  activePaneIndicatorIds.value = []
+  overlayIndicatorSettingsById.value = {}
+  chartType.value = 'line'
+  timeframe.value = 'ALL'
+  interval.value = '1Y'
+
+  const activeId = activeCategoryTabId.value
+  if (activeId) {
+    extraPanesByTab.value = { ...extraPanesByTab.value, [activeId]: [] }
+  }
+}
+
+function restoreYahooModeSnapshot() {
+  const snapshot = yahooModeSnapshot.value
+  if (!snapshot) return
+  selectedSymbols.value = [...snapshot.selectedSymbols]
+  hiddenSeries.value = new Set(snapshot.hiddenSeries)
+  legendColors.value = { ...snapshot.legendColors }
+  legendNames.value = { ...snapshot.legendNames }
+  activeOverlayIndicatorIds.value = [...snapshot.activeOverlayIndicatorIds]
+  activePaneIndicatorIds.value = [...snapshot.activePaneIndicatorIds]
+  overlayIndicatorSettingsById.value = { ...snapshot.overlayIndicatorSettings }
+  timeframe.value = snapshot.timeframe
+  interval.value = snapshot.interval
+  chartType.value = snapshot.chartType
+
+  const activeId = activeCategoryTabId.value
+  if (activeId) {
+    extraPanesByTab.value = {
+      ...extraPanesByTab.value,
+      [activeId]: snapshot.extraPanes.map((pane) => ({ ...pane, symbols: [...pane.symbols] }))
+    }
+  }
+}
 
 // Go to page (for navigation menu)
 function goToPage(page: string) {
@@ -1471,7 +2400,7 @@ function getLegendDescription(symbol: string): string {
 function getSymbolUnit(symbol: string): string {
   const meta = selectedSymbolMeta.value[symbol]
   if (meta?.unit) return meta.unit
-  return symbol.endsWith('-N') ? 'Rp' : 'Dokumen'
+  return symbol.endsWith('.JK') ? 'Rp' : 'Price'
 }
 
 function updateLegendName(symbol: string, name: string) {
@@ -1510,12 +2439,18 @@ const filteredSymbols = computed(() => {
 
 type CategoryValue = 'all' | 'dokumen' | 'nilai'
 type CategoryTab = { id: string; label: string; category: CategoryValue }
-type PaneState = { id: string; symbols: string[] }
+type PaneState = {
+  id: string
+  symbols: string[]
+  mode?: 'symbol' | 'indicator'
+  indicatorId?: string
+  indicatorEngine?: 'rsi' | 'macd' | 'stoch' | 'volume'
+  indicatorPeriod?: number
+}
 
 const categoryOptions: { value: CategoryValue; label: string }[] = [
   { value: 'all', label: 'All' },
-  { value: 'dokumen', label: 'Dokumen' },
-  { value: 'nilai', label: 'Nilai' }
+  { value: 'nilai', label: 'Market' }
 ]
 
 const categoryTabs = ref<CategoryTab[]>([])
@@ -1538,7 +2473,7 @@ watch(activeCategoryTabId, (next, prev) => {
   nextTick(() => {
     initializePaneHeights()
   })
-  if (prev) {
+  if (prev && sourceMode.value === 'yahoo') {
     selectedSymbolsByTab.value = {
       ...selectedSymbolsByTab.value,
       [prev]: [...selectedSymbols.value]
@@ -1555,25 +2490,66 @@ watch(activeCategoryTabId, (next, prev) => {
       ...legendNamesByTab.value,
       [prev]: { ...legendNames.value }
     }
+    activeOverlayIndicatorIdsByTab.value = {
+      ...activeOverlayIndicatorIdsByTab.value,
+      [prev]: [...activeOverlayIndicatorIds.value]
+    }
+    activePaneIndicatorIdsByTab.value = {
+      ...activePaneIndicatorIdsByTab.value,
+      [prev]: [...activePaneIndicatorIds.value]
+    }
+    overlayIndicatorSettingsByTab.value = {
+      ...overlayIndicatorSettingsByTab.value,
+      [prev]: { ...overlayIndicatorSettingsById.value }
+    }
   }
   if (next) {
-    selectedSymbols.value = [...(selectedSymbolsByTab.value[next] || [])]
-    hiddenSeries.value = new Set(hiddenSeriesByTab.value[next] || [])
-    legendColors.value = { ...(legendColorsByTab.value[next] || {}) }
-    legendNames.value = { ...(legendNamesByTab.value[next] || {}) }
+    if (sourceMode.value === 'research') {
+      selectedSymbols.value = ['EURUSD']
+      hiddenSeries.value = new Set()
+      legendColors.value = {}
+      legendNames.value = {}
+      activeOverlayIndicatorIds.value = ['overlay-none']
+      activePaneIndicatorIds.value = []
+      overlayIndicatorSettingsById.value = {}
+      extraPanesByTab.value = { ...extraPanesByTab.value, [next]: [] }
+    } else if (sourceMode.value === 'economy') {
+      selectedSymbols.value = ['JTRGDPGFY']
+      hiddenSeries.value = new Set()
+      legendColors.value = {}
+      legendNames.value = {}
+      activeOverlayIndicatorIds.value = ['overlay-none']
+      activePaneIndicatorIds.value = []
+      overlayIndicatorSettingsById.value = {}
+      extraPanesByTab.value = { ...extraPanesByTab.value, [next]: [] }
+    } else {
+      selectedSymbols.value = [...(selectedSymbolsByTab.value[next] || [])]
+      hiddenSeries.value = new Set(hiddenSeriesByTab.value[next] || [])
+      legendColors.value = { ...(legendColorsByTab.value[next] || {}) }
+      legendNames.value = { ...(legendNamesByTab.value[next] || {}) }
+      activeOverlayIndicatorIds.value = [...(activeOverlayIndicatorIdsByTab.value[next] || getDefaultOverlayIndicatorIds())]
+      activePaneIndicatorIds.value = [...(activePaneIndicatorIdsByTab.value[next] || [])]
+      overlayIndicatorSettingsById.value = { ...(overlayIndicatorSettingsByTab.value[next] || {}) }
+    }
     activeLegendSettings.value = null
+    activeOverlaySettingsId.value = null
   } else {
     selectedSymbols.value = []
     hiddenSeries.value = new Set()
     legendColors.value = {}
     legendNames.value = {}
+    activeOverlayIndicatorIds.value = getDefaultOverlayIndicatorIds()
+    activePaneIndicatorIds.value = []
+    overlayIndicatorSettingsById.value = {}
     activeLegendSettings.value = null
+    activeOverlaySettingsId.value = null
   }
   switchingTab.value = false
+  syncIndicatorPanesForActiveTab()
 })
 
 watch(selectedSymbols, (val) => {
-  if (switchingTab.value) return
+  if (switchingTab.value || sourceMode.value !== 'yahoo') return
   const activeId = activeCategoryTabId.value
   if (!activeId) return
   selectedSymbolsByTab.value = {
@@ -1587,10 +2563,11 @@ watch(selectedSymbols, (val) => {
       clearYAxisOverrides(activeId)
     }
   }
+  syncIndicatorPanesForActiveTab()
 }, { deep: true })
 
 watch(hiddenSeries, (val) => {
-  if (switchingTab.value) return
+  if (switchingTab.value || sourceMode.value !== 'yahoo') return
   const activeId = activeCategoryTabId.value
   if (!activeId) return
   hiddenSeriesByTab.value = {
@@ -1599,8 +2576,38 @@ watch(hiddenSeries, (val) => {
   }
 }, { deep: true })
 
+watch(activeOverlayIndicatorIds, (val) => {
+  if (switchingTab.value || sourceMode.value !== 'yahoo') return
+  const activeId = activeCategoryTabId.value
+  if (!activeId) return
+  activeOverlayIndicatorIdsByTab.value = {
+    ...activeOverlayIndicatorIdsByTab.value,
+    [activeId]: [...val]
+  }
+}, { deep: true })
+
+watch(activePaneIndicatorIds, (val) => {
+  if (switchingTab.value || sourceMode.value !== 'yahoo') return
+  const activeId = activeCategoryTabId.value
+  if (!activeId) return
+  activePaneIndicatorIdsByTab.value = {
+    ...activePaneIndicatorIdsByTab.value,
+    [activeId]: [...val]
+  }
+}, { deep: true })
+
+watch(overlayIndicatorSettingsById, (val) => {
+  if (switchingTab.value || sourceMode.value !== 'yahoo') return
+  const activeId = activeCategoryTabId.value
+  if (!activeId) return
+  overlayIndicatorSettingsByTab.value = {
+    ...overlayIndicatorSettingsByTab.value,
+    [activeId]: { ...val }
+  }
+}, { deep: true })
+
 watch(legendColors, (val) => {
-  if (switchingTab.value) return
+  if (switchingTab.value || sourceMode.value !== 'yahoo') return
   const activeId = activeCategoryTabId.value
   if (!activeId) return
   legendColorsByTab.value = {
@@ -1610,7 +2617,7 @@ watch(legendColors, (val) => {
 }, { deep: true })
 
 watch(legendNames, (val) => {
-  if (switchingTab.value) return
+  if (switchingTab.value || sourceMode.value !== 'yahoo') return
   const activeId = activeCategoryTabId.value
   if (!activeId) return
   legendNamesByTab.value = {
@@ -1619,8 +2626,35 @@ watch(legendNames, (val) => {
   }
 }, { deep: true })
 
-watch([periodType, year, rawMode, cumulative, sumberDana, kategoriPlant, normalize, logScale], () => {
+watch([periodType, year, rawMode, cumulative, sumberDana, kategoriPlant], () => {
   clearYAxisOverrides()
+})
+
+watch(sourceMode, async (next, previous) => {
+  if (next === previous) return
+  if (previous === 'yahoo' && next !== 'yahoo') {
+    captureYahooModeSnapshot()
+  }
+  if (next === 'research') {
+    applyResearchModeDefaults()
+  } else if (next === 'economy') {
+    applyEconomyModeDefaults()
+  } else if (next === 'yahoo' && previous !== 'yahoo') {
+    restoreYahooModeSnapshot()
+  }
+  closeSearchModal()
+  clearYAxisOverrides()
+  await loadSymbols()
+})
+
+watch(sourceMode, (mode) => {
+  if (mode === 'research' && chartType.value !== 'candlestick') {
+    chartType.value = 'candlestick'
+  }
+})
+
+watch([activePaneIndicatorIds, activeCategoryTabId], () => {
+  syncIndicatorPanesForActiveTab()
 })
 
 // Watch for pane changes and initialize heights
@@ -1640,6 +2674,9 @@ function addCategoryTab(category: CategoryValue, openSearch = false) {
   legendColorsByTab.value = { ...legendColorsByTab.value, [id]: {} }
   legendNamesByTab.value = { ...legendNamesByTab.value, [id]: {} }
   extraPanesByTab.value = { ...extraPanesByTab.value, [id]: [] }
+  activeOverlayIndicatorIdsByTab.value = { ...activeOverlayIndicatorIdsByTab.value, [id]: getDefaultOverlayIndicatorIds() }
+  activePaneIndicatorIdsByTab.value = { ...activePaneIndicatorIdsByTab.value, [id]: [] }
+  overlayIndicatorSettingsByTab.value = { ...overlayIndicatorSettingsByTab.value, [id]: {} }
   activeCategoryTabId.value = id
   if (openSearch) {
     openSearchModal()
@@ -1659,6 +2696,9 @@ function closeCategoryTab(tabId: string) {
   const { [tabId]: _yo, ...restYo } = yAxisOverrideByTab.value
   const { [tabId]: _ys, ...restYs } = yAxisBySymbolOverrideByTab.value
   const { [tabId]: _panes, ...restPanes } = extraPanesByTab.value
+  const { [tabId]: _overlayIds, ...restOverlayIds } = activeOverlayIndicatorIdsByTab.value
+  const { [tabId]: _paneIds, ...restPaneIds } = activePaneIndicatorIdsByTab.value
+  const { [tabId]: _overlaySettings, ...restOverlaySettings } = overlayIndicatorSettingsByTab.value
   selectedSymbolsByTab.value = restSel
   hiddenSeriesByTab.value = restHid
   legendColorsByTab.value = restLc
@@ -1666,6 +2706,9 @@ function closeCategoryTab(tabId: string) {
   yAxisOverrideByTab.value = restYo
   yAxisBySymbolOverrideByTab.value = restYs
   extraPanesByTab.value = restPanes
+  activeOverlayIndicatorIdsByTab.value = restOverlayIds
+  activePaneIndicatorIdsByTab.value = restPaneIds
+  overlayIndicatorSettingsByTab.value = restOverlaySettings
 
   if (wasActive) {
     const nextTab = categoryTabs.value[idx] || categoryTabs.value[idx - 1] || null
@@ -1744,7 +2787,7 @@ function addPaneForSymbol(symbol: string) {
   const cleaned = panes
     .map((pane) => ({ ...pane, symbols: pane.symbols.filter((s) => s !== symbol) }))
     .filter((pane) => pane.symbols.length > 0)
-  const newPane: PaneState = { id: `pane-${Date.now()}`, symbols: [symbol] }
+  const newPane: PaneState = { id: `pane-${Date.now()}`, symbols: [symbol], mode: 'symbol' }
   
   // Calculate total pane count: main (1) + existing extra panes (cleaned) + new pane (1)
   const totalPaneCount = 1 + cleaned.length + 1
@@ -1769,6 +2812,102 @@ function addPaneForSymbol(symbol: string) {
   // Update both the panes and heights in a single operation
   extraPanesByTab.value = { ...extraPanesByTab.value, [activeId]: [...cleaned, newPane] }
   paneHeightsByTab.value = { ...paneHeightsByTab.value, [activeId]: newHeights }
+}
+
+function buildBalancedPaneHeights(
+  panes: Array<{ id: string; isMain?: boolean }>,
+  totalHeight: number
+): Record<string, number> {
+  if (!panes.length) return {}
+  const safeTotal = Math.max(450, totalHeight)
+  const weights = panes.map((pane) => (pane.id === 'main' || pane.isMain ? 1.8 : 1))
+  const totalWeight = weights.reduce((sum, value) => sum + value, 0)
+  const heights = panes.map((pane, index) => ({
+    id: pane.id,
+    height: Math.max(MIN_PANE_HEIGHT, Math.floor((safeTotal * weights[index]) / Math.max(totalWeight, 1)))
+  }))
+  let used = heights.reduce((sum, pane) => sum + pane.height, 0)
+
+  while (used > safeTotal) {
+    const shrinkTarget = heights
+      .filter((pane) => pane.height > MIN_PANE_HEIGHT)
+      .sort((a, b) => b.height - a.height)[0]
+    if (!shrinkTarget) break
+    shrinkTarget.height -= 1
+    used -= 1
+  }
+
+  while (used < safeTotal) {
+    const growTarget = heights
+      .slice()
+      .sort((a, b) => {
+        if (a.id === 'main') return -1
+        if (b.id === 'main') return 1
+        return a.height - b.height
+      })[0]
+    if (!growTarget) break
+    growTarget.height += 1
+    used += 1
+  }
+
+  return Object.fromEntries(heights.map((pane) => [pane.id, pane.height]))
+}
+
+function syncIndicatorPanesForActiveTab() {
+  const activeId = activeCategoryTabId.value
+  if (!activeId) return
+  const panes = extraPanesByTab.value[activeId] || []
+  const sourceSymbol = selectedSymbols.value[0] || panes.find((pane) => pane.mode !== 'indicator')?.symbols[0]
+  const indicators = activePaneIndicators.value
+
+  if (!sourceSymbol || !indicators.length) {
+    const nextPanes = panes.filter((p) => p.mode !== 'indicator')
+    if (nextPanes.length !== panes.length) {
+      extraPanesByTab.value = { ...extraPanesByTab.value, [activeId]: nextPanes }
+      const totalHeight = Math.max(450, chartViewportHeight.value)
+      const nextHeights = buildBalancedPaneHeights(
+        [{ id: 'main', isMain: true }, ...nextPanes.map((pane) => ({ id: pane.id }))],
+        totalHeight
+      )
+      paneHeightsByTab.value = { ...paneHeightsByTab.value, [activeId]: nextHeights }
+    }
+    const nextPaneData = { ...paneDataById.value }
+    Object.keys(nextPaneData).forEach((key) => {
+      if (key.startsWith('pane-indicator-')) delete nextPaneData[key]
+    })
+    paneDataById.value = nextPaneData
+    return
+  }
+
+  const nonIndicatorPanes = panes.filter((p) => p.mode !== 'indicator')
+  const indicatorPanes: PaneState[] = indicators.map((indicator) => ({
+    id: `pane-indicator-${indicator.id}`,
+    symbols: [sourceSymbol],
+    mode: 'indicator',
+    indicatorId: indicator.id,
+    indicatorEngine: indicator.engine as 'rsi' | 'macd' | 'stoch' | 'volume',
+    indicatorPeriod: indicator.period
+  }))
+  extraPanesByTab.value = { ...extraPanesByTab.value, [activeId]: [...nonIndicatorPanes, ...indicatorPanes] }
+
+  const totalHeight = Math.max(450, chartViewportHeight.value)
+  const nextHeights = buildBalancedPaneHeights(
+    [
+      { id: 'main', isMain: true },
+      ...nonIndicatorPanes.map((pane) => ({ id: pane.id })),
+      ...indicatorPanes.map((pane) => ({ id: pane.id }))
+    ],
+    totalHeight
+  )
+  paneHeightsByTab.value = { ...paneHeightsByTab.value, [activeId]: nextHeights }
+
+  const nextPaneData = { ...paneDataById.value }
+  Object.keys(nextPaneData).forEach((key) => {
+    if (key.startsWith('pane-indicator-') && !indicatorPanes.some((pane) => pane.id === key)) {
+      delete nextPaneData[key]
+    }
+  })
+  paneDataById.value = nextPaneData
 }
 
 // Select symbol with scale option
@@ -1797,7 +2936,7 @@ function selectSymbolWithScale(sym: SymbolItem, scaleMode: ScaleMode) {
     }
 
     if (scaleMode === 'percent') {
-      console.log(`Added ${sym.symbol} with Same % scale (normalized)`)
+      console.log(`Added ${sym.symbol} with same scale`)
     } else if (scaleMode === 'scale') {
       console.log(`Added ${sym.symbol} with New price scale`)
     }
@@ -1823,7 +2962,13 @@ function selectSymbolWithScale(sym: SymbolItem, scaleMode: ScaleMode) {
 async function loadSymbols() {
   loadingSymbols.value = true
   try {
-    const res = await authFetch('/api/procurement/symbols')
+    const endpoint =
+      sourceMode.value === 'research'
+        ? '/api/research/symbols'
+        : sourceMode.value === 'economy'
+          ? '/api/economy/symbols'
+          : '/api/procurement/symbols'
+    const res = await authFetch(endpoint)
     if (!res.ok) {
       throw new Error(`HTTP ${res.status}: ${res.statusText}`)
     }
@@ -1833,6 +2978,36 @@ async function loadSymbols() {
     }
   } catch (err) {
     console.error('Failed to load symbols:', err)
+  } finally {
+    loadingSymbols.value = false
+  }
+}
+
+async function searchRemoteSymbols(query: string) {
+  const trimmed = query.trim()
+  if (trimmed.length < 2) return
+
+  loadingSymbols.value = true
+  try {
+    const endpoint =
+      sourceMode.value === 'research'
+        ? '/api/research/search'
+        : sourceMode.value === 'economy'
+          ? '/api/economy/search'
+          : '/api/procurement/search'
+    const res = await authFetch(`${endpoint}?q=${encodeURIComponent(trimmed)}&limit=25`)
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`)
+    }
+    const json = await res.json()
+    if (json.status === 'success') {
+      const merged = new Map<string, SymbolItem>()
+      allSymbols.value.forEach((item) => merged.set(item.symbol, item))
+      ;(json.data || []).forEach((item: SymbolItem) => merged.set(item.symbol, item))
+      allSymbols.value = Array.from(merged.values())
+    }
+  } catch (err) {
+    console.error('Failed to search symbols:', err)
   } finally {
     loadingSymbols.value = false
   }
@@ -1925,6 +3100,13 @@ function closeSearchModal() {
 
 function handleDocumentClick(event: MouseEvent) {
   const target = event.target as Node
+  if (indicatorMenuOpen.value) {
+    const menuEl = document.querySelector('.tv-indicator-menu')
+    const btnEl = indicatorButtonRef.value
+    if (menuEl && menuEl.contains(target)) return
+    if (btnEl && btnEl.contains(target)) return
+    indicatorMenuOpen.value = false
+  }
   if (activeTabSettingsId.value) {
     const settingsEl = document.querySelector('.tv-tab-settings')
     const cogEl = document.querySelector('.tv-category-cog')
@@ -1932,22 +3114,14 @@ function handleDocumentClick(event: MouseEvent) {
     if (cogEl && cogEl.contains(target)) return
     closeTabSettings()
   }
-  if (periodMenuOpen.value) {
-    const dropdown = periodDropdownRef.value
-    if (!dropdown || !dropdown.contains(target)) {
-      periodMenuOpen.value = false
-    }
-  }
-  if (chartTypeMenuOpen.value) {
-    const dropdown = chartTypeDropdownRef.value
-    if (!dropdown || !dropdown.contains(target)) {
-      chartTypeMenuOpen.value = false
-    }
-  }
 }
 
-// Filter symbols (no-op, computed handles it)
-function filterSymbols() {}
+function filterSymbols() {
+  if (symbolSearchTimer) window.clearTimeout(symbolSearchTimer)
+  symbolSearchTimer = window.setTimeout(() => {
+    searchRemoteSymbols(searchQuery.value)
+  }, 300)
+}
 
 // Handle data loaded
 function onDataLoaded(data: Record<string, any[]>) {
@@ -1966,22 +3140,13 @@ function onDataLoaded(data: Record<string, any[]>) {
         symbolBounds[symbol] = { min: undefined, max: undefined }
         return
       }
-      let seriesVals = values.map((d: any) => d.close).filter((v: any) => typeof v === 'number')
-      if (normalize.value && seriesVals.length) {
-        const firstVal = seriesVals[0]
-        if (firstVal > 0) {
-          seriesVals = seriesVals.map((v: number) => (v / firstVal) * 100)
-        }
-      }
+      const seriesVals = values.map((d: any) => d.close).filter((v: any) => typeof v === 'number')
       if (!seriesVals.length) {
         symbolBounds[symbol] = { min: undefined, max: undefined }
         return
       }
       let minVal = Math.min(...seriesVals)
       let maxVal = Math.max(...seriesVals)
-      if (logScale.value) {
-        minVal = Math.max(minVal, 1)
-      }
       const range = Math.max(maxVal - minVal, 1)
       const pad = range * 0.05
       const paddedMin = minVal >= 0 ? Math.max(0, minVal - pad) : minVal - pad
@@ -1992,9 +3157,6 @@ function onDataLoaded(data: Record<string, any[]>) {
     if (allValues.length) {
       let minVal = Math.min(...allValues)
       let maxVal = Math.max(...allValues)
-      if (logScale.value) {
-        minVal = Math.max(minVal, 1)
-      }
       const range = Math.max(maxVal - minVal, 1)
       const pad = range * 0.05
       const paddedMin = minVal >= 0 ? Math.max(0, minVal - pad) : minVal - pad
@@ -2022,23 +3184,46 @@ function onDataLoaded(data: Record<string, any[]>) {
     if (!values.length) return
 
     const closes = values.map((d: any) => d.close)
-    const total = closes.reduce((a: number, b: number) => a + b, 0)
-    const unit = getSymbolUnit(symbol)
-    totalByUnit[unit] = (totalByUnit[unit] || 0) + total
-
     let latestIdx = closes.length - 1
     while (latestIdx >= 0 && closes[latestIdx] === 0) {
       latestIdx -= 1
     }
     if (latestIdx < 0) latestIdx = closes.length - 1
 
+    const unit = getSymbolUnit(symbol)
     const latest = closes[latestIdx]
-    const latestDate = new Date(values[latestIdx].time * 1000).toLocaleDateString('id-ID')
+    const latestRow = values[latestIdx] || {}
+    let previousIdx = latestIdx - 1
+    while (previousIdx >= 0 && (closes[previousIdx] === 0 || closes[previousIdx] === null || closes[previousIdx] === undefined)) {
+      previousIdx -= 1
+    }
+    const previous = previousIdx >= 0 ? closes[previousIdx] : latest
+    const change = latest - previous
+    const changePct = previous ? (change / previous) * 100 : 0
+    totalByUnit[unit] = (totalByUnit[unit] || 0) + latest
+    const latestTimestamp = Number(latestRow.time || 0)
+    const latestDate = latestTimestamp
+      ? new Date(latestTimestamp * 1000).toLocaleString('id-ID', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+      : '--'
 
     seriesSummaries.push({
       symbol,
-      total,
+      total: latest,
       latest,
+      previous,
+      change,
+      changePct,
+      open: Number(latestRow.open),
+      high: Number(latestRow.high),
+      low: Number(latestRow.low),
+      volume: Number(latestRow.volume),
+      latestTimestamp,
       latestDate,
       color: getLegendColor(symbol, index),
       unit
@@ -2086,30 +3271,54 @@ function onChartError(msg: string) {
 }
 
 // Format number
-const currencyShortId = new Intl.NumberFormat('id-ID', {
+const currencyId = new Intl.NumberFormat('id-ID', {
   style: 'currency',
   currency: 'IDR',
-  notation: 'compact',
-  compactDisplay: 'short',
-  maximumFractionDigits: 1
+  maximumFractionDigits: 2
 })
 
-const numberShortId = new Intl.NumberFormat('id-ID', {
-  maximumFractionDigits: 1
+const numberId = new Intl.NumberFormat('id-ID', {
+  maximumFractionDigits: 4
 })
 
-function formatCountShort(val: number): string {
-  if (val === undefined || val === null || Number.isNaN(val)) return '--'
-  if (val >= 1e9) return (val / 1e9).toFixed(1) + 'B'
-  if (val >= 1e6) return (val / 1e6).toFixed(1) + 'M'
-  if (val >= 1e3) return (val / 1e3).toFixed(0) + 'K'
-  return val.toFixed(0)
+const currencyByUnit: Record<string, string> = {
+  Rp: 'IDR',
+  IDR: 'IDR',
+  USD: 'USD',
+  EUR: 'EUR',
+  JPY: 'JPY',
+  GBP: 'GBP',
+  AUD: 'AUD',
+  CAD: 'CAD',
+  CHF: 'CHF',
+  NZD: 'NZD'
 }
 
 function formatValue(val: number | undefined, unit: string): string {
   if (val === undefined || val === null || Number.isNaN(val)) return '--'
-  if (unit === 'Rp') return currencyShortId.format(val)
-  return formatCountShort(val)
+  if (unit === 'Rp' || unit === 'IDR') return currencyId.format(val)
+  const currencyCode = currencyByUnit[unit]
+  if (currencyCode) {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currencyCode,
+      maximumFractionDigits: currencyCode === 'JPY' ? 2 : 4
+    }).format(val)
+  }
+  return numberId.format(val)
+}
+
+function formatSignedValue(val: number | undefined, unit: string): string {
+  if (val === undefined || val === null || Number.isNaN(val)) return '--'
+  const abs = Math.abs(val)
+  const sign = val >= 0 ? '+' : '-'
+  return `${sign}${formatValue(abs, unit)}`
+}
+
+function formatPercent(val: number | undefined): string {
+  if (val === undefined || val === null || Number.isNaN(val)) return '--'
+  const sign = val >= 0 ? '+' : '-'
+  return `${sign}${Math.abs(val).toFixed(2)}%`
 }
 
 // Handle resize
@@ -2138,12 +3347,24 @@ function computePanelStyle(btnEl: HTMLElement | null): Record<string, string> {
   if (!btnEl || !chartAreaRef.value) return {}
   const areaRect = chartAreaRef.value.getBoundingClientRect()
   const btnRect = btnEl.getBoundingClientRect()
-  const top = btnRect.top - areaRect.top + btnRect.height / 2
-  const right = areaRect.right - btnRect.left + 10
+  const top = Math.max(16, btnRect.top - areaRect.top - 6)
+  const right = areaRect.right - btnRect.left + 14
   return {
     top: `${top}px`,
-    right: `${right}px`,
-    transform: 'translateY(-50%)'
+    right: `${right}px`
+  }
+}
+
+function computeLayersDrawerStyle(): Record<string, string> {
+  if (!chartAreaRef.value) return {}
+  const areaRect = chartAreaRef.value.getBoundingClientRect()
+  const panelWidth = Math.min(460, Math.max(360, Math.round(areaRect.width * 0.34)))
+  const maxWidth = Math.max(320, areaRect.width - 104)
+  return {
+    top: '16px',
+    right: '72px',
+    bottom: '16px',
+    width: `${Math.min(panelWidth, maxWidth)}px`
   }
 }
 
@@ -2152,7 +3373,7 @@ function updatePanelPositions() {
     objectTreePanelStyle.value = computePanelStyle(objectTreeBtnRef.value)
   }
   if (showLayersPanel.value) {
-    layersPanelStyle.value = computePanelStyle(layersBtnRef.value)
+    layersPanelStyle.value = computeLayersDrawerStyle()
   }
 }
 
@@ -2242,16 +3463,23 @@ function saveState() {
       hiddenSeriesByTab: hiddenSeriesByTab.value,
         legendColorsByTab: legendColorsByTab.value,
         legendNamesByTab: legendNamesByTab.value,
-        yAxisOverrideByTab: yAxisOverrideByTab.value,
-        yAxisBySymbolOverrideByTab: yAxisBySymbolOverrideByTab.value,
-        extraPanesByTab: extraPanesByTab.value,
-        paneHeightsByTab: paneHeightsByTab.value,
-        selectedSymbols: selectedSymbols.value,
+      yAxisOverrideByTab: yAxisOverrideByTab.value,
+      yAxisBySymbolOverrideByTab: yAxisBySymbolOverrideByTab.value,
+      extraPanesByTab: extraPanesByTab.value,
+      paneHeightsByTab: paneHeightsByTab.value,
+      activeOverlayIndicatorIdsByTab: activeOverlayIndicatorIdsByTab.value,
+      activePaneIndicatorIdsByTab: activePaneIndicatorIdsByTab.value,
+      overlayIndicatorSettingsByTab: overlayIndicatorSettingsByTab.value,
+      selectedSymbols: selectedSymbols.value,
       chartType: chartType.value,
+      timeframe: timeframe.value,
+      interval: interval.value,
+      activeOverlayIndicatorIds: activeOverlayIndicatorIds.value,
+      overlayIndicatorSettingsById: overlayIndicatorSettingsById.value,
+      activePaneIndicatorIds: activePaneIndicatorIds.value,
       periodType: periodType.value,
+      timezoneOption: timezoneOption.value,
       year: year.value,
-      normalize: normalize.value,
-      logScale: logScale.value,
       rawMode: rawMode.value,
       cumulative: cumulative.value,
       singleScale: singleScale.value,
@@ -2278,12 +3506,67 @@ function restoreState() {
         if (state.yAxisBySymbolOverrideByTab) yAxisBySymbolOverrideByTab.value = state.yAxisBySymbolOverrideByTab
         if (state.extraPanesByTab) extraPanesByTab.value = state.extraPanesByTab
         if (state.paneHeightsByTab) paneHeightsByTab.value = state.paneHeightsByTab
+        if (state.activeOverlayIndicatorIdsByTab) activeOverlayIndicatorIdsByTab.value = state.activeOverlayIndicatorIdsByTab
+        if (state.activePaneIndicatorIdsByTab) activePaneIndicatorIdsByTab.value = state.activePaneIndicatorIdsByTab
+        if (state.overlayIndicatorSettingsByTab) overlayIndicatorSettingsByTab.value = state.overlayIndicatorSettingsByTab
         if (state.selectedSymbols) selectedSymbols.value = state.selectedSymbols
-      if (state.chartType) chartType.value = state.chartType
+      if (state.chartType) {
+        chartType.value = state.chartType === 'ohlc' ? 'candlestick' : state.chartType
+      }
+      if (state.timeframe && isValidRange(state.timeframe)) {
+        timeframe.value = state.timeframe
+      }
+      if (state.interval && isValidInterval(state.interval)) {
+        interval.value = state.interval
+      } else {
+        interval.value = '1D'
+      }
+      if (Array.isArray(state.activeOverlayIndicatorIds)) activeOverlayIndicatorIds.value = state.activeOverlayIndicatorIds
+      if (state.overlayIndicatorSettingsById && typeof state.overlayIndicatorSettingsById === 'object') {
+        overlayIndicatorSettingsById.value = state.overlayIndicatorSettingsById
+      }
+      if (Array.isArray(state.activePaneIndicatorIds)) activePaneIndicatorIds.value = state.activePaneIndicatorIds
+      if (typeof state.selectedOverlayIndicatorId === 'string') activeOverlayIndicatorIds.value = [state.selectedOverlayIndicatorId]
+      if (typeof state.selectedPaneIndicatorId === 'string') {
+        activePaneIndicatorIds.value = [state.selectedPaneIndicatorId]
+      } else if (state.selectedPaneIndicatorId === null) {
+        activePaneIndicatorIds.value = []
+      }
+      if (!state.selectedOverlayIndicatorId && typeof state.movingAveragePreset === 'string') {
+        const legacyMap: Record<string, string> = {
+          none: 'overlay-none',
+          sma20: 'overlay-sma',
+          sma50: 'overlay-sma',
+          ema20: 'overlay-ema',
+          ema50: 'overlay-ema'
+        }
+        activeOverlayIndicatorIds.value = [legacyMap[state.movingAveragePreset] || 'overlay-none']
+      }
+      if (state.selectedPaneIndicatorId === undefined && state.rsiPaneEnabled === true) {
+        activePaneIndicatorIds.value = ['pane-rsi-14']
+      }
+      const activeId = state.activeCategoryTabId
+      if (activeId && !activeOverlayIndicatorIdsByTab.value[activeId]) {
+        activeOverlayIndicatorIdsByTab.value = {
+          ...activeOverlayIndicatorIdsByTab.value,
+          [activeId]: [...activeOverlayIndicatorIds.value]
+        }
+      }
+      if (activeId && !activePaneIndicatorIdsByTab.value[activeId]) {
+        activePaneIndicatorIdsByTab.value = {
+          ...activePaneIndicatorIdsByTab.value,
+          [activeId]: [...activePaneIndicatorIds.value]
+        }
+      }
+      if (activeId && !overlayIndicatorSettingsByTab.value[activeId]) {
+        overlayIndicatorSettingsByTab.value = {
+          ...overlayIndicatorSettingsByTab.value,
+          [activeId]: { ...overlayIndicatorSettingsById.value }
+        }
+      }
       if (state.periodType) periodType.value = state.periodType
+      if (state.timezoneOption) timezoneOption.value = state.timezoneOption
       if (state.year) year.value = state.year
-      if (state.normalize !== undefined) normalize.value = state.normalize
-      if (state.logScale !== undefined) logScale.value = state.logScale
       if (state.rawMode !== undefined) rawMode.value = state.rawMode
       if (state.cumulative !== undefined) cumulative.value = state.cumulative
       if (state.singleScale !== undefined) singleScale.value = state.singleScale
@@ -2297,20 +3580,37 @@ function restoreState() {
 }
 
 // Watch for state changes and save
-watch([categoryTabs, activeCategoryTabId, selectedSymbolsByTab, hiddenSeriesByTab, legendColorsByTab, legendNamesByTab, yAxisOverrideByTab, yAxisBySymbolOverrideByTab, extraPanesByTab, paneHeightsByTab, selectedSymbols, chartType, periodType, year, normalize, logScale, rawMode, cumulative, singleScale, scaleSide, sumberDana, kategoriPlant], saveState, { deep: true })
+watch([categoryTabs, activeCategoryTabId, selectedSymbolsByTab, hiddenSeriesByTab, legendColorsByTab, legendNamesByTab, yAxisOverrideByTab, yAxisBySymbolOverrideByTab, extraPanesByTab, paneHeightsByTab, activeOverlayIndicatorIdsByTab, activePaneIndicatorIdsByTab, overlayIndicatorSettingsByTab, selectedSymbols, chartType, timeframe, interval, activeOverlayIndicatorIds, overlayIndicatorSettingsById, activePaneIndicatorIds, timezoneOption, periodType, year, rawMode, cumulative, singleScale, scaleSide, sumberDana, kategoriPlant], saveState, { deep: true })
 watch([showObjectTree, showLayersPanel], async () => {
   await nextTick()
   updatePanelPositions()
 })
 
+watch(showLayersPanel, (isOpen) => {
+  if (isOpen) {
+    activeLayersTab.value = 'objects'
+  }
+})
+watch(() => newIndicatorForm.value.engine, (engine) => {
+  if (!['rsi', 'stoch'].includes(engine)) {
+    newIndicatorForm.value.engine = 'rsi'
+  }
+  if (!newIndicatorForm.value.period || newIndicatorForm.value.period < 2) {
+    newIndicatorForm.value.period = newIndicatorForm.value.engine === 'stoch' ? 14 : 14
+  }
+})
+
 // Init
 onMounted(() => {
   restoreState() // Restore saved state first
+  loadIndicators()
   loadSymbols()
   nextTick(updateChartViewport)
   nextTick(updatePanelPositions)
   nextTick(() => initializePaneHeights())
   window.addEventListener('resize', handleResize)
+  window.addEventListener('resize', updateIndicatorMenuPosition)
+  window.addEventListener('scroll', updateIndicatorMenuPosition, true)
   window.addEventListener('keydown', handleGlobalShortcuts)
   document.addEventListener('click', handleDocumentClick)
   // Global resize events (mouse + touch)
@@ -2326,6 +3626,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
+  window.removeEventListener('resize', updateIndicatorMenuPosition)
+  window.removeEventListener('scroll', updateIndicatorMenuPosition, true)
   window.removeEventListener('keydown', handleGlobalShortcuts)
   document.removeEventListener('click', handleDocumentClick)
   document.removeEventListener('mousemove', onResizeMove)
@@ -2376,9 +3678,38 @@ onUnmounted(() => {
   justify-content: flex-start;
   min-width: 0;
   gap: 4px;
-  overflow-x: auto;
-  scrollbar-width: none;
+  overflow: visible;
   margin-left: 30px;
+}
+
+.tv-source-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--stroke);
+  border-radius: 999px;
+  background: var(--surface-alt);
+}
+
+.tv-source-switch .tv-btn {
+  border-radius: 999px;
+}
+
+.tv-select-research {
+  min-width: 140px;
+}
+
+.tv-chart-type-lock {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--stroke);
+  border-radius: 4px;
+  background: var(--surface-alt);
+  color: var(--ink);
+  font-size: 12px;
 }
 
 .tv-header-center::-webkit-scrollbar {
@@ -2477,6 +3808,199 @@ onUnmounted(() => {
 .tv-dropdown-item.active {
   background: rgba(41, 98, 255, 0.15);
   color: var(--accent);
+}
+
+.tv-indicator-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.tv-indicator-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 250px;
+  max-width: 280px;
+  padding: 6px;
+  border: 1px solid var(--stroke);
+  border-radius: 6px;
+  background: var(--surface);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+  z-index: 1200;
+  display: grid;
+  gap: 4px;
+}
+
+.tv-indicator-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 2px 6px;
+}
+
+.tv-indicator-storage {
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+
+.tv-indicator-add-btn {
+  border: 1px solid var(--stroke);
+  background: var(--surface-alt);
+  color: var(--ink);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.tv-indicator-loading,
+.tv-indicator-error {
+  font-size: 0.74rem;
+  padding: 4px;
+}
+
+.tv-indicator-error {
+  color: #ef5350;
+}
+
+.tv-indicator-title {
+  font-size: 0.68rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 2px 4px;
+}
+
+.tv-indicator-item {
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tv-indicator-item-main {
+  display: grid;
+  gap: 2px;
+}
+
+.tv-indicator-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tv-indicator-badge {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+}
+
+.tv-indicator-meta {
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+
+.tv-indicator-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tv-indicator-item:hover {
+  background: var(--surface-alt);
+}
+
+.tv-indicator-item.active {
+  background: rgba(41, 98, 255, 0.15);
+  color: var(--accent);
+}
+
+.tv-indicator-delete {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.tv-indicator-settings {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.tv-indicator-settings-panel {
+  display: grid;
+  gap: 8px;
+  margin: 4px 0 6px;
+  padding: 8px;
+  border: 1px solid var(--stroke);
+  border-radius: 6px;
+  background: var(--bg);
+}
+
+.tv-indicator-settings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.tv-indicator-field {
+  display: grid;
+  gap: 4px;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.tv-indicator-form {
+  display: grid;
+  gap: 6px;
+  padding-top: 4px;
+  border-top: 1px solid var(--stroke);
+  margin-top: 4px;
+}
+
+.tv-indicator-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.tv-indicator-input {
+  width: 100%;
+  border: 1px solid var(--stroke);
+  background: var(--bg);
+  color: var(--ink);
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 0.78rem;
+}
+
+.tv-indicator-form-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.tv-select-compact {
+  min-width: 0;
+  width: 100%;
 }
 
 .tv-btn-group-toggle {
@@ -2686,9 +4210,11 @@ onUnmounted(() => {
   border: none;
   background: transparent;
   color: var(--muted);
-  font-size: 0.9rem;
   cursor: pointer;
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .tv-category-close:hover {
@@ -3019,11 +4545,38 @@ onUnmounted(() => {
   border: none;
   background: transparent;
   color: var(--muted);
-  font-size: 1.1rem;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .tv-drawing-close:hover {
+  color: var(--ink);
+}
+
+.search-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.search-modal-close {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.search-modal-close:hover {
+  background: var(--surface-alt);
   color: var(--ink);
 }
 
@@ -3136,6 +4689,8 @@ onUnmounted(() => {
 .tv-chart-canvas {
   flex: 1;
   position: relative;
+  display: flex;
+  flex-direction: column;
   width: 100%;
   height: 100%;
   overflow: hidden;
@@ -3148,21 +4703,19 @@ onUnmounted(() => {
 
 .tv-chart-scroll {
   position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
   width: 100%;
-  height: 100%;
+  height: auto;
   overflow: hidden;
   max-width: 100%;
   max-height: 100%;
   overscroll-behavior: contain;
-  cursor: grab;
+  cursor: default;
   scrollbar-width: none;
-  user-select: none;
-  -webkit-user-select: none;
-  -ms-user-select: none;
-}
-
-.tv-chart-scroll:active {
-  cursor: grabbing;
+  user-select: auto;
+  -webkit-user-select: auto;
+  -ms-user-select: auto;
 }
 
 .tv-chart-scroll::-webkit-scrollbar {
@@ -3173,11 +4726,12 @@ onUnmounted(() => {
 .tv-chart-scroll-inner {
   position: relative;
   min-width: 100%;
-  min-height: 100%;
+  min-height: 0;
   padding: 0;
   box-sizing: border-box;
   width: 100%;
-  height: 100%;
+  height: auto;
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -3370,6 +4924,60 @@ onUnmounted(() => {
   height: 100% !important;
 }
 
+.tv-range-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  min-height: 40px;
+  padding: 6px 10px;
+  border-top: 1px solid var(--stroke);
+  background: var(--surface);
+  z-index: 35;
+  position: relative;
+  flex-wrap: wrap;
+}
+
+.tv-range-preset {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.tv-range-btn {
+  border: 1px solid var(--stroke);
+  background: var(--surface-alt);
+  color: var(--ink);
+  border-radius: 6px;
+  height: 26px;
+  padding: 0 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.tv-range-btn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(41, 98, 255, 0.14);
+}
+
+.tv-range-interval {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 4px;
+}
+
+.tv-range-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.tv-select-interval {
+  min-width: 118px;
+}
+
 .tv-chart-canvas :deep(.apexcharts-canvas) {
   width: 100% !important;
 }
@@ -3487,6 +5095,90 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 3px;
   min-width: 0;
+}
+
+.tv-prediction-legend {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--stroke);
+  display: grid;
+  gap: 6px;
+}
+
+.tv-prediction-legend-title {
+  font-size: 0.66rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.tv-prediction-direction-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.tv-prediction-direction-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.tv-prediction-direction-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+
+.tv-prediction-direction-swatch.is-bull {
+  background: rgba(66, 165, 245, 0.88);
+}
+
+.tv-prediction-direction-swatch.is-bear {
+  background: rgba(255, 112, 67, 0.88);
+}
+
+.tv-prediction-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  transition: opacity 0.15s;
+}
+.tv-prediction-legend-row.is-hidden {
+  opacity: 0.35;
+}
+
+.tv-prediction-legend-badge {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.24);
+}
+.tv-prediction-legend-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.tv-prediction-legend-label {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--ink);
+  flex: 1;
+  min-width: 0;
+}
+
+.tv-prediction-legend-note {
+  font-size: 0.68rem;
+  color: var(--muted);
+  white-space: nowrap;
 }
 
 .tv-legend-row {
@@ -3786,6 +5478,16 @@ onUnmounted(() => {
   color: var(--muted);
 }
 
+.tv-summary-series-metric.is-up {
+  color: #22c55e;
+  font-weight: 600;
+}
+
+.tv-summary-series-metric.is-down {
+  color: #ef4444;
+  font-weight: 600;
+}
+
 /* ============ Legacy Styles (Search Modal, etc.) ============ */
 .series-chips {
   display: flex;
@@ -4032,7 +5734,7 @@ onUnmounted(() => {
   right: 0;
   top: 0;
   bottom: auto;
-  width: 200px;  /* Reduced from 220px */
+  width: 300px;
   transform: none;
   background: color-mix(in srgb, var(--surface) 92%, transparent);
   border: 1px solid var(--stroke);
@@ -4042,13 +5744,18 @@ onUnmounted(() => {
 }
 
 .tv-layers-panel {
-  right: 0;
-  top: 0;
-  bottom: auto;
+  right: 72px;
+  top: 16px;
+  bottom: 16px;
+  width: clamp(360px, 34vw, 460px);
+  max-width: calc(100% - 104px);
+  min-height: min(520px, calc(100% - 32px));
+  display: flex;
+  flex-direction: column;
 }
 
 .tv-layers-panel.is-shifted {
-  right: 0;
+  right: 72px;
 }
 
 .tv-object-tree {
@@ -4070,9 +5777,13 @@ onUnmounted(() => {
   background: none;
   border: none;
   color: var(--muted);
-  font-size: 1.2rem;
   cursor: pointer;
   padding: 0 4px;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .tv-panel-close:hover {
@@ -4080,9 +5791,15 @@ onUnmounted(() => {
 }
 
 .tv-panel-body {
-  padding: 8px;
-  max-height: 250px;
+  padding: 12px;
+  max-height: min(420px, calc(100vh - 180px));
   overflow-y: auto;
+}
+
+.tv-layers-panel .tv-panel-body {
+  flex: 1;
+  max-height: none;
+  min-height: 0;
 }
 
 /* Object Tree Items */
@@ -4131,11 +5848,15 @@ onUnmounted(() => {
   background: none;
   border: none;
   color: var(--muted);
-  font-size: 1rem;
   cursor: pointer;
   padding: 0 4px;
   opacity: 0;
   transition: opacity 0.15s;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .tv-object-item:hover .tv-object-delete {
@@ -4148,7 +5869,43 @@ onUnmounted(() => {
 
 /* Layer Items */
 .tv-layer-section {
-  margin-bottom: 8px;
+  margin-bottom: 12px;
+}
+
+.tv-layer-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+  padding-top: 2px;
+}
+
+.tv-layer-tab {
+  border: 1px solid var(--stroke);
+  background: var(--surface-alt);
+  color: var(--muted);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tv-layer-tab:hover {
+  color: var(--ink);
+  background: var(--hover);
+}
+
+.tv-layer-tab.active {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--stroke));
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+}
+
+.tv-layer-tab-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .tv-layer-title {
@@ -4182,7 +5939,13 @@ onUnmounted(() => {
 }
 
 .tv-layer-icon {
-  font-size: 0.9rem;
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
 }
 
 .tv-layer-name {
@@ -4193,11 +5956,15 @@ onUnmounted(() => {
   background: none;
   border: none;
   color: var(--muted);
-  font-size: 1rem;
   cursor: pointer;
   padding: 0 4px;
   opacity: 0;
   transition: opacity 0.15s;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .tv-layer-item:hover .tv-layer-delete {
@@ -4218,5 +5985,77 @@ onUnmounted(() => {
 .tv-layer-item:hover .tv-layer-action {
   opacity: 1;
   color: #ef5350;
+}
+
+.tv-data-window-symbols {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.tv-data-window-symbol-btn {
+  border: 1px solid var(--stroke);
+  background: var(--surface-alt);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.tv-data-window-symbol-btn.active {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--stroke));
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+}
+
+.tv-data-window-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--surface-alt);
+}
+
+.tv-data-window-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--stroke) 80%, transparent);
+  font-size: 0.76rem;
+}
+
+.tv-data-window-row:last-child {
+  border-bottom: none;
+}
+
+.tv-data-window-row span {
+  color: var(--muted);
+}
+
+.tv-data-window-row strong {
+  color: var(--ink);
+  text-align: right;
+}
+
+.tv-layer-tree {
+  margin: 2px 0 8px 24px;
+  padding: 6px 8px;
+  border: 1px solid var(--stroke);
+  border-radius: 6px;
+  background: var(--surface-alt);
+  font-size: 0.72rem;
+  color: var(--muted);
+  display: grid;
+  gap: 3px;
+}
+
+.tv-layer-tree strong {
+  color: var(--ink);
+  font-weight: 600;
 }
 </style>

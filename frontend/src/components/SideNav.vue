@@ -12,7 +12,7 @@
 
     <!-- Icon-only nav links in pill container -->
     <nav class="sn-links">
-      <RouterLink class="sn-link" to="/" exact-active-class="is-active" title="Procurement Charting">
+      <RouterLink class="sn-link" to="/" exact-active-class="is-active" title="Charting">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3 12h18M12 3c3.5 4 3.5 14 0 18M12 3c-3.5 4-3.5 14 0 18" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
       </RouterLink>
       <RouterLink class="sn-link" to="/sources" exact-active-class="is-active" title="Data Sources">
@@ -37,6 +37,9 @@
       <!-- Divider -->
       <div class="sn-divider"></div>
 
+      <RouterLink class="sn-link" to="/research" exact-active-class="is-active" title="Research">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3h18v4H3zM3 9h8v12H3zM13 9h8v5h-8zM13 16h8v5h-8z"/></svg>
+      </RouterLink>
       <RouterLink class="sn-link" to="/dfg" exact-active-class="is-active" title="DFG">
         <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </RouterLink>
